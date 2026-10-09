@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { isValidObjectId } from 'mongoose';
+import { can, type Permission } from '../auth/permissions';
 import { HttpError } from '../errors/http-error';
 import { UserModel, toPublicUser, type PublicUser, type UserRole } from '../models/user.model';
 import { verifyAccessToken, type AccessTokenPayload } from '../utils/jwt';
@@ -49,6 +50,19 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   req.user = toPublicUser(user);
   next();
 };
+
+/** Must run after requireAuth. Responds 403 when the user's role lacks the permission. */
+export function requirePermission(permission: Permission): RequestHandler {
+  return (req, _res, next) => {
+    const user = getAuthenticatedUser(req);
+
+    if (!can(user.role, permission)) {
+      throw new HttpError(403, 'You do not have permission to access this resource');
+    }
+
+    next();
+  };
+}
 
 /** Must run after requireAuth. Responds 403 when the user has none of the given roles. */
 export function requireRole(...roles: UserRole[]): RequestHandler {

@@ -1,4 +1,5 @@
 import type { PipelineStage } from 'mongoose';
+import { can } from '../auth/permissions';
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
@@ -17,12 +18,12 @@ export const RECENT_TICKETS_LIMIT = 5;
 const PENDING_STATUSES: TicketStatus[] = ['aberto', 'em_andamento'];
 
 export interface DashboardSummary {
-  /** "all" for IT, "mine" for requesters (only their own tickets are counted). */
+  /** "all" when the user can see every ticket, "mine" otherwise (only their own tickets are counted). */
   scope: 'all' | 'mine';
   byStatus: Record<TicketStatus, number> & { total: number };
   pendingByPriority: Record<TicketPriority, number>;
   pendingByCategory: Record<TicketCategory, number>;
-  /** IT only. Each number matches the ticket list with the same filters. */
+  /** Only for users who operate tickets. Each number matches the ticket list with the same filters. */
   workload?: {
     /** = GET /tickets?assignee=none */
     unassigned: number;
@@ -56,7 +57,9 @@ function countOf(rows: { count: number }[] | undefined): number {
 }
 
 export async function getDashboardSummary(actor: PublicUser): Promise<DashboardSummary> {
-  const isIt = actor.role === 'ti';
+  const seesAllTickets = can(actor.role, 'tickets:view-all');
+  // The personal workload only makes sense for people who work on tickets.
+  const hasWorkload = can(actor.role, 'tickets:operate');
 
   // Each facet is an independent pipeline that runs over the documents that
   // passed the first $match (the user's scope), all in one database query.
@@ -72,7 +75,7 @@ export async function getDashboardSummary(actor: PublicUser): Promise<DashboardS
     ],
   };
 
-  if (isIt) {
+  if (hasWorkload) {
     // Same filter builder as the list endpoint, so the card and the list agree.
     facets.unassigned = [{ $match: buildTicketFilter({ assignee: 'none' }, actor) }, { $count: 'count' }];
     facets.inProgressAssignedToMe = [
@@ -93,11 +96,11 @@ export async function getDashboardSummary(actor: PublicUser): Promise<DashboardS
   const byStatus = countBy(TICKET_STATUSES, result.byStatus);
 
   return {
-    scope: isIt ? 'all' : 'mine',
+    scope: seesAllTickets ? 'all' : 'mine',
     byStatus: { ...byStatus, total: byStatus.aberto + byStatus.em_andamento + byStatus.resolvido },
     pendingByPriority: countBy(TICKET_PRIORITIES, result.pendingByPriority),
     pendingByCategory: countBy(TICKET_CATEGORIES, result.pendingByCategory),
-    ...(isIt && {
+    ...(hasWorkload && {
       workload: {
         unassigned: countOf(result.unassigned),
         inProgressAssignedToMe: countOf(result.inProgressAssignedToMe),

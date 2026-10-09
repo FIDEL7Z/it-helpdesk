@@ -34,6 +34,7 @@ const listTicketsQuerySchema = z.object({
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   category: z.enum(TICKET_CATEGORIES).optional(),
+  assignee: z.enum(ticketService.ASSIGNEE_FILTERS).optional(),
   search: z
     .string()
     .trim()

@@ -1,0 +1,26 @@
+import { MemoryStore, rateLimit } from 'express-rate-limit';
+
+/** 10 login attempts per IP every 15 minutes (successful or not). */
+export const LOGIN_RATE_LIMIT = {
+  limit: 10,
+  windowMs: 15 * 60 * 1000,
+} as const;
+
+// Counters live in this process's memory: they reset when the server restarts and are
+// not shared between instances. Enough for a single-instance internal app.
+const loginAttemptsStore = new MemoryStore();
+
+/** Slows down password guessing on POST /api/auth/login. Answers 429 when exceeded. */
+export const loginRateLimiter = rateLimit({
+  ...LOGIN_RATE_LIMIT,
+  store: loginAttemptsStore,
+  // Sends the standard RateLimit / RateLimit-Policy / Retry-After headers.
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts. Try again later' },
+});
+
+/** Clears every counter. Used by the tests, which log in many times from the same IP. */
+export function resetLoginRateLimit(): Promise<void> {
+  return loginAttemptsStore.resetAll();
+}

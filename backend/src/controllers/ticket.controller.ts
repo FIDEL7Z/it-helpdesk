@@ -64,3 +64,46 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
 
   res.json({ ticket });
 }
+
+const updateTicketSchema = z
+  .strictObject({
+    title: titleSchema.optional(),
+    description: descriptionSchema.optional(),
+    category: z.enum(TICKET_CATEGORIES).optional(),
+    priority: z.enum(TICKET_PRIORITIES).optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: 'Provide at least one field to update',
+  });
+
+const changeStatusSchema = z.strictObject({
+  status: z.enum(TICKET_STATUSES),
+});
+
+const assignTicketSchema = z.strictObject({
+  assigneeId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid user id'),
+});
+
+export async function updateTicket(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const input = updateTicketSchema.parse(req.body);
+  const ticket = await ticketService.updateTicket(id, input, getAuthenticatedUser(req));
+
+  res.json({ ticket });
+}
+
+export async function changeStatus(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const { status } = changeStatusSchema.parse(req.body);
+  const ticket = await ticketService.changeStatus(id, status, getAuthenticatedUser(req));
+
+  res.json({ ticket });
+}
+
+export async function assignTicket(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const { assigneeId } = assignTicketSchema.parse(req.body);
+  const ticket = await ticketService.assignTicket(id, assigneeId, getAuthenticatedUser(req));
+
+  res.json({ ticket });
+}

@@ -10,8 +10,12 @@ import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
 const app = express();
 
+// Do not advertise the framework in every response.
+app.disable('x-powered-by');
+
 app.use(cors({ origin: env.CORS_ORIGIN }));
-app.use(express.json());
+// Explicit body size limit: the largest valid payload (a ticket description) is ~5 KB.
+app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);

@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   CATEGORY_LABELS,
   PRIORITY_LABELS,
@@ -45,6 +46,7 @@ function validate(title: string, description: string, category: TicketCategory |
 }
 
 export function NewTicketPage() {
+  useDocumentTitle('Abrir chamado')
   const navigate = useNavigate()
 
   const [title, setTitle] = useState('')

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import {
   ASSIGNEE_FILTERS,
@@ -59,6 +60,7 @@ function readCreatedTitle(state: unknown): string | null {
 }
 
 export function TicketsPage() {
+  useDocumentTitle('Chamados')
   const { user } = useAuth()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()

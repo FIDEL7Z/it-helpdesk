@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ApiStatus } from '../components/ApiStatus'
 import { BrandMark } from '../components/BrandMark'
 import { FullPageLoader } from '../components/FullPageLoader'
@@ -55,6 +56,7 @@ function redirectTarget(state: unknown): string {
 }
 
 export function LoginPage() {
+  useDocumentTitle('Entrar')
   const { status, login } = useAuth()
   const location = useLocation()
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import { getDashboardSummary, type DashboardSummary } from '../services/dashboard'
 import {
@@ -22,6 +23,7 @@ type LoadState = {
 const PRIORITY_ORDER: TicketPriority[] = ['alta', 'media', 'baixa']
 
 export function DashboardPage() {
+  useDocumentTitle('Dashboard')
   const { user } = useAuth()
   const [reloadCount, setReloadCount] = useState(0)
   const [state, setState] = useState<LoadState>({ key: -1, summary: null, error: null })

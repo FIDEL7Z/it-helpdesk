@@ -219,8 +219,51 @@ describe('GET /api/tickets (listing, filters and pagination)', () => {
     assert.equal(last.body.tickets.length, 1);
   });
 
+  it('filters by assignee (none / me)', async () => {
+    // Only "Excel (365) travando" was started, which auto-assigned it to Tech One.
+    let { body } = await api('GET', '/tickets?assignee=none', tech);
+    assert.equal(body.pagination.total, 4);
+    assert.ok(body.tickets.every((t: any) => t.assignee === null));
+
+    ({ body } = await api('GET', '/tickets?assignee=me', tech));
+    assert.deepEqual(body.tickets.map((t: any) => t.title), ['Excel (365) travando']);
+
+    ({ body } = await api('GET', '/tickets?assignee=me', otherTech));
+    assert.equal(body.pagination.total, 0);
+  });
+
+  it('combines the assignee filter with other filters and pagination', async () => {
+    let { body } = await api('GET', '/tickets?assignee=none&priority=alta', tech);
+    assert.deepEqual(body.tickets.map((t: any) => t.title).sort(), ['VPN não conecta', 'Wi-Fi lento']);
+
+    ({ body } = await api('GET', '/tickets?assignee=me&status=em_andamento', tech));
+    assert.equal(body.pagination.total, 1);
+
+    ({ body } = await api('GET', '/tickets?assignee=none&limit=2&page=2', tech));
+    assert.equal(body.tickets.length, 2);
+    assert.deepEqual(body.pagination, { page: 2, limit: 2, total: 4, totalPages: 2 });
+  });
+
+  it('the assignee filter stays inside the requester scope', async () => {
+    let { body } = await api('GET', '/tickets?assignee=none', requester);
+    assert.deepEqual(body.tickets.map((t: any) => t.title).sort(), ['Monitor piscando', 'VPN não conecta']);
+
+    ({ body } = await api('GET', '/tickets?assignee=me', requester));
+    assert.equal(body.pagination.total, 0);
+  });
+
   it('validates query parameters', async () => {
-    for (const query of ['limit=51', 'limit=0', 'page=0', 'page=abc', 'status=fechado', 'priority=urgente', 'category=cafe']) {
+    for (const query of [
+      'limit=51',
+      'limit=0',
+      'page=0',
+      'page=abc',
+      'status=fechado',
+      'priority=urgente',
+      'category=cafe',
+      'assignee=ninguem',
+      `assignee=${tech.id}`,
+    ]) {
       const { status } = await api('GET', `/tickets?${query}`, tech);
       assert.equal(status, 400, query);
     }

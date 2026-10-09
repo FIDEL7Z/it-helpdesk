@@ -35,13 +35,13 @@ async function seed(): Promise<void> {
 
   const demoUsers: DemoUser[] = [
     {
-      name: 'Equipe de TI',
+      name: 'Carlos Andrade',
       email: seedEnv.SEED_TI_EMAIL,
       password: seedEnv.SEED_TI_PASSWORD,
       role: 'ti',
     },
     {
-      name: 'Usuário Solicitante',
+      name: 'Mariana Souza',
       email: seedEnv.SEED_SOLICITANTE_EMAIL,
       password: seedEnv.SEED_SOLICITANTE_PASSWORD,
       role: 'solicitante',

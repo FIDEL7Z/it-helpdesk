@@ -240,6 +240,12 @@ textarea {
   padding-right: 84px;
 }
 
+/* Edge/IE draw their own "reveal password" eye, which would duplicate our button. */
+.field__input--with-action::-ms-reveal,
+.field__input--with-action::-ms-clear {
+  display: none;
+}
+
 .field__action {
   position: absolute;
   top: 50%;
@@ -571,6 +577,7 @@ textarea {
   border-radius: 999px;
   font-size: 0.8125rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .badge--ti {
@@ -751,6 +758,10 @@ textarea.field__input {
   background: var(--color-surface-muted);
 }
 
+.ticket-table__date {
+  white-space: nowrap;
+}
+
 .ticket-table__title a {
   color: var(--color-text);
   font-weight: 600;
@@ -812,13 +823,21 @@ textarea.field__input {
     content: none;
   }
 
+  /* Search on its own row, filters in an even grid below it. Grid (not a wrapping
+     flex column) keeps every row only as tall as its content. */
+  .toolbar {
+    display: grid;
+    gap: 16px;
+  }
+
   .toolbar__search {
     max-width: none;
   }
 
-  .toolbar__filters,
-  .filter {
-    flex: 1 1 140px;
+  .toolbar__filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    align-content: start;
   }
 
   .filter .field__input {

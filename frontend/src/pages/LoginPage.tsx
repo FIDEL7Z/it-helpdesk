@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ApiStatus } from '../components/ApiStatus'
 import { BrandMark } from '../components/BrandMark'
 import { FullPageLoader } from '../components/FullPageLoader'
@@ -33,6 +34,7 @@ function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'E-mail ou senha incorretos.'
     if (error.status === 400) return 'Verifique o e-mail e a senha informados.'
+    if (error.status === 429) return 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
     if (error.status === 0) return 'Não foi possível conectar ao servidor. Tente novamente em instantes.'
   }
   return 'Ocorreu um erro inesperado. Tente novamente.'
@@ -54,6 +56,7 @@ function redirectTarget(state: unknown): string {
 }
 
 export function LoginPage() {
+  useDocumentTitle('Entrar')
   const { status, login } = useAuth()
   const location = useLocation()
 

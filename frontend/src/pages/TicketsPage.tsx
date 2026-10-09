@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import {
   ASSIGNEE_FILTERS,
@@ -59,6 +60,7 @@ function readCreatedTitle(state: unknown): string | null {
 }
 
 export function TicketsPage() {
+  useDocumentTitle('Chamados')
   const { user } = useAuth()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -251,7 +253,7 @@ export function TicketsPage() {
                   <td data-label="Responsável" className={ticket.assignee ? undefined : 'text-muted'}>
                     {ticket.assignee?.name ?? 'Não atribuído'}
                   </td>
-                  <td data-label="Aberto em">
+                  <td data-label="Aberto em" className="ticket-table__date">
                     <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
                   </td>
                 </tr>

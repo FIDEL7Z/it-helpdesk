@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import { ApiError } from '../services/api'
 import type { User } from '../services/auth'
@@ -46,6 +47,7 @@ export function TicketDetailPage() {
   const requestKey = `${id}#${reloadCount}`
   const [state, setState] = useState<LoadState>({ key: '', ticket: null, error: null })
   const loading = state.key !== requestKey
+  useDocumentTitle(state.ticket?.title ?? 'Chamado')
 
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)

@@ -34,6 +34,12 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return;
   }
 
+  // Thrown by express.json() when the body is larger than the configured limit.
+  if (hasProperty(error, 'type') && error.type === 'entity.too.large') {
+    res.status(413).json({ message: 'Request body too large' });
+    return;
+  }
+
   // Safety net: request data is validated with Zod first, so these should not normally happen.
   if (error instanceof mongoose.Error.CastError) {
     res.status(400).json({ message: 'Invalid identifier' });

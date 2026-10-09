@@ -287,7 +287,13 @@ describe('User model roles', () => {
       UserModel.create({ name: 'Valid', email: 'valid.gestor@test.local', passwordHash: 'x', role: 'gestor' }),
     );
     await assert.rejects(
-      UserModel.create({ name: 'Invalid', email: 'invalid.role@test.local', passwordHash: 'x', role: 'admin' }),
+      UserModel.create({
+        name: 'Invalid',
+        email: 'invalid.role@test.local',
+        passwordHash: 'x',
+        // Deliberately invalid value: the cast only bypasses TypeScript so the schema can reject it.
+        role: 'admin' as UserRole,
+      }),
       (error: Error) => error.name === 'ValidationError',
     );
   });

@@ -70,10 +70,19 @@ export type Pagination = {
   totalPages: number
 }
 
+export const ASSIGNEE_FILTERS = ['none', 'me'] as const
+export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number]
+
+export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
+  none: 'Sem responsável',
+  me: 'Atribuídos a mim',
+}
+
 export type TicketFilters = {
   status?: TicketStatus
   priority?: TicketPriority
   category?: TicketCategory
+  assignee?: AssigneeFilter
   search?: string
   page?: number
 }
@@ -135,4 +144,8 @@ export function isTicketPriority(value: string | null): value is TicketPriority 
 
 export function isTicketCategory(value: string | null): value is TicketCategory {
   return TICKET_CATEGORIES.some((category) => category === value)
+}
+
+export function isAssigneeFilter(value: string | null): value is AssigneeFilter {
+  return ASSIGNEE_FILTERS.some((filter) => filter === value)
 }

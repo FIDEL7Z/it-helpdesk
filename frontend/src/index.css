@@ -1111,3 +1111,244 @@ textarea.field__input {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
+
+/* ---------- Dashboard ---------- */
+
+.dashboard {
+  display: grid;
+  gap: 24px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stats--workload {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 860px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .stats {
+    gap: 12px;
+  }
+
+  .stats--workload {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.stat-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.stat-card__label {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card__hint {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.stat-card--aberto {
+  border-left-color: var(--color-info);
+}
+
+.stat-card--em_andamento {
+  border-left-color: var(--color-warning);
+}
+
+.stat-card--resolvido {
+  border-left-color: var(--color-success);
+}
+
+.stat-card--attention {
+  border-left-color: var(--color-danger);
+}
+
+.stat-card--mine {
+  border-left-color: var(--color-primary);
+}
+
+.dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 860px) {
+  .dashboard__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card__header .card__title {
+  margin-bottom: 0;
+}
+
+.card__title--tight {
+  margin-bottom: 2px;
+}
+
+.card__description {
+  margin-bottom: 16px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.card__link {
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.card__link:hover {
+  text-decoration: underline;
+}
+
+/* Bars */
+
+.bar-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-list__item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9375rem;
+}
+
+.bar-list__value {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-list__track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  overflow: hidden;
+}
+
+.bar-list__bar {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+
+.bar-list__bar--alta {
+  background: var(--color-danger);
+}
+
+.bar-list__bar--media {
+  background: var(--color-warning);
+}
+
+.bar-list__bar--baixa {
+  background: var(--color-text-muted);
+}
+
+/* Recent tickets */
+
+.recent-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.recent-list__item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.recent-list__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.recent-list__title {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.recent-list__title:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.recent-list__meta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.recent-list__badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

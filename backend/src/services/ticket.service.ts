@@ -70,11 +70,19 @@ export interface CreateTicketInput {
   priority: TicketPriority;
 }
 
-export interface ListTicketsQuery {
+export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
+export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
+
+export interface TicketFilters {
   status?: TicketStatus;
   priority?: TicketPriority;
   category?: TicketCategory;
   search?: string;
+  /** "none": no assignee yet; "me": assigned to the authenticated user. */
+  assignee?: AssigneeFilter;
+}
+
+export interface ListTicketsQuery extends TicketFilters {
   page: number;
   limit: number;
 }
@@ -151,6 +159,28 @@ export async function findAccessibleTicket(id: string, actor: PublicUser): Promi
   return ticket;
 }
 
+/**
+ * Single place that turns filters into a MongoDB query, always scoped to what the
+ * user may see (requesters: only their own tickets). Used by the ticket list and
+ * by the dashboard, so their numbers always match.
+ * Ids are ObjectIds (not strings) because aggregation pipelines do not cast types.
+ */
+export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): QueryFilter<Ticket> {
+  const actorId = new Types.ObjectId(actor.id);
+  const filter: QueryFilter<Ticket> = {};
+
+  if (actor.role !== 'ti') filter.requester = actorId;
+  if (filters.status) filter.status = filters.status;
+  if (filters.priority) filter.priority = filters.priority;
+  if (filters.category) filter.category = filters.category;
+  if (filters.assignee === 'none') filter.assignee = null;
+  if (filters.assignee === 'me') filter.assignee = actorId;
+  // User input is escaped so it is matched literally, not as a regular expression.
+  if (filters.search) filter.title = { $regex: escapeRegex(filters.search), $options: 'i' };
+
+  return filter;
+}
+
 // ---------- Use cases ----------
 
 export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetail> {
@@ -168,15 +198,7 @@ export async function listTickets(
   query: ListTicketsQuery,
   actor: PublicUser,
 ): Promise<{ tickets: TicketSummary[]; pagination: Pagination }> {
-  const filter: QueryFilter<Ticket> = {};
-
-  if (actor.role !== 'ti') filter.requester = actor.id;
-  if (query.status) filter.status = query.status;
-  if (query.priority) filter.priority = query.priority;
-  if (query.category) filter.category = query.category;
-  // User input is escaped so it is matched literally, not as a regular expression.
-  if (query.search) filter.title = { $regex: escapeRegex(query.search), $options: 'i' };
-
+  const filter = buildTicketFilter(query, actor);
   const { page, limit } = query;
 
   const [total, tickets] = await Promise.all([

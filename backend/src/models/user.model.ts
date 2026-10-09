@@ -1,6 +1,7 @@
 import { Schema, model, type HydratedDocument } from 'mongoose';
 
-export const USER_ROLES = ['solicitante', 'ti'] as const;
+/** solicitante: opens tickets. ti: works on tickets. gestor: IT manager, read-only supervision. */
+export const USER_ROLES = ['solicitante', 'ti', 'gestor'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export interface User {

@@ -8,13 +8,13 @@ import type { UserRole } from '../models/user.model';
  */
 export const PERMISSIONS = {
   /** See every ticket. Without it, a user only sees the tickets they opened. */
-  'tickets:view-all': ['ti'],
+  'tickets:view-all': ['ti', 'gestor'],
   /** Workflow actions: change status, assign and triage (category and priority). */
   'tickets:operate': ['ti'],
   /** Can be set as a ticket's assignee. */
   'tickets:be-assigned': ['ti'],
-  /** List the IT team members (assignee picker). */
-  'users:list-it-staff': ['ti'],
+  /** List the IT team members (assignee picker, team supervision). */
+  'users:list-it-staff': ['ti', 'gestor'],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

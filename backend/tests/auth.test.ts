@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
@@ -9,6 +9,7 @@ import app from '../src/app';
 import { env } from '../src/config/env';
 import { requireAuth, requireRole } from '../src/middlewares/auth.middleware';
 import { errorHandler } from '../src/middlewares/error.middleware';
+import { resetLoginRateLimit } from '../src/middlewares/rate-limit.middleware';
 import { UserModel } from '../src/models/user.model';
 import { hashPassword } from '../src/utils/password';
 
@@ -59,6 +60,11 @@ before(async () => {
   tiUserId = ti.id;
 
   ({ server, url: baseUrl } = await listen(app));
+});
+
+// These tests log in many times from the same IP; the rate limit is tested in security.test.ts.
+beforeEach(async () => {
+  await resetLoginRateLimit();
 });
 
 after(async () => {

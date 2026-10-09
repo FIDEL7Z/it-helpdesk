@@ -1,30 +1,26 @@
-import { useEffect, useState } from 'react'
-import { getHealth } from './services/api'
-
-type ApiStatus = 'loading' | 'online' | 'offline'
-
-const statusLabel: Record<ApiStatus, string> = {
-  loading: 'Checking...',
-  online: 'Online',
-  offline: 'Offline',
-}
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { AppLayout } from './components/AppLayout'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { DashboardPage } from './pages/DashboardPage'
+import { LoginPage } from './pages/LoginPage'
+import { TicketsPage } from './pages/TicketsPage'
 
 function App() {
-  const [status, setStatus] = useState<ApiStatus>('loading')
-
-  useEffect(() => {
-    getHealth()
-      .then((data) => setStatus(data.status === 'ok' ? 'online' : 'offline'))
-      .catch(() => setStatus('offline'))
-  }, [])
-
   return (
-    <main>
-      <h1>IT Helpdesk</h1>
-      <p>
-        API status: <strong>{statusLabel[status]}</strong>
-      </p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/tickets" element={<TicketsPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

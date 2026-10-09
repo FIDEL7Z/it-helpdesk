@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
+import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
@@ -78,7 +79,9 @@ export function TicketsPage() {
   const { tickets, pagination } = list
 
   const createdTitle = readCreatedTitle(location.state)
-  const isIt = user?.role === 'ti'
+  const seesAllTickets = can(user?.role, 'tickets:view-all')
+  // "Atribuídos a mim" only makes sense for people who can be assigned.
+  const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   const hasFilters = Boolean(
     filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
@@ -126,7 +129,7 @@ export function TicketsPage() {
         <div>
           <h1 className="page__title">Chamados</h1>
           <p className="page__subtitle">
-            {isIt
+            {seesAllTickets
               ? 'Acompanhe e atenda as solicitações de TI de toda a empresa.'
               : 'Abra e acompanhe as suas solicitações para a equipe de TI.'}
           </p>
@@ -172,7 +175,7 @@ export function TicketsPage() {
             options={TICKET_CATEGORIES.map((value) => [value, CATEGORY_LABELS[value]])}
             onChange={(value) => updateFilter('category', value)}
           />
-          {isIt && (
+          {canFilterByAssignee && (
             <FilterSelect
               id="filter-assignee"
               label="Responsável"
@@ -210,7 +213,7 @@ export function TicketsPage() {
                 Limpar filtros
               </button>
             </>
-          ) : isIt ? (
+          ) : seesAllTickets ? (
             <p>Nenhum chamado registrado até o momento.</p>
           ) : (
             <>

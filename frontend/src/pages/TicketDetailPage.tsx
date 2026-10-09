@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
+import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
@@ -110,7 +111,8 @@ export function TicketDetailPage() {
     )
   }
 
-  const isIt = user?.role === 'ti'
+  const canOperate = can(user?.role, 'tickets:operate')
+  const isSupervisor = can(user?.role, 'tickets:view-all') && !canOperate
   const isOwner = ticket.requester?.id === user?.id
   const canEditText = isOwner && ticket.status === 'aberto'
   const isResolved = ticket.status === 'resolvido'
@@ -211,7 +213,7 @@ export function TicketDetailPage() {
             </dl>
           </div>
 
-          {isIt && (
+          {canOperate && (
             <div className="card">
               <h2 className="card__title">Atendimento</h2>
               <div className="action-stack">
@@ -246,7 +248,13 @@ export function TicketDetailPage() {
             </div>
           )}
 
-          {!isIt && isOwner && !canEditText && (
+          {isSupervisor && !isOwner && (
+            <p className="side-note">
+              Visualização de supervisão: o atendimento é feito pela equipe de TI.
+            </p>
+          )}
+
+          {!canOperate && isOwner && !canEditText && (
             <p className="side-note">
               {isResolved
                 ? 'Este chamado foi resolvido. Se o problema voltar, fale com a equipe de TI para reabri-lo.'

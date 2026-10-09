@@ -9,6 +9,11 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z
     .templateLiteral([z.number().int().positive(), z.enum(['s', 'm', 'h', 'd'])])
     .default('8h'),
+  // Comma-separated list of frontend origins allowed by CORS.
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:5173')
+    .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
 });
 
 const parsed = envSchema.safeParse(process.env);

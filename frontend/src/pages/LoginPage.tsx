@@ -33,6 +33,7 @@ function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'E-mail ou senha incorretos.'
     if (error.status === 400) return 'Verifique o e-mail e a senha informados.'
+    if (error.status === 429) return 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
     if (error.status === 0) return 'Não foi possível conectar ao servidor. Tente novamente em instantes.'
   }
   return 'Ocorreu um erro inesperado. Tente novamente.'

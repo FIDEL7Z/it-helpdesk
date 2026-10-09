@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import mongoose from 'mongoose';
 import { ZodError, z } from 'zod';
 import { HttpError } from '../errors/http-error';
 
@@ -27,6 +28,17 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   // Thrown by express.json() when the body is not valid JSON.
   if (hasProperty(error, 'type') && error.type === 'entity.parse.failed') {
     res.status(400).json({ message: 'Malformed JSON body' });
+    return;
+  }
+
+  // Safety net: request data is validated with Zod first, so these should not normally happen.
+  if (error instanceof mongoose.Error.CastError) {
+    res.status(400).json({ message: 'Invalid identifier' });
+    return;
+  }
+
+  if (error instanceof mongoose.Error.ValidationError) {
+    res.status(400).json({ message: 'Invalid data' });
     return;
   }
 

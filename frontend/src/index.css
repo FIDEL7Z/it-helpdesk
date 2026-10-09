@@ -94,7 +94,9 @@ dd {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -789,6 +791,11 @@ textarea.field__input {
     border: 0;
   }
 
+  /* Keep badges at their natural width inside the label/value grid. */
+  .ticket-table td > * {
+    justify-self: start;
+  }
+
   .ticket-table td::before {
     content: attr(data-label);
     color: var(--color-text-muted);
@@ -918,6 +925,7 @@ textarea.field__input {
 .form__row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 16px;
 }
 

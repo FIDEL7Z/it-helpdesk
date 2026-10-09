@@ -891,3 +891,49 @@ textarea.field__input {
   font-size: 0.875rem;
   white-space: nowrap;
 }
+
+/* ---------- Tickets: forms and details ---------- */
+
+.page--narrow {
+  max-width: 760px;
+}
+
+.back-link {
+  justify-self: start;
+  margin-bottom: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.form-alert {
+  margin-bottom: 20px;
+}
+
+.form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .form__row {
+    grid-template-columns: 1fr;
+  }
+
+  .form__actions .button {
+    flex: 1 1 auto;
+  }
+}

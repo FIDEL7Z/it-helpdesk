@@ -3,6 +3,7 @@ import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { NewTicketPage } from './pages/NewTicketPage'
 import { TicketsPage } from './pages/TicketsPage'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/tickets" element={<TicketsPage />} />
+            <Route path="/tickets/new" element={<NewTicketPage />} />
           </Route>
         </Route>
 

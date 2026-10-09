@@ -12,6 +12,9 @@
     "test": "tsx --test tests/*.test.ts",
     "seed:demo": "tsx src/scripts/seed-demo.ts"
   },
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

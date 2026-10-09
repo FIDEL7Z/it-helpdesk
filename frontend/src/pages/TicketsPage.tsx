@@ -253,7 +253,7 @@ export function TicketsPage() {
                   <td data-label="Responsável" className={ticket.assignee ? undefined : 'text-muted'}>
                     {ticket.assignee?.name ?? 'Não atribuído'}
                   </td>
-                  <td data-label="Aberto em">
+                  <td data-label="Aberto em" className="ticket-table__date">
                     <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
                   </td>
                 </tr>

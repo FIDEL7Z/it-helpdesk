@@ -18,9 +18,12 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   }
 
   if (error instanceof ZodError) {
+    const { fieldErrors, formErrors } = z.flattenError(error);
     res.status(400).json({
       message: 'Invalid request data',
-      errors: z.flattenError(error).fieldErrors,
+      errors: fieldErrors,
+      // Errors not tied to one field, e.g. "Unrecognized key: requester".
+      ...(formErrors.length > 0 && { formErrors }),
     });
     return;
   }

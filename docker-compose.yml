@@ -1,0 +1,26 @@
+# Local MongoDB for development and evaluation.
+# The backend and the frontend run with npm (see README).
+#
+# Note: MongoDB runs WITHOUT authentication here. The port is published only on
+# 127.0.0.1, so it is reachable from this machine but not from the network.
+# Do not use this configuration in production.
+name: it-helpdesk
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  # Named volume: data survives `docker compose down` (removed only with `down -v`).
+  mongo-data:

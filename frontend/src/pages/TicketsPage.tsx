@@ -3,12 +3,15 @@ import { Link, useLocation, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/useAuth'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import {
+  ASSIGNEE_FILTERS,
+  ASSIGNEE_FILTER_LABELS,
   CATEGORY_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
+  isAssigneeFilter,
   isTicketCategory,
   isTicketPriority,
   isTicketStatus,
@@ -20,7 +23,7 @@ import {
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-type FilterKey = 'status' | 'priority' | 'category' | 'search'
+type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search'
 
 type ListState = {
   key: string
@@ -34,12 +37,14 @@ function readFilters(params: URLSearchParams): TicketFilters {
   const status = params.get('status')
   const priority = params.get('priority')
   const category = params.get('category')
+  const assignee = params.get('assignee')
   const page = Number(params.get('page'))
 
   return {
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
     category: isTicketCategory(category) ? category : undefined,
+    assignee: isAssigneeFilter(assignee) ? assignee : undefined,
     search: params.get('search')?.trim() || undefined,
     page: Number.isInteger(page) && page > 1 ? page : 1,
   }
@@ -72,7 +77,9 @@ export function TicketsPage() {
 
   const createdTitle = readCreatedTitle(location.state)
   const isIt = user?.role === 'ti'
-  const hasFilters = Boolean(filters.status || filters.priority || filters.category || filters.search)
+  const hasFilters = Boolean(
+    filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -163,6 +170,15 @@ export function TicketsPage() {
             options={TICKET_CATEGORIES.map((value) => [value, CATEGORY_LABELS[value]])}
             onChange={(value) => updateFilter('category', value)}
           />
+          {isIt && (
+            <FilterSelect
+              id="filter-assignee"
+              label="Responsável"
+              value={filters.assignee ?? ''}
+              options={ASSIGNEE_FILTERS.map((value) => [value, ASSIGNEE_FILTER_LABELS[value]])}
+              onChange={(value) => updateFilter('assignee', value)}
+            />
+          )}
           {hasFilters && (
             <button type="button" className="button button--ghost" onClick={clearFilters}>
               Limpar filtros

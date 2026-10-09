@@ -38,9 +38,10 @@ A solução é um **service desk interno enxuto**:
 | Falta de visibilidade | Dashboard com contagens por status, pendentes por prioridade e categoria, e a fila da TI |
 | Acompanhamento difícil | Fluxo de status explícito e histórico de cada chamado (quem fez o quê e quando) |
 
-Existem dois perfis:
+Existem três perfis:
 - **Solicitante:** qualquer colaborador. Abre chamados e acompanha os seus.
 - **TI:** a equipe de suporte. Vê todos os chamados, faz a triagem, atribui, atende e resolve.
+- **Gestor (Gestão de TI):** supervisiona. Vê todos os chamados e o histórico em **modo leitura**. Pode abrir e editar os próprios chamados como qualquer colaborador, mas não faz triagem, atribuição nem mudança de status.
 
 ## Funcionalidades
 
@@ -154,6 +155,7 @@ Os arquivos `.env` **não são versionados**. Copie de `.env.example`.
 | `CORS_ORIGIN` | não | `http://localhost:5173` | Origens do frontend que podem chamar a API, separadas por vírgula |
 | `SEED_TI_EMAIL` / `SEED_TI_PASSWORD` | para o seed | ver `.env.example` | Usuário de TI criado pelo `npm run seed` |
 | `SEED_SOLICITANTE_EMAIL` / `SEED_SOLICITANTE_PASSWORD` | para o seed | ver `.env.example` | Usuário solicitante criado pelo `npm run seed` |
+| `SEED_GESTOR_EMAIL` / `SEED_GESTOR_PASSWORD` | não | ver `.env.example` | Gestor de demonstração. **Preencha as duas ou nenhuma**: sem nenhuma, o seed não cria o gestor; com só uma, falha com erro claro |
 
 As variáveis são validadas com Zod na inicialização, e um valor inválido impede a API de subir.
 
@@ -171,6 +173,9 @@ Criados pelo `npm run seed` com os valores do `backend/.env.example`. São **cre
 |---|---|---|---|
 | TI | Carlos Andrade | `ti@helpdesk.local` | `TiDemo@2026` |
 | Solicitante | Mariana Souza | `solicitante@helpdesk.local` | `Solicitante@2026` |
+| Gestor | Ana Ribeiro | `gestor@helpdesk.local` | `Gestor@2026` |
+
+Se você criou o `backend/.env` antes da existência do gestor, acrescente as duas variáveis `SEED_GESTOR_*` do `.env.example` e rode o `npm run seed` de novo. Os usuários existentes são pulados.
 
 Não existe cadastro público: num sistema interno, os usuários são criados pela empresa (aqui, pelo seed).
 
@@ -178,7 +183,7 @@ Não existe cadastro público: num sistema interno, os usuários são criados pe
 
 | Comando | O que faz | Garantias |
 |---|---|---|
-| `npm run seed` | Cria os 2 usuários de teste | É idempotente: se o e-mail já existir, pula. **Nunca troca a senha** de um usuário existente. Não imprime senhas |
+| `npm run seed` | Cria os usuários de teste (TI, solicitante e, se configurado, gestor) | É idempotente: se o e-mail já existir, pula. **Nunca troca a senha nem o papel** de um usuário existente. Não imprime senhas |
 | `npm run seed:demo` | Cria 10 chamados de exemplo, com status, histórico e datas variados | **Só insere**: não altera nem apaga nada. É idempotente: um chamado demo existente (mesmo solicitante e mesmo título) é pulado. Exige que o `npm run seed` tenha rodado antes |
 
 Os dois scripts encerram com código 1 em caso de erro (variável inválida, banco fora do ar ou usuários ausentes).
@@ -202,6 +207,7 @@ Os testes do backend usam o `node:test`, que já vem no Node. Cada teste sobe o 
 | `tests/auth.test.ts` | Login (válido, senha errada, usuário inexistente, validação, papel enviado pelo cliente sendo ignorado), `/auth/me` (sem token, inválido, assinado com outro segredo, expirado, usuário apagado), `requireRole` (200/401/403) e e-mail único |
 | `tests/tickets.test.ts` | Criação (dono vindo do token, campos proibidos), listagem por papel, filtros (incluindo `assignee`), busca, paginação, detalhe (404 para chamado de outra pessoa), edição, transições de status, reabertura, atribuição, histórico e concorrência |
 | `tests/dashboard.test.ts` | Contagens por papel, pendentes por prioridade e categoria, zeros preenchidos, recentes e **igualdade de cada número com o total da lista equivalente** |
+| `tests/permissions.test.ts` | Mapa de permissões (cada papel × cada permissão; papel desconhecido nega tudo), matriz das rotas para solicitante, TI e gestor, regras do gestor (edita os próprios chamados, não opera, não pode ser responsável), dashboard do gestor e papel lido sempre do banco |
 | `tests/security.test.ts` | Rate limit do login (429 depois de 10 tentativas, headers padrão, isolamento dos outros endpoints), ausência do `X-Powered-By` e limite do corpo JSON (413) |
 
 ## Endpoints da API
@@ -215,11 +221,11 @@ Base: `http://localhost:3000/api`. Todas as respostas são JSON. Os erros seguem
 | GET | `/auth/me` | logado | `{ user }` |
 | POST | `/tickets` | logado | Abre um chamado: `{ title, description, category, priority? }` |
 | GET | `/tickets` | logado | Lista os chamados que o usuário pode ver. Query: `status`, `priority`, `category`, `assignee` (`none` ou `me`), `search`, `page`, `limit` (máx. 50) |
-| GET | `/tickets/:id` | dono ou TI | Detalhe com histórico |
+| GET | `/tickets/:id` | dono, TI ou gestor | Detalhe com histórico |
 | PATCH | `/tickets/:id` | dono ou TI | O dono edita `title` e `description` (só com o chamado `aberto`). A TI edita `category` e `priority` (se não estiver `resolvido`) |
 | PATCH | `/tickets/:id/status` | TI | `{ status }`, seguindo as transições permitidas |
 | PATCH | `/tickets/:id/assignee` | TI | `{ assigneeId }`. O responsável precisa ser da TI |
-| GET | `/users/it-staff` | TI | Lista a equipe de TI (para o seletor de responsável) |
+| GET | `/users/it-staff` | TI ou gestor | Lista a equipe de TI, ou seja, quem pode ser responsável (o gestor não entra) |
 | GET | `/dashboard/summary` | logado | Indicadores no escopo do usuário (ver [Dashboard](#dashboard)) |
 
 **Códigos HTTP:**
@@ -238,15 +244,22 @@ As regras são aplicadas **no backend**. O frontend só esconde as ações que a
 
 ### Permissões
 
-| Ação | Solicitante | TI |
-|---|---|---|
-| Abrir chamado | ✅ (como solicitante) | ✅ |
-| Ver chamados | só os próprios | todos |
-| Editar título e descrição | só os próprios e só com status `aberto` | ❌ |
-| Alterar categoria e prioridade (triagem) | ❌ | ✅ se não estiver `resolvido` |
-| Mudar status | ❌ | ✅ |
-| Atribuir responsável | ❌ | ✅ (só para usuários da TI, e se não estiver `resolvido`) |
+| Ação | Solicitante | TI | Gestor |
+|---|---|---|---|
+| Abrir chamado | ✅ (como solicitante) | ✅ | ✅ |
+| Ver chamados e histórico | só os próprios | todos | todos (leitura) |
+| Editar título e descrição | só os próprios e só com status `aberto` | só os próprios e só com status `aberto` | só os próprios e só com status `aberto` |
+| Alterar categoria e prioridade (triagem) | ❌ | ✅ se não estiver `resolvido` | ❌ |
+| Mudar status | ❌ | ✅ | ❌ |
+| Atribuir responsável | ❌ | ✅ (só para usuários da TI, e se não estiver `resolvido`) | ❌ |
+| Ser responsável por um chamado | ❌ | ✅ | ❌ |
+| Listar a equipe de TI | ❌ | ✅ | ✅ |
 
+As permissões ficam **num único lugar**: `backend/src/auth/permissions.ts`, um mapa de permissão → papéis. Exemplos: `tickets:view-all`, `tickets:operate`, `tickets:be-assigned` e `users:list-it-staff`. Rotas e services perguntam "este papel **pode** fazer X?" com `can()` ou `requirePermission()`, em vez de comparar nomes de papel. Um papel novo começa **sem nenhuma permissão** até ser incluído no mapa.
+
+O frontend tem uma cópia desse mapa (`frontend/src/auth/permissions.ts`) **só para mostrar ou esconder botões**. Quem decide é sempre a API: chamar a rota diretamente sem permissão resulta em 403.
+
+- O papel **não fica no token**. Ele é lido do banco a cada requisição, então uma mudança de papel vale na próxima requisição, sem novo login.
 - O **solicitante** de um chamado vem sempre do token, nunca do corpo da requisição.
 - Mandar campos como `requester`, `status`, `assignee` ou `history` onde não são permitidos dá **400**.
 
@@ -267,7 +280,7 @@ Cada chamado guarda eventos com **tipo, autor, data e uma descrição objetiva**
 
 ### Dashboard
 
-Os números são calculados **no escopo do usuário**: o solicitante vê só os próprios chamados e a TI vê todos. Cada número é igual ao total da lista com o filtro equivalente:
+Os números são calculados **no escopo do usuário**: o solicitante vê só os próprios chamados; a TI e o gestor veem todos. Os cartões "Sem responsável" e "Em atendimento comigo" aparecem só para a TI. Por enquanto, o gestor usa este dashboard com escopo global, até existir uma visão gerencial própria. Cada número é igual ao total da lista com o filtro equivalente:
 
 | Cartão | Lista equivalente |
 |---|---|
@@ -286,6 +299,7 @@ it-helpdesk/
 ├── docs/screenshots/         Imagens usadas neste README
 ├── backend/
 │   ├── src/
+│   │   ├── auth/             permissions.ts: mapa único de permissões por papel
 │   │   ├── config/           env.ts (validação das variáveis com Zod) e db.ts
 │   │   ├── models/           User e Ticket (schemas Mongoose, enums e transições)
 │   │   ├── routes/           Rotas por recurso e middlewares de acesso
@@ -300,14 +314,14 @@ it-helpdesk/
 └── frontend/
     └── src/
         ├── services/         Cliente HTTP único (api.ts) e funções por recurso
-        ├── auth/             AuthContext, AuthProvider (sessão) e useAuth
+        ├── auth/             AuthContext, AuthProvider (sessão), useAuth e a cópia do mapa de permissões (só para a interface)
         ├── components/       Layout, rota protegida, badges e loaders
         ├── pages/            Login, Dashboard, Chamados, Novo chamado e Detalhe
         ├── hooks/            useDocumentTitle
         └── utils/            Formatação de data e mensagens de erro
 ```
 
-**Caminho de uma requisição autenticada:** `route` → `requireAuth` (valida o JWT e carrega o usuário do banco) → `requireRole` (quando a ação é exclusiva da TI) → `controller` (Zod) → `service` (regras e escopo) → Mongoose. Os erros sobem para o middleware central, que responde em JSON sem detalhes internos.
+**Caminho de uma requisição autenticada:** `route` → `requireAuth` (valida o JWT e carrega o usuário do banco) → `requirePermission` (quando a ação exige uma permissão específica, como as exclusivas da TI) → `controller` (Zod) → `service` (regras e escopo) → Mongoose. Os erros sobem para o middleware central, que responde em JSON sem detalhes internos.
 
 ## Decisões técnicas
 
@@ -319,6 +333,7 @@ it-helpdesk/
 | **JWT HS256 com algoritmo fixado** e payload só com `sub` | Bloqueia o ataque `alg=none` e não expõe dados no token | Não há revogação de token antes de expirar |
 | **Mensagem genérica no login** e comparação com um hash fictício | Nem a mensagem nem o tempo de resposta revelam se o e-mail existe | Nenhum relevante |
 | **404 (e não 403)** para chamado de outra pessoa | A API não confirma que aquele id existe | Nenhum relevante |
+| **Permissões centralizadas** (mapa permissão → papéis, negado por padrão) | Um único lugar para revisar quem pode fazer o quê; um papel novo não herda permissões por engano | Precisa manter a cópia do frontend sincronizada (ela só controla a interface) |
 | **Uma rota por ação** (`/status`, `/assignee`) e **schemas estritos** | Não existe um "update genérico" que permita burlar as regras | Mais rotas |
 | **Bloqueio otimista** pelo `updatedAt` | Duas pessoas da TI alterando ao mesmo tempo: uma recebe 409 em vez de sobrescrever a outra | A pessoa precisa repetir a ação depois que os dados são recarregados |
 | **`buildTicketFilter` compartilhado** pela lista e pelo dashboard | Os números do dashboard e da lista não têm como divergir | Nenhum |
@@ -362,7 +377,8 @@ Antes de começar: rode `npm run seed` e `npm run seed:demo` no backend e suba o
    - No dashboard, mostre "Sem responsável" e "Em atendimento comigo". Clique em "Sem responsável".
    - Abra o chamado do projetor e clique em **Iniciar atendimento**. Ele passa a "Em andamento", você vira o responsável e o histórico ganha 2 eventos.
    - Mude a prioridade (triagem) e clique em **Marcar como resolvido**. Depois clique em **Reabrir chamado** e mostre o evento de reabertura.
-5. **Fechamento (30 s):** volte ao dashboard, que já mostra os números atualizados. Se houver tempo, mostre a lista no celular (DevTools, 375 px) e o tema escuro.
+5. **Supervisão (opcional, 30 s):** entre como **gestor** (`gestor@helpdesk.local`). Ele vê todos os chamados e o histórico, mas o detalhe não tem ações de atendimento: o gestor só lê.
+6. **Fechamento (30 s):** volte ao dashboard, que já mostra os números atualizados. Se houver tempo, mostre a lista no celular (DevTools, 375 px) e o tema escuro.
 
 ## Solução de problemas
 

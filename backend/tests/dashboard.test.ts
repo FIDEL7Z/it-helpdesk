@@ -28,6 +28,10 @@ let tech: TestUser;
 let otherTech: TestUser;
 
 async function api(method: string, path: string, user?: TestUser, body?: unknown) {
+  if (method === 'PATCH' && body && typeof body === 'object' && !('expectedRevision' in body)) {
+    const latest = await api('GET', path.replace(/\/(status|assignee)$/, ''), user);
+    body = { ...body, expectedRevision: latest.body.ticket?.revision ?? 0, reason: 'Motivo explícito do cenário de teste' };
+  }
   const response = await fetch(`${baseUrl}/api${path}`, {
     method,
     headers: {

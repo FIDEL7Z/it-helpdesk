@@ -14,6 +14,6 @@ export type DashboardSummary = {
   recent: TicketSummary[]
 }
 
-export function getDashboardSummary(signal?: AbortSignal): Promise<{ summary: DashboardSummary }> {
-  return apiRequest('/dashboard/summary', { signal })
+export function getDashboardSummary(signal?: AbortSignal, dataOrigin: 'operational' | 'demo' | 'legacy' = 'operational'): Promise<{ summary: DashboardSummary }> {
+  return apiRequest(`/dashboard/summary?dataOrigin=${dataOrigin}`, { signal })
 }

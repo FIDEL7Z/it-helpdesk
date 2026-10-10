@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '../config/demo'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { can } from '../auth/permissions'
@@ -25,7 +26,7 @@ import {
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search'
+type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin'
 
 type ListState = {
   key: string
@@ -43,6 +44,15 @@ function readFilters(params: URLSearchParams): TicketFilters {
   const page = Number(params.get('page'))
 
   return {
+    createdFrom: params.get('createdFrom') ?? undefined,
+    createdTo: params.get('createdTo') ?? undefined,
+    attention: ['high_unassigned', 'oldest', 'inactive'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
+    ageDays: params.has('ageDays') ? Number(params.get('ageDays')) : undefined,
+    inactivityDays: params.has('inactivityDays') ? Number(params.get('inactivityDays')) : undefined,
+    pending: params.get('pending') === 'true' ? true : undefined,
+    assigneeId: /^[a-f\d]{24}$/i.test(params.get('assigneeId') ?? '') ? params.get('assigneeId')! : undefined,
+    requesterId: /^[a-f\d]{24}$/i.test(params.get('requesterId') ?? '') ? params.get('requesterId')! : undefined,
+    dataOrigin: !DEMO_MODE ? 'operational' : ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
     category: isTicketCategory(category) ? category : undefined,
@@ -83,7 +93,7 @@ export function TicketsPage() {
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   const hasFilters = Boolean(
-    filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+    filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && filters.dataOrigin) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
 
   useEffect(() => {
@@ -103,6 +113,7 @@ export function TicketsPage() {
 
   function updateFilter(key: FilterKey, value: string) {
     const next = new URLSearchParams(searchParams)
+    if (key === 'assignee') next.delete('assigneeId')
     if (value) next.set(key, value)
     else next.delete(key)
     next.delete('page')
@@ -144,6 +155,15 @@ export function TicketsPage() {
           Chamado “{createdTitle}” aberto com sucesso.
         </div>
       )}
+
+      {canFilterByAssignee && <nav className="queue-links" aria-label="Atalhos da fila operacional">
+        <Link className="button button--secondary" to={`/tickets?assignee=none${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Sem responsável</Link>
+        <Link className="button button--secondary" to={`/tickets?assignee=me${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Atribuídos a mim</Link>
+        <Link className="button button--secondary" to={`/tickets?status=em_andamento${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Em andamento</Link>
+      </nav>}
+      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
+      {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
+      {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       <div className="toolbar">
         {/* Remounted when the URL search changes (e.g. back button, clear filters). */}
@@ -192,6 +212,13 @@ export function TicketsPage() {
         </div>
       </div>
 
+        {DEMO_MODE && <div className="field">
+          <label className="field__label" htmlFor="list-origin">Origem dos dados</label>
+          <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
+            <option value="">Todos (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
+          </select>
+        </div>}
+
       {error ? (
         <div className="alert alert--error" role="alert">
           <p>{error}</p>
@@ -235,7 +262,8 @@ export function TicketsPage() {
                 <th scope="col">Prioridade</th>
                 <th scope="col">Status</th>
                 <th scope="col">Solicitante</th>
-                <th scope="col">Responsável</th>
+                <th scope="col">Responsável atribuído</th>
+                <th scope="col">Resolvido por</th>
                 <th scope="col">Aberto em</th>
               </tr>
             </thead>
@@ -243,7 +271,7 @@ export function TicketsPage() {
               {tickets.map((ticket) => (
                 <tr key={ticket.id}>
                   <td data-label="Título" className="ticket-table__title">
-                    <Link to={`/tickets/${ticket.id}`}>{ticket.title}</Link>
+                    <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
                   </td>
                   <td data-label="Categoria">{CATEGORY_LABELS[ticket.category]}</td>
                   <td data-label="Prioridade">
@@ -254,10 +282,11 @@ export function TicketsPage() {
                   </td>
                   <td data-label="Solicitante">{ticket.requester?.name ?? 'Usuário removido'}</td>
                   <td data-label="Responsável" className={ticket.assignee ? undefined : 'text-muted'}>
-                    {ticket.assignee?.name ?? 'Não atribuído'}
+                    {ticket.assignee?.name ?? (ticket.assigneeId ? 'Usuário indisponível' : 'Não atribuído')}
                   </td>
+                  <td data-label="Resolvido por">{ticket.status === 'resolvido' ? ticket.resolvedBy?.name ?? (ticket.resolvedById ? 'Usuário indisponível' : 'Sem autoria estruturada (legado)') : '—'}</td>
                   <td data-label="Aberto em" className="ticket-table__date">
-                    <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
+                    {ticket.createdAt ? <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time> : 'Data não registrada'}
                   </td>
                 </tr>
               ))}

@@ -194,6 +194,7 @@ async function seedDemo(): Promise<void> {
     const hasAssignee = demo.assignedWhileOpen || demo.status !== 'aberto';
 
     const ticket = new TicketModel({
+      dataOrigin: 'demo',
       title: demo.title,
       description: demo.description,
       category: demo.category,

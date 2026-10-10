@@ -37,13 +37,13 @@ export function getAuthenticatedUser(req: Request): PublicUser {
 
 /**
  * Validates the Bearer token (signature and expiration) and loads the user from
- * the database, so deleted users are rejected and the role is always current.
+ * the database, so deleted/inactive users are rejected and role changes apply to an existing token.
  */
 export const requireAuth: RequestHandler = async (req, _res, next) => {
   const payload = decodeToken(readBearerToken(req));
 
   const user = isValidObjectId(payload.sub) ? await UserModel.findById(payload.sub) : null;
-  if (!user) {
+  if (!user || !user.active) {
     throw new HttpError(401, 'User no longer exists');
   }
 

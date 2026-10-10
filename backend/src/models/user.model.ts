@@ -1,12 +1,13 @@
 import { Schema, model, type HydratedDocument } from 'mongoose';
 
-/** solicitante: opens tickets. ti: works on tickets. gestor: IT manager, read-only supervision. */
+/** solicitante: opens tickets. ti: works on tickets. gestor: manager with supervision and ticket operations. */
 export const USER_ROLES = ['solicitante', 'ti', 'gestor'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export interface User {
   name: string;
   email: string;
+  active: boolean;
   passwordHash: string;
   role: UserRole;
   createdAt: Date;
@@ -30,6 +31,7 @@ const userSchema = new Schema<User>(
     // Excluded from queries by default; must be requested with .select('+passwordHash').
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, required: true },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true },
 );

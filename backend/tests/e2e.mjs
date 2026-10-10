@@ -107,6 +107,8 @@ function connectCdp(url) {
 async function run() {
   const executable = await findBrowser();
   // Set only this test process's signing secret; dotenv still supplies the MongoDB URI.
+  process.env.DEMO_MODE = 'true';
+  process.env.VITE_DEMO_MODE = 'true';
   process.env.JWT_SECRET = randomUUID();
   const [{ default: app }, { env }, { UserModel }, { TicketModel }, { hashPassword }, { signAccessToken }] =
     await Promise.all([
@@ -122,9 +124,11 @@ async function run() {
   for (const role of ['solicitante', 'ti', 'gestor']) {
     users[role] = await UserModel.create({ name: `E2E ${role}`, email: `${role}@e2e.local`, role, passwordHash });
   }
+  const secondAnalyst = await UserModel.create({ name: 'Carlos Andrade', email: 'second-ti@e2e.local', role: 'ti', passwordHash });
+  const zeroAnalyst = await UserModel.create({ name: 'Zero-load analyst', email: 'zero-ti@e2e.local', role: 'ti', passwordHash });
   const other = await UserModel.create({ name: 'Other requester', email: 'other@e2e.local', role: 'solicitante', passwordHash });
   const ticket = (title, requester, status = 'aberto', assignee = null) => TicketModel.create({
-    title, description: 'Problema de teste com descrição suficiente.', category: 'software', priority: 'media',
+    dataOrigin: 'operational', title, description: 'Problema de teste com descrição suficiente.', category: 'software', priority: 'media',
     requester: requester._id, status, assignee: assignee?._id ?? null,
     history: [{ type: 'created', author: requester._id, message: 'Chamado aberto' }],
   });
@@ -178,11 +182,16 @@ async function run() {
   };
   const fill = (id, value) => evaluate(`(() => {
     const input = document.getElementById(${JSON.stringify(id)});
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+    Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
   const submit = () => evaluate('document.querySelector("form").requestSubmit()');
-  const browserApi = (method, path, body) => evaluate(`(async () => {
+  const browserApi = async (method, path, body) => {
+    if (method === 'PATCH' && body && body.expectedRevision === undefined) {
+      const read = await browserApi('GET', path.replace(/\/(status|assignee)$/, ''));
+      body = { ...body, expectedRevision: read.body.ticket?.revision ?? 0 };
+    }
+    return evaluate(`(async () => {
     const response = await fetch(${JSON.stringify(apiUrl + path)}, {
       method: ${JSON.stringify(method)},
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') },
@@ -191,6 +200,7 @@ async function run() {
     });
     return { status: response.status, body: await response.json() };
   })()`);
+  };
   const dashboard = async (expected, role) => {
     await waitDom(`${role} dashboard data`, 'document.querySelectorAll(".stat-card__value").length >= 4');
     const values = await evaluate('Array.from(document.querySelectorAll(".stat-card__value")).slice(0,4).map(el => Number(el.textContent))');
@@ -210,15 +220,28 @@ async function run() {
 
   for (const role of ['solicitante', 'ti', 'gestor']) {
     // Login may return to the previous protected route; verify the session before navigating.
-    await go('/login');
+    // A distinct login URL starts a fresh navigation, rather than reloading the
+    // previous login history entry carrying a protected return route.
+    await go(`/login?profile=${role}`);
     await waitDom(`${role} login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
     await fill('email', users[role].email);
     await fill('password', password);
     await submit();
     await waitDom(`${role} login`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
-    await evaluate('Array.from(document.querySelectorAll(".app-nav a")).find(el => el.getAttribute("href") === "/dashboard").click()');
+    if (role === 'gestor') {
+      await waitDom('manager default landing', 'location.pathname === "/manager"');
+      check(true, 'Manager normal login opens exclusive management page');
+    }
+    if (role === 'gestor') await go('/dashboard');
+    else await evaluate('Array.from(document.querySelectorAll(".app-nav a")).find(el => el.getAttribute("href") === "/dashboard").click()');
     await waitDom(`${role} dashboard route`, 'location.pathname === "/dashboard"');
-    const expected = role === 'solicitante' ? [2, 1, 0, 1] : [4, 2, 1, 1];
+    if (role !== 'gestor') {
+      check((await browserApi('GET', '/dashboard/manager')).status === 403, `${role}: manager API is forbidden`);
+      await go('/manager');
+      await waitDom(`${role} cannot enter manager page`, 'location.pathname === "/dashboard"');
+      check(await evaluate(`!document.querySelector('.manager-page') && !document.querySelector('.app-nav a[href="/manager"]')`), `${role}: manager page and navigation are restricted`);
+    }
+    let expected = role === 'solicitante' ? [2, 1, 0, 1] : role === 'gestor' ? [4, 1, 1, 2] : [4, 2, 1, 1];
     await dashboard(expected, role);
     for (let reload = 1; reload <= 3; reload++) {
       const previousOrigin = await evaluate('performance.timeOrigin');
@@ -235,40 +258,203 @@ async function run() {
     const titles = await evaluate('Array.from(document.querySelectorAll(".ticket-table__title a")).map(el => el.textContent)');
     check(titles.length === expected[0] && titles.includes('Other requester private ticket') === (role !== 'solicitante'), `${role}: visible ticket list isolation`);
 
+    if (role === 'ti') {
+      await go(`/tickets/${own.id}`);
+      await waitDom('TI assignment form', '!!document.getElementById("assignee")');
+      const stale = await browserApi('PATCH', `/tickets/${own.id}`, { category: 'hardware' });
+      check(stale.status === 200, 'Concurrent API action changes the revision loaded by the UI');
+      await evaluate(`(() => { const select = document.getElementById('assignee'); select.value = ${JSON.stringify(secondAnalyst.id)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate('document.getElementById("assignee").closest("form").requestSubmit()');
+      await waitDom('stale UI action rejected', 'document.querySelector("[role=alert]")?.textContent.includes("Os dados foram atualizados")');
+      check((await browserApi('GET', `/tickets/${own.id}`)).body.ticket.assignee === null, 'Stale frontend revision cannot assign or append a successful event');
+      await waitDom('conflict reload finishes', 'document.getElementById("triage-category")?.value === "hardware"');
+      await evaluate(`(() => { const select = document.getElementById('assignee'); select.value = ${JSON.stringify(secondAnalyst.id)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate('document.getElementById("assignee").closest("form").requestSubmit()');
+      await waitDom('TI assigned to Carlos', 'Array.from(document.querySelectorAll("dd")).some(el => el.textContent === "Carlos Andrade")');
+      await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Iniciar atendimento").click()');
+      await waitDom('TI resolution justification input', '!!document.getElementById("status-reason")');
+      check(await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Marcar como resolvido").disabled'), 'Resolution by another operator requires justification in the UI');
+      check((await browserApi('PATCH', `/tickets/${own.id}/status`, { status: 'resolvido' })).status === 400, 'API rejects unjustified resolution by another operator');
+      await fill('status-reason', 'Realizei a correção em colaboração com Carlos.');
+      await evaluate('document.getElementById("status-reason").closest("form").requestSubmit()');
+      await waitDom('explicit resolver in history', 'Array.from(document.querySelectorAll(".timeline__message")).some(el => el.textContent === "Resolvido por E2E ti")');
+      const resolution = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+      check(resolution.assignee.id === secondAnalyst.id && resolution.resolvedBy.id === users.ti.id, 'Responsible Carlos and authenticated resolver TI remain distinct');
+      check(resolution.history.at(-1).audit.reason.includes('Carlos') && resolution.history.at(-1).audit.assigneeAtEvent === secondAnalyst.id, 'Resolution persists structured justification and assignee at event');
+      await go('/tickets');
+      await waitDom('resolver column', 'Array.from(document.querySelectorAll(".ticket-table tbody tr")).some(el => el.textContent.includes("Carlos Andrade"))');
+      check(await evaluate('Array.from(document.querySelectorAll("td")).some(el => el.dataset.label === "Resolvido por" && el.textContent === "E2E ti")'), 'Ticket table identifies the resolver separately');
+    }
+
     if (role === 'gestor') {
       await go(`/tickets/${own.id}`);
       await waitDom('manager foreign detail', 'document.querySelector("h1")?.textContent === "Requester open ticket"');
-      check(await evaluate('!document.querySelector(".action-stack") && !Array.from(document.querySelectorAll("button")).some(el => el.textContent.trim() === "Editar chamado")'), 'Manager cannot see operation or foreign text editing controls');
-      for (const [path, body] of [
-        [`/${own.id}/status`, { status: 'em_andamento' }],
-        [`/${own.id}/assignee`, { assigneeId: users.ti.id }],
-        [`/${own.id}`, { priority: 'alta' }],
-        [`/${own.id}`, { category: 'hardware' }],
-        [`/${own.id}`, { title: 'Forbidden manager edit' }],
-      ]) {
-        check((await browserApi('PATCH', `/tickets${path}`, body)).status === 403, `Manager API rejects ${Object.keys(body)[0]} change`);
-      }
+      check(await evaluate('!!document.querySelector(".action-stack") && !Array.from(document.querySelectorAll("button")).some(el => el.textContent.trim() === "Editar chamado")'), 'Manager sees operational controls without foreign text editing');
+      check((await browserApi('PATCH', `/tickets/${own.id}`, { title: 'Forbidden manager edit' })).status === 403, 'Manager still cannot edit foreign text');
       await go(`/tickets/${managerOwn.id}`);
       await waitDom('manager own detail', 'document.querySelector("h1")?.textContent === "Manager own open ticket"');
       await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Editar chamado").click()');
       await waitDom('manager own edit form', '!!document.getElementById("edit-title")');
-      check(await evaluate('!!document.querySelector(".ticket-layout__main form") && !document.querySelector(".action-stack")'), 'Manager sees own text editing controls without operation controls');
+      check(await evaluate('!!document.querySelector(".ticket-layout__main form") && !!document.querySelector(".action-stack")'), 'Manager sees own text editing and operational controls');
       await fill('edit-title', 'Manager edited own ticket');
       await submit();
       await waitDom('manager own edit saved', 'document.querySelector("h1")?.textContent === "Manager edited own ticket"');
       const saved = await browserApi('GET', `/tickets/${managerOwn.id}`);
       check(saved.status === 200 && saved.body.ticket.title === 'Manager edited own ticket', 'Manager can edit own open ticket through the UI with real persistence');
-      const assignment = await fetch(`${apiUrl}/tickets/${own.id}/assignee`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signAccessToken(users.ti.id)}` },
-        body: JSON.stringify({ assigneeId: users.gestor.id }), signal: AbortSignal.timeout(10000),
-      });
-      check(assignment.status === 400, 'IT cannot assign a manager');
-      await assignment.text();
+      const assignment = await browserApi('PATCH', `/tickets/${managerOwn.id}/assignee`, { assigneeId: users.gestor.id });
+      check(assignment.status === 200, 'Manager can assign and assume responsibility');
+      const triaged = await browserApi('PATCH', `/tickets/${managerOwn.id}`, { priority: 'alta', reason: 'Prioridade operacional revisada pela gestão.' });
+      check(triaged.status === 200 && triaged.body.ticket.history.at(-1).audit.actorId === users.gestor.id, 'Manager changes priority with authenticated audit and justification');
+      const started = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'em_andamento' });
+      check(started.status === 200 && started.body.ticket.history.at(-1).audit.actorId === users.gestor.id, 'Manager starts work as authenticated actor');
+      check((await browserApi('PATCH', `/tickets/${managerOwn.id}/assignee`, { assigneeId: secondAnalyst.id })).status === 400, 'Manager cannot reassign active work without reason');
+      const reassigned = await browserApi('PATCH', `/tickets/${managerOwn.id}/assignee`, { assigneeId: secondAnalyst.id, reason: 'Redistribuição justificada da equipe.' });
+      const assumedAgain = await browserApi('PATCH', `/tickets/${managerOwn.id}/assignee`, { assigneeId: users.gestor.id, reason: 'Gestão retoma atendimento autorizado.' });
+      check(reassigned.status === 200 && assumedAgain.status === 200 && assumedAgain.body.ticket.history.at(-1).audit.actorId === users.gestor.id, 'Manager reassigns and resumes active work with structured audit');
+      const completed = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'resolvido' });
+      check(completed.status === 200 && completed.body.ticket.resolvedBy.id === users.gestor.id, 'Manager resolves with explicit authenticated authorship');
+      const reopened = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'em_andamento', reason: 'Problema reapareceu no teste do segundo ciclo.' });
+      check(reopened.status === 200 && reopened.body.ticket.activeCycleId === 2 && reopened.body.ticket.resolvedBy === null, 'Manager reopens into a new cycle without deleting prior resolution');
+      expected = [4, 0, 2, 2];
       await go('/dashboard');
       await dashboard(expected, role);
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits a 390px viewport');
       await command('Emulation.clearDeviceMetricsOverride');
+      const demo = await ticket('Separate demonstration fixture', users.solicitante);
+      await TicketModel.updateOne({ _id: demo._id }, { $set: { dataOrigin: 'demo' } });
+      await go('/manager');
+      await waitDom('manager analytics loaded', 'document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      const report = (await browserApi('GET', '/dashboard/manager')).body.dashboard;
+      check(await evaluate(`document.querySelectorAll('.pie-chart svg').length >= 1 && document.querySelectorAll('.line-chart .recharts-area').length === 2 && document.querySelector('[data-chart=hours]').dataset.observations === '24'`), 'Manager renders shadcn-style area and priority charts with all 24 hours');
+      check(await evaluate(`Array.from(document.querySelectorAll('.pie-chart .chart-legend li')).every(el => el.textContent.includes('%')) && !Array.from(document.querySelectorAll('.pie-chart path, .line-chart polyline')).some(el => /NaN|Infinity/.test(el.getAttribute('d') ?? el.getAttribute('points'))) `), 'Charts expose percentages and contain valid finite coordinates');
+      check(report.current.total === 4 && report.period.created === 4, 'Manager counts exclude demonstration by default');
+      check(report.period.resolutions === 2 && report.period.resolvedTickets === 2 && report.period.reopenings === 1, 'Manager resolutions survive reopen and count one event per cycle');
+      check(report.team.find(row => row.id === users.ti.id).resolutions === 1 && report.team.find(row => row.id === secondAnalyst.id).resolutions === 0, 'Manager productivity uses resolver rather than current assignee');
+      check(report.team.find(row => row.id === zeroAnalyst.id).assigned === 0 && await evaluate('document.getElementById("manager-team").parentElement.textContent.includes("Zero-load analyst")'), 'Zero-load analysts appear in the real manager table');
+      check(report.requesters[0].created === 2 && report.requesters[0].name === users.solicitante.name, 'Requester ranking is based on persisted period creations');
+      check(report.coverage.resolvedWithoutStructuredHistory === 1 && await evaluate(`Array.from(document.querySelectorAll('.manager-help')).some(el => el.textContent.includes('sem autoria comprovada'))`), 'Legacy resolution is disclosed and excluded from productivity');
+      const select = (id, value) => evaluate(`(() => { const el = document.getElementById(${JSON.stringify(id)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      for (const period of ['today', 'week', 'month', 'year']) {
+        await select('manager-period', period);
+        await waitDom(`manager period ${period}`, `location.search.includes('period=${period}') && document.querySelectorAll('.manager-page .stat-card__value').length === 6`);
+        const filtered = (await browserApi('GET', `/dashboard/manager?period=${period}`)).body.dashboard;
+        check(filtered.filters.period === period && filtered.period.created === 4, `Manager ${period} filter reaches backend`);
+      }
+      await select('manager-dataOrigin', 'demo');
+      await waitDom('demonstration indicators', 'document.querySelector(".manager-source--demo") && document.querySelector(".manager-page .stat-card__value")?.textContent === "1"');
+      check((await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard.current.total === 1, 'Demonstration indicators remain separate and visibly identified');
+      await select('manager-dataOrigin', 'operational');
+      await waitDom('operational indicators restored', 'document.querySelector(".manager-page .stat-card__value")?.textContent === "4"');
+      await evaluate('document.querySelector(".manager-filters__advanced").open = true');
+      await select('manager-analystId', secondAnalyst.id);
+      await waitDom('analyst filter', `location.search.includes('analystId=${secondAnalyst.id}') && document.querySelectorAll('.manager-page .stat-card__value').length === 6`);
+      check((await browserApi('GET', `/dashboard/manager?analystId=${secondAnalyst.id}`)).body.dashboard.period.resolutions === 0, 'Analyst filter does not credit assigned ticket resolution to Carlos');
+      await evaluate('Array.from(document.querySelectorAll(".manager-table a")).find(el => el.textContent === "Ver chamados").click()');
+      await waitDom('analyst operational queue', `location.pathname === '/tickets' && location.search.includes('assigneeId=${secondAnalyst.id}') && document.querySelectorAll('.ticket-table tbody tr').length === 1`);
+      const queueUrl = await evaluate('location.pathname + location.search');
+      await evaluate('document.querySelector(".ticket-table__title a").click()');
+      await waitDom('queue detail', '!!document.querySelector(".timeline")');
+      await evaluate('document.querySelector(".back-link").click()');
+      await waitDom('filtered queue restored', `location.pathname + location.search === ${JSON.stringify(queueUrl)} && !!document.querySelector('.ticket-table tbody tr')`);
+      check(true, 'Manager drills into analyst queue and returns from history with filters preserved');
+      await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
+      await waitDom('manager navigation from operation', 'location.pathname === "/manager" && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      check(true, 'Manager navigation separates supervision and operation');
+      // Rich demonstration fixtures use the same valid audit schema, in the temporary DB only.
+      const { demoTickets, insertDemoTickets } = await import('../src/services/manager-demo.ts');
+      check((await insertDemoTickets(demoTickets([users.solicitante, other, users.ti, secondAnalyst, users.gestor]))).created === 24, 'Structured demonstration seed inserts 24 isolated new fixtures');
+      check((await insertDemoTickets(demoTickets([users.solicitante, other, users.ti, secondAnalyst, users.gestor]))).skipped === 24, 'Second seed run preserves all fixtures without duplicates');
+      const oldDate = new Date(Date.now() - 10 * 86400000);
+      await TicketModel.create({ dataOrigin: 'demo', title: '[DEMO] Aging and inactivity fixture', description: 'Explicitly fictitious isolated E2E fixture for alerts.', category: 'hardware', priority: 'alta', status: 'em_andamento', requester: other._id, assignee: secondAnalyst._id, createdAt: oldDate, updatedAt: new Date(), revision: 1, activeCycleId: 1, history: [{ type: 'assigned', author: users.gestor._id, at: oldDate, message: 'Fictitious assignment', audit: { schemaVersion: 2, eventId: randomUUID(), operationId: randomUUID(), actorId: users.gestor._id, actorSnapshot: { name: users.gestor.name, role: 'gestor' }, eventType: 'assigned', occurredAt: oldDate, revision: 1, eventIndex: 0, cycleId: 1, from: { assignee: null }, to: { assignee: secondAnalyst._id }, assigneeAtEvent: secondAnalyst._id, dataOrigin: 'demo' } }] });
+      await select('manager-dataOrigin', 'demo');
+      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && document.querySelector(".manager-page .stat-card__value")?.textContent !== "4"');
+      const demoReport = (await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard;
+      check(demoReport.current.total === 26 && demoReport.period.resolutions === 14 && demoReport.period.reopenings === 4, 'Demo aggregates reflect actual structured cycles and remain separate from four operational tickets');
+      for (const attention of ['high_unassigned', 'oldest', 'inactive']) {
+        const href = await evaluate(`Array.from(document.querySelectorAll('.alert-card')).find(el => el.href.includes('attention=${attention}')).getAttribute('href')`);
+        const result = await browserApi('GET', href);
+        const count = attention === 'high_unassigned' ? demoReport.alerts.highUnassigned : attention === 'oldest' ? demoReport.alerts.oldPending : demoReport.alerts.inactive;
+        check(result.status === 200 && result.body.pagination.total === count && count > 0, `Actionable ${attention} alert matches the authorized queue count`);
+      }
+      await evaluate(`Array.from(document.querySelectorAll('.alert-card')).find(el => el.href.includes('attention=inactive')).click()`);
+      await waitDom('inactive queue', 'location.pathname === "/tickets" && location.search.includes("attention=inactive") && !!document.querySelector(".ticket-table tbody tr")');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Inactivity alert loads the real queue using structured activity despite recent updatedAt');
+      await evaluate('document.querySelector(".ticket-table__title a").click()');
+      await waitDom('inactive history', '!!document.querySelector(".timeline")');
+      await evaluate('document.querySelector(".back-link").click()');
+      await waitDom('inactive queue restored', 'location.search.includes("attention=inactive") && !!document.querySelector(".ticket-table tbody tr")');
+      check(true, 'Activity and origin filters survive list-detail-return navigation');
+      await go('/manager?dataOrigin=demo');
+      await waitDom('demo restored for visual review', '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      // Controlled browser-only fetch failures exercise states without stopping any service.
+      await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/tickets?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E queue failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
+      await evaluate(`document.querySelector('.app-nav a[href="/tickets"]').click()`);
+      await waitDom('queue loading state', 'document.querySelector("[role=status]")?.textContent.includes("Carregando chamados")');
+      check(true, 'Queue exposes accessible loading state');
+      await waitDom('queue error state', 'document.querySelector("[role=alert]")?.textContent.includes("erro inesperado")');
+      check(true, 'Queue exposes error and recovery action');
+      await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
+      await waitDom('queue recovery', '!!document.querySelector(".ticket-table tbody tr")');
+      check(true, 'Queue retry recovers real persisted tickets');
+      await fill('ticket-search', 'Aging and inactivity fixture');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('literal queue search', 'location.search.includes("search=") && document.querySelectorAll(".ticket-table tbody tr").length === 1');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Search reaches the API and filters actual queue rows');
+      await fill('ticket-search', 'No matching fictitious ticket 987654321');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('queue empty state', '!document.querySelector(".ticket-table tbody tr") && document.querySelector(".card--empty")?.textContent.includes("Nenhum")');
+      check(true, 'Queue shows understandable empty search results');
+      await go('/tickets?dataOrigin=demo');
+      await waitDom('demo queue for mobile', '!!document.querySelector(".ticket-table tbody tr")');
+      await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      check(await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth && Array.from(document.querySelectorAll('select')).every(el => !!document.querySelector('label[for="' + el.id + '"]'))`), 'Real queue fits mobile and associates every selector with its label');
+      await writeFile(resolve(root, 'backend/e2e-results/tickets-mobile.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await command('Emulation.clearDeviceMetricsOverride');
+      await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/dashboard/manager?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E manager failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
+      await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
+      await waitDom('manager loading state', 'document.querySelector(".manager-page [role=status]")?.textContent.includes("Carregando")');
+      check(true, 'Manager exposes accessible loading state');
+      await waitDom('manager error state', 'document.querySelector(".manager-page [role=alert]")?.textContent.includes("erro inesperado")');
+      check(true, 'Manager exposes error and recovery action');
+      await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
+      await waitDom('manager recovery', 'document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      check(true, 'Manager retry recovers actual analytics');
+      await go('/manager?dataOrigin=demo');
+      await waitDom('rich dashboard for screenshots', '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      const output = resolve(root, 'backend/e2e-results');
+      await mkdir(output, { recursive: true });
+      await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+      await delay(200); // Let palette transitions settle before visual capture.
+      const contrast = () => evaluate(`(() => {
+        const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 });
+        const luminance = value => { const [r,g,b] = rgb(value); return .2126*r + .7152*g + .0722*b; };
+        return Array.from(document.querySelectorAll('.button--primary, .button--secondary')).every(el => { const s = getComputedStyle(el); const a = luminance(s.color), b = luminance(s.backgroundColor); return (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 4.5; });
+      })()`);
+      check(await contrast(), 'Light theme action buttons meet 4.5:1 text contrast');
+      await writeFile(join(output, 'manager-desktop-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await evaluate('document.getElementById("manager-team").scrollIntoView({ block: "start" })');
+      await writeFile(join(output, 'manager-team-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await evaluate('document.getElementById("manager-trends").scrollIntoView({ block: "start" })');
+      await waitDom('populated area chart for visual review', 'document.querySelectorAll(".line-chart .recharts-area-curve").length === 2');
+      check(await evaluate('Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100 && el.getBoundingClientRect().height > 100) && Array.from(document.querySelectorAll(".line-chart .recharts-area-curve")).every(el => el.getAttribute("d")?.length > 20)'), 'Rich area chart renders actual paths after navigation and resizing');
+      await evaluate('(async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
+      await writeFile(join(output, 'manager-chart-diagnostics.json'), JSON.stringify(await evaluate('Array.from(document.querySelectorAll(".chart-container")).map(el => ({ label: el.getAttribute("aria-label"), width: el.clientWidth, height: el.clientHeight, svgs: el.querySelectorAll("svg").length, paths: el.querySelectorAll("path").length }))'), null, 2));
+      await writeFile(join(output, 'manager-lines-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await evaluate('window.scrollTo(0,0)');
+      check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits desktop without page overflow');
+      await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
+      check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
+      await writeFile(join(output, 'manager-mobile-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+      await delay(200);
+      check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
+      await writeFile(join(output, 'manager-mobile-dark.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark"'), 'Manager dark theme uses the shared system palette');
+      await command('Emulation.clearDeviceMetricsOverride');
+      await command('Emulation.setEmulatedMedia', { features: [] });
     }
     await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent === "Sair").click()');
     await waitDom(`${role} logout`, 'location.pathname === "/login" && !!document.getElementById("email")');

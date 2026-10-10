@@ -28,7 +28,7 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 16px rgba(16, 24, 40, 0.06);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
@@ -419,7 +419,7 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 32px;
-  max-width: 1120px;
+  max-width: 1480px;
   min-height: 64px;
   margin: 0 auto;
   padding: 10px 24px;
@@ -473,7 +473,7 @@ textarea {
 }
 
 .app-main {
-  max-width: 1120px;
+  max-width: 1480px;
   margin: 0 auto;
   padding: 32px 24px;
 }
@@ -1371,3 +1371,94 @@ textarea.field__input {
   align-items: center;
   gap: 12px;
 }
+
+/* Compact management and operational navigation; shares both theme palettes. */
+.eyebrow { color: var(--color-text-muted); font-size: .8rem; font-weight: 650; letter-spacing: .04em; }
+.manager-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.manager-filters__advanced { grid-column: 1 / -1; }
+.manager-filters__advanced summary { color: var(--color-primary); font-size: .875rem; font-weight: 600; cursor: pointer; }
+.manager-filters__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 10px; align-items: end; }
+.manager-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.manager-stats .stat-card { padding: 16px; gap: 6px; }
+.manager-stats .stat-card__value { font-size: 1.9rem; }
+.section-title { font-size: 1.15rem; margin-bottom: 12px; }
+.manager-source { padding: 10px 14px; border-left: 3px solid var(--color-primary); background: var(--color-surface-muted); font-size: .875rem; }
+.manager-source--demo { border-color: var(--color-warning); }
+.table-scroll { overflow-x: auto; max-width: 100%; margin: 16px 0; }
+.manager-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .875rem; }
+.manager-table th, .manager-table td { padding: 12px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.manager-table thead { background: var(--color-surface-muted); }
+.manager-table tbody th { font-weight: 600; }
+.manager-table small { display: block; font-size: .75rem; font-weight: 400; color: var(--color-text-muted); }
+.manager-table a { color: var(--color-primary); }
+.manager-table--trends { min-width: 440px; }
+.trend-bars { display: grid; gap: 4px; min-width: 100px; }
+.trend-bars span { display: block; height: 6px; border-radius: 3px; }
+.trend-bars__created, .manager-bar { background: var(--color-primary); }
+.trend-bars__resolved { background: var(--color-success); }
+.queue-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.queue-links a { text-decoration: none; }
+.app-main, .page, .dashboard, .dashboard__grid > *, .manager-page section { min-width: 0; }
+@media (max-width: 900px) { .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .manager-filters__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-filters { padding: 14px; }
+  .manager-filters .field__label { font-size: .75rem; }
+  .manager-filters .field__input { padding-left: 7px; padding-right: 7px; font-size: .8rem; }
+  .manager-stats .stat-card { padding: 12px; }
+  .manager-stats .stat-card__hint { font-size: .75rem; }
+  .app-nav__link { font-size: .8rem; }
+  .manager-source { overflow-wrap: anywhere; }
+}
+
+/* Charts retain text legends and tables for precise, accessible reading. */
+:root { --chart-blue: #2456cc; --chart-teal: #087f72; --chart-amber: #b66b09; --chart-violet: #7954bd; --chart-rose: #bb466a; }
+@media (prefers-color-scheme: dark) {
+  :root { --chart-blue: #83a6ff; --chart-teal: #58cbb7; --chart-amber: #edb85b; --chart-violet: #b29aee; --chart-rose: #ed96b0; }
+}
+.pie-chart { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.pie-chart__svg { width: 180px; max-width: 100%; flex: 0 0 180px; }
+.chart-legend { padding: 0; margin: 12px 0; list-style: none; display: grid; gap: 10px; font-size: .875rem; }
+.chart-legend li { display: flex; align-items: center; gap: 8px; }
+.chart-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.chart-legend--inline { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+.line-chart { margin: 20px 0; }
+.line-chart figcaption { font-size: .875rem; font-weight: 600; }
+.line-chart svg { display: block; width: 100%; max-height: 300px; }
+.line-chart text { fill: var(--color-text-muted); font-size: 12px; }
+.line-chart__grid { stroke: var(--color-border); }
+.line-chart__created { stroke: var(--chart-blue); fill: var(--chart-blue); }
+.line-chart__resolved { stroke: var(--chart-teal); fill: var(--chart-teal); }
+@media (max-width: 600px) {
+  .pie-chart { justify-content: center; }
+  .chart-legend { width: 100%; }
+  .line-chart text { font-size: 12px; }
+}
+
+/* shadcn chart pattern adapted to the application's CSS tokens. */
+.chart-container { width: 100%; height: 280px; min-width: 0; font-size: .75rem; }
+.chart-container .recharts-cartesian-axis-tick text { fill: var(--color-text-muted); }
+.chart-tooltip { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); box-shadow: 0 4px 16px #0002; }
+.chart-tooltip > div { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.chart-tooltip b { margin-left: auto; }
+.manager-alerts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.alert-card { display: grid; gap: 7px; padding: 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--chart-rose); border-radius: var(--radius-md); color: var(--color-text); text-decoration: none; }
+.alert-card__value { font-size: 1.8rem; }
+.alert-card > span:last-child { color: var(--color-primary); font-weight: 600; font-size: .8rem; }
+.alert-card:hover, a.stat-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 12px #0001; }
+.manager-help { color: var(--color-text-muted); font-size: .875rem; margin: 8px 0; }
+.manager-help summary, .manager-page details summary { cursor: pointer; }
+.manager-related { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; }
+.load-highlight { color: var(--color-primary) !important; font-weight: 600 !important; }
+.workload-list { list-style: none; padding: 0; display: grid; gap: 18px; }
+.workload-list a { color: var(--color-primary); font-weight: 600; }
+.workload-bars { height: 12px; display: flex; margin: 7px 0; background: var(--color-surface-muted); border-radius: 4px; overflow: hidden; }
+.workload-bars__alta { background: var(--chart-rose); }.workload-bars__media { background: var(--chart-amber); }.workload-bars__baixa { background: var(--chart-teal); }
+@media (max-width: 1080px) { .manager-related { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .manager-alerts { grid-template-columns: 1fr; }.chart-container { height: 240px; } }
+
+.chart-container { overflow: clip; }
+.chart-container .recharts-surface { max-width: 100%; }
+.pie-chart .chart-container { width: 220px; height: 240px; flex: 0 1 220px; }
+.pie-chart .chart-legend { flex: 1; min-width: 160px; }

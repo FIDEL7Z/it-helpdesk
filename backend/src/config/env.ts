@@ -2,6 +2,10 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
+  DEMO_MODE: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  APP_TIMEZONE: z.string().default('America/Fortaleza').refine(value => {
+    try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; }
+  }, 'APP_TIMEZONE must be a valid IANA timezone'),
   PORT: z.coerce.number().int().positive().default(3000),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must have at least 32 characters'),

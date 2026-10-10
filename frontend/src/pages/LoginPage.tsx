@@ -41,7 +41,7 @@ function loginErrorMessage(error: unknown): string {
 }
 
 /** Page the user tried to open before being sent to login (only internal paths). */
-function redirectTarget(state: unknown): string {
+function redirectTarget(state: unknown, manager: boolean): string {
   if (
     typeof state === 'object' &&
     state !== null &&
@@ -52,12 +52,12 @@ function redirectTarget(state: unknown): string {
   ) {
     return state.from
   }
-  return '/dashboard'
+  return manager ? '/manager' : '/dashboard'
 }
 
 export function LoginPage() {
   useDocumentTitle('Entrar')
-  const { status, login } = useAuth()
+  const { status, login, user } = useAuth()
   const location = useLocation()
 
   const [email, setEmail] = useState('')
@@ -76,7 +76,7 @@ export function LoginPage() {
 
   // Covers both a user who is already logged in and a successful login below.
   if (status === 'authenticated') {
-    return <Navigate to={redirectTarget(location.state)} replace />
+    return <Navigate to={redirectTarget(location.state, user?.role === 'gestor')} replace />
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

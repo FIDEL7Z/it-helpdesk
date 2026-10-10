@@ -56,10 +56,10 @@ function countOf(rows: { count: number }[] | undefined): number {
   return rows?.[0]?.count ?? 0;
 }
 
-export async function getDashboardSummary(actor: PublicUser): Promise<DashboardSummary> {
+export async function getDashboardSummary(actor: PublicUser, dataOrigin?: 'operational' | 'demo' | 'legacy'): Promise<DashboardSummary> {
   const seesAllTickets = can(actor.role, 'tickets:view-all');
   // The personal workload only makes sense for people who work on tickets.
-  const hasWorkload = can(actor.role, 'tickets:operate');
+  const hasWorkload = actor.role === 'ti';
 
   // Each facet is an independent pipeline that runs over the documents that
   // passed the first $match (the user's scope), all in one database query.
@@ -77,9 +77,9 @@ export async function getDashboardSummary(actor: PublicUser): Promise<DashboardS
 
   if (hasWorkload) {
     // Same filter builder as the list endpoint, so the card and the list agree.
-    facets.unassigned = [{ $match: buildTicketFilter({ assignee: 'none' }, actor) }, { $count: 'count' }];
+    facets.unassigned = [{ $match: buildTicketFilter({ assignee: 'none', dataOrigin }, actor) }, { $count: 'count' }];
     facets.inProgressAssignedToMe = [
-      { $match: buildTicketFilter({ assignee: 'me', status: 'em_andamento' }, actor) },
+      { $match: buildTicketFilter({ assignee: 'me', status: 'em_andamento', dataOrigin }, actor) },
       { $count: 'count' },
     ];
   }
@@ -87,10 +87,10 @@ export async function getDashboardSummary(actor: PublicUser): Promise<DashboardS
   const [[result], recent] = await Promise.all([
     TicketModel.aggregate<FacetResult>([
       // Authorization first: requesters only ever aggregate their own tickets.
-      { $match: buildTicketFilter({}, actor) },
+      { $match: buildTicketFilter({ dataOrigin }, actor) },
       { $facet: facets },
     ]),
-    listTickets({ page: 1, limit: RECENT_TICKETS_LIMIT }, actor),
+    listTickets({ page: 1, limit: RECENT_TICKETS_LIMIT, dataOrigin }, actor),
   ]);
 
   const byStatus = countBy(TICKET_STATUSES, result.byStatus);

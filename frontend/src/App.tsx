@@ -3,9 +3,12 @@ import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { lazy, Suspense } from 'react'
 import { NewTicketPage } from './pages/NewTicketPage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
 import { TicketsPage } from './pages/TicketsPage'
+
+const ManagerPage = lazy(() => import('./pages/ManagerPage').then(module => ({ default: module.ManagerPage })))
 
 function App() {
   return (
@@ -16,6 +19,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/manager" element={<Suspense fallback={<div role="status" className="card card--empty">Carregando visão gerencial...</div>}><ManagerPage /></Suspense>} />
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/tickets/new" element={<NewTicketPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />

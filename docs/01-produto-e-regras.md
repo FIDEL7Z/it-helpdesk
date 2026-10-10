@@ -8,11 +8,11 @@ O setor de TI recebe solicitações internas em volume, com dificuldade para org
 
 O produto atende três necessidades: o solicitante comunica e acompanha seu problema; a TI organiza e executa o atendimento; o gestor consulta o conjunto das demandas sem operar os chamados de outras pessoas. O dashboard aparece após o login normal e mantém o escopo permitido para cada usuário. Uma rota protegida acessada anteriormente pode ser restaurada após o login.
 
-## Raciocínio sobre o produto — rascunho para revisão do autor
+## Como pensei na solução
 
 > Primeiro analisei o problema operacional da TI: receber muitas solicitações sem uma organização clara dificulta o atendimento e o acompanhamento. Identifiquei necessidades diferentes para o solicitante, o suporte e o gestor. Organizei a solução em torno da abertura, do atendimento e do acompanhamento dos chamados, considerando segurança, rastreabilidade e facilidade de uso. Priorizei uma aplicação funcional, com autenticação, persistência e histórico, antes de recursos avançados.
 
-Este texto traduz as ideias fornecidas pelo autor e depende de sua aprovação editorial. Não descreve entrevistas, pesquisa de campo ou testes com usuários. Motivações pessoais para a escolha da stack, alternativas consideradas e aprendizados individuais precisam ser confirmados antes de serem atribuídos ao autor.
+Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de campo ou testes com usuários.
 
 ## Permissões implementadas
 

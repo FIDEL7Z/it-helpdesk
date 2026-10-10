@@ -200,7 +200,7 @@ Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável.
 
 ## Documentação complementar
 
-- [Produto, regras e raciocínio do autor para revisão](docs/01-produto-e-regras.md)
+- [Produto, regras e raciocínio do autor](docs/01-produto-e-regras.md)
 - [Arquitetura, coleções, referências e índices](docs/02-arquitetura-e-dados.md)
 - [Jornadas, ciclo de vida e referência da API](docs/03-fluxos-e-api.md)
 - [Definições das métricas, decisões técnicas e limitações](docs/04-metricas-decisoes-e-limites.md)

@@ -28,7 +28,7 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 16px rgba(16, 24, 40, 0.06);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
@@ -1370,4 +1370,44 @@ textarea.field__input {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Compact management and operational navigation; shares both theme palettes. */
+.eyebrow { color: var(--color-text-muted); font-size: .8rem; font-weight: 650; letter-spacing: .04em; }
+.manager-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.manager-filters__advanced { grid-column: 1 / -1; }
+.manager-filters__advanced summary { color: var(--color-primary); font-size: .875rem; font-weight: 600; cursor: pointer; }
+.manager-filters__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 10px; align-items: end; }
+.manager-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.manager-stats .stat-card { padding: 16px; gap: 6px; }
+.manager-stats .stat-card__value { font-size: 1.9rem; }
+.section-title { font-size: 1.15rem; margin-bottom: 12px; }
+.manager-source { padding: 10px 14px; border-left: 3px solid var(--color-primary); background: var(--color-surface-muted); font-size: .875rem; }
+.manager-source--demo { border-color: var(--color-warning); }
+.table-scroll { overflow-x: auto; max-width: 100%; margin: 16px 0; }
+.manager-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .875rem; }
+.manager-table th, .manager-table td { padding: 12px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.manager-table thead { background: var(--color-surface-muted); }
+.manager-table tbody th { font-weight: 600; }
+.manager-table small { display: block; font-size: .75rem; font-weight: 400; color: var(--color-text-muted); }
+.manager-table a { color: var(--color-primary); }
+.manager-table--trends { min-width: 440px; }
+.trend-bars { display: grid; gap: 4px; min-width: 100px; }
+.trend-bars span { display: block; height: 6px; border-radius: 3px; }
+.trend-bars__created, .manager-bar { background: var(--color-primary); }
+.trend-bars__resolved { background: var(--color-success); }
+.queue-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.queue-links a { text-decoration: none; }
+.app-main, .page, .dashboard, .dashboard__grid > *, .manager-page section { min-width: 0; }
+@media (max-width: 900px) { .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .manager-filters__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-filters { padding: 14px; }
+  .manager-filters .field__label { font-size: .75rem; }
+  .manager-filters .field__input { padding-left: 7px; padding-right: 7px; font-size: .8rem; }
+  .manager-stats .stat-card { padding: 12px; }
+  .manager-stats .stat-card__hint { font-size: .75rem; }
+  .app-nav__link { font-size: .8rem; }
+  .manager-source { overflow-wrap: anywhere; }
 }

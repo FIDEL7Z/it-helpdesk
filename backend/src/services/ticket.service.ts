@@ -88,6 +88,7 @@ export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
 export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
 
 export interface TicketFilters {
+  pending?: boolean;
   assigneeId?: string;
   requesterId?: string;
   dataOrigin?: Ticket['dataOrigin'];
@@ -230,6 +231,10 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
   if (filters.dataOrigin === 'legacy') filter.$or = [{ dataOrigin: 'legacy' }, { dataOrigin: { $exists: false } }];
   else if (filters.dataOrigin) filter.dataOrigin = filters.dataOrigin;
   if (filters.status) filter.status = filters.status;
+  if (filters.pending) {
+    if (!filters.status) filter.status = { $in: ['aberto', 'em_andamento'] };
+    else if (filters.status === 'resolvido') filter._id = { $exists: false };
+  }
   if (filters.priority) filter.priority = filters.priority;
   if (filters.category) filter.category = filters.category;
   if (filters.assignee === 'none') filter.assignee = null;

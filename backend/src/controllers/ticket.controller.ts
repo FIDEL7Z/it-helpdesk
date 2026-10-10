@@ -31,6 +31,7 @@ const createTicketSchema = z.strictObject({
 });
 
 const listTicketsQuerySchema = z.object({
+  pending: z.enum(['true']).optional().transform(value => value === 'true' ? true : undefined),
   assigneeId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   requesterId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional(),

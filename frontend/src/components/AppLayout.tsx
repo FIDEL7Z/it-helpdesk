@@ -22,11 +22,11 @@ export function AppLayout() {
           </div>
 
           <nav className="app-nav" aria-label="Navegação principal">
-            <NavLink to="/dashboard" className="app-nav__link">
-              Dashboard
+            <NavLink to={user?.role === 'gestor' ? '/manager' : '/dashboard'} className="app-nav__link">
+              {user?.role === 'gestor' ? 'Visão gerencial' : 'Dashboard'}
             </NavLink>
             <NavLink to="/tickets" className="app-nav__link">
-              Chamados
+              {user?.role === 'solicitante' ? 'Meus chamados' : 'Operação de chamados'}
             </NavLink>
           </nav>
 

@@ -155,6 +155,9 @@ describe('Manager analytics and authorization', () => {
   });
   it('keeps authorization when drilling down by assignee or requester', async () => {
     await fixture('2026-06-01T12:00:00Z', { assignee: otherTech });
+    await fixture('2026-06-01T12:00:00Z', { status: 'resolvido' });
+    assert.equal((await api('GET', '/tickets?pending=true', manager)).body.pagination.total, 1);
+    assert.equal((await api('GET', '/tickets?pending=true&status=resolvido', manager)).body.pagination.total, 0);
     assert.equal((await api('GET', `/tickets?assigneeId=${otherTech}`, manager)).body.pagination.total, 1);
     assert.equal((await api('GET', `/tickets?requesterId=${otherRequester}`, requester)).status, 403);
     assert.equal((await api('GET', `/tickets?assigneeId=${tech}`, requester)).status, 403);

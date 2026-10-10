@@ -43,6 +43,9 @@ function readFilters(params: URLSearchParams): TicketFilters {
   const page = Number(params.get('page'))
 
   return {
+    pending: params.get('pending') === 'true' ? true : undefined,
+    assigneeId: /^[a-f\d]{24}$/i.test(params.get('assigneeId') ?? '') ? params.get('assigneeId')! : undefined,
+    requesterId: /^[a-f\d]{24}$/i.test(params.get('requesterId') ?? '') ? params.get('requesterId')! : undefined,
     dataOrigin: ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
@@ -84,7 +87,7 @@ export function TicketsPage() {
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   const hasFilters = Boolean(
-    filters.dataOrigin || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+    filters.pending || filters.assigneeId || filters.requesterId || filters.dataOrigin || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
 
   useEffect(() => {
@@ -104,6 +107,7 @@ export function TicketsPage() {
 
   function updateFilter(key: FilterKey, value: string) {
     const next = new URLSearchParams(searchParams)
+    if (key === 'assignee') next.delete('assigneeId')
     if (value) next.set(key, value)
     else next.delete(key)
     next.delete('page')
@@ -145,6 +149,14 @@ export function TicketsPage() {
           Chamado “{createdTitle}” aberto com sucesso.
         </div>
       )}
+
+      {canFilterByAssignee && <nav className="queue-links" aria-label="Atalhos da fila operacional">
+        <Link className="button button--secondary" to={`/tickets?assignee=none${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Sem responsável</Link>
+        <Link className="button button--secondary" to={`/tickets?assignee=me${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Atribuídos a mim</Link>
+        <Link className="button button--secondary" to={`/tickets?status=em_andamento${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Em andamento</Link>
+      </nav>}
+      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. O período gerencial não restringe esta fila atual. Use “Limpar filtros” para consultar todos.</p>}
+      {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       <div className="toolbar">
         {/* Remounted when the URL search changes (e.g. back button, clear filters). */}
@@ -252,7 +264,7 @@ export function TicketsPage() {
               {tickets.map((ticket) => (
                 <tr key={ticket.id}>
                   <td data-label="Título" className="ticket-table__title">
-                    <Link to={`/tickets/${ticket.id}`}>{ticket.title}</Link>
+                    <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
                   </td>
                   <td data-label="Categoria">{CATEGORY_LABELS[ticket.category]}</td>
                   <td data-label="Prioridade">

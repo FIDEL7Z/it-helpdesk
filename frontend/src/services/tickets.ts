@@ -105,6 +105,9 @@ export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
 }
 
 export type TicketFilters = {
+  pending?: boolean
+  assigneeId?: string
+  requesterId?: string
   dataOrigin?: 'operational' | 'demo' | 'legacy'
   status?: TicketStatus
   priority?: TicketPriority

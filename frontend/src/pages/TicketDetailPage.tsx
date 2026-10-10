@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -41,6 +41,9 @@ type LoadState = {
 type ActionResult = Promise<{ ticket: TicketDetail }>
 
 export function TicketDetailPage() {
+  const location = useLocation()
+  const candidate: unknown = location.state?.returnTo
+  const returnTo = typeof candidate === 'string' && /^\/tickets(?:\?|$)/.test(candidate) ? candidate : '/tickets'
   const { id = '' } = useParams()
   const { user } = useAuth()
 
@@ -91,7 +94,7 @@ export function TicketDetailPage() {
   if (!ticket) {
     return (
       <section className="page">
-        <Link to="/tickets" className="back-link">
+        <Link to={returnTo} className="back-link">
           ← Voltar para chamados
         </Link>
         {loading ? (
@@ -102,7 +105,7 @@ export function TicketDetailPage() {
         ) : (
           <div className="card card--empty">
             <p>{state.error}</p>
-            <Link to="/tickets" className="button button--secondary">
+            <Link to={returnTo} className="button button--secondary">
               Ver meus chamados
             </Link>
           </div>
@@ -120,7 +123,7 @@ export function TicketDetailPage() {
   return (
     <section className="page">
       <header className="page__header">
-        <Link to="/tickets" className="back-link">
+        <Link to={returnTo} className="back-link">
           ← Voltar para chamados
         </Link>
         <div className="ticket-heading">

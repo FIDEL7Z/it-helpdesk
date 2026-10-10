@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
@@ -45,7 +46,7 @@ export function DashboardPage() {
 
   if (!user) return null
 
-  const isIt = user.role === 'ti'
+  const seesAllTickets = can(user.role, 'tickets:view-all')
   const { summary } = state
 
   return (
@@ -54,7 +55,9 @@ export function DashboardPage() {
         <div>
           <h1 className="page__title">Olá, {user.name}</h1>
           <p className="page__subtitle">
-            {isIt ? 'Visão geral dos chamados de TI da empresa.' : 'Acompanhe as suas solicitações para a equipe de TI.'}
+            {seesAllTickets
+              ? 'Visão geral dos chamados de TI da empresa.'
+              : 'Acompanhe as suas solicitações para a equipe de TI.'}
           </p>
         </div>
         <Link to="/tickets/new" className="button button--primary">
@@ -117,7 +120,7 @@ export function DashboardPage() {
 
           {summary.byStatus.total === 0 ? (
             <div className="card card--empty">
-              {isIt ? (
+              {seesAllTickets ? (
                 <p>Nenhum chamado registrado até o momento.</p>
               ) : (
                 <>
@@ -168,7 +171,7 @@ export function DashboardPage() {
                           {ticket.title}
                         </Link>
                         <p className="recent-list__meta">
-                          {isIt && <>{ticket.requester?.name ?? 'Usuário removido'} · </>}
+                          {seesAllTickets && <>{ticket.requester?.name ?? 'Usuário removido'} · </>}
                           {CATEGORY_LABELS[ticket.category]} ·{' '}
                           <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
                         </p>

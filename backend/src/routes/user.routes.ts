@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { listItStaff } from '../controllers/user.controller';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { requireAuth, requirePermission } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.get('/it-staff', requireAuth, requireRole('ti'), listItStaff);
+router.get('/it-staff', requireAuth, requirePermission('users:list-it-staff'), listItStaff);
 
 export default router;

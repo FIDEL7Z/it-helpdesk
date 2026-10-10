@@ -7,7 +7,7 @@ import {
   listTickets,
   updateTicket,
 } from '../controllers/ticket.controller';
-import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { requireAuth, requirePermission } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -19,8 +19,8 @@ router.get('/', listTickets);
 router.get('/:id', getTicket);
 router.patch('/:id', updateTicket);
 
-// Workflow actions are restricted to the IT team.
-router.patch('/:id/status', requireRole('ti'), changeStatus);
-router.patch('/:id/assignee', requireRole('ti'), assignTicket);
+// Workflow actions: only roles with the "tickets:operate" permission.
+router.patch('/:id/status', requirePermission('tickets:operate'), changeStatus);
+router.patch('/:id/assignee', requirePermission('tickets:operate'), assignTicket);
 
 export default router;

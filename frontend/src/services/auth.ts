@@ -1,6 +1,6 @@
 import { apiRequest } from './api'
 
-export type UserRole = 'solicitante' | 'ti'
+export type UserRole = 'solicitante' | 'ti' | 'gestor'
 
 export type User = {
   id: string
@@ -12,6 +12,7 @@ export type User = {
 export const ROLE_LABELS: Record<UserRole, string> = {
   ti: 'Equipe de TI',
   solicitante: 'Solicitante',
+  gestor: 'Gestão de TI',
 }
 
 type LoginResponse = {

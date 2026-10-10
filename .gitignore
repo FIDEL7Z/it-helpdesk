@@ -6,7 +6,11 @@ dist/
 
 # Environment variables
 .env
-.env.local
+.env.*
+!.env.example
+
+# Local browser test diagnostics
+e2e-results/
 
 # Logs
 *.log

@@ -1,4 +1,5 @@
 import { Types, type QueryFilter } from 'mongoose';
+import { can } from '../auth/permissions';
 import { HttpError } from '../errors/http-error';
 import {
   STATUS_TRANSITIONS,
@@ -152,7 +153,7 @@ export function isRequester(ticket: TicketDocument, actor: PublicUser): boolean 
 export async function findAccessibleTicket(id: string, actor: PublicUser): Promise<TicketDocument> {
   const ticket = await TicketModel.findById(id);
 
-  if (!ticket || (actor.role !== 'ti' && !isRequester(ticket, actor))) {
+  if (!ticket || (!can(actor.role, 'tickets:view-all') && !isRequester(ticket, actor))) {
     throw new HttpError(404, 'Ticket not found');
   }
 
@@ -169,7 +170,7 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
   const actorId = new Types.ObjectId(actor.id);
   const filter: QueryFilter<Ticket> = {};
 
-  if (actor.role !== 'ti') filter.requester = actorId;
+  if (!can(actor.role, 'tickets:view-all')) filter.requester = actorId;
   if (filters.status) filter.status = filters.status;
   if (filters.priority) filter.priority = filters.priority;
   if (filters.category) filter.category = filters.category;
@@ -290,7 +291,7 @@ export async function updateTicket(
   }
 
   if (input.category !== undefined || input.priority !== undefined) {
-    if (actor.role !== 'ti') {
+    if (!can(actor.role, 'tickets:operate')) {
       throw new HttpError(403, 'Only the IT team can change category and priority');
     }
     if (ticket.status === 'resolvido') {
@@ -374,7 +375,7 @@ export async function assignTicket(
   }
 
   const assignee = await UserModel.findById(assigneeId);
-  if (!assignee || assignee.role !== 'ti') {
+  if (!assignee || !can(assignee.role, 'tickets:be-assigned')) {
     throw new HttpError(400, 'Assignee must be an IT team member');
   }
 

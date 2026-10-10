@@ -4,12 +4,31 @@ import { env } from '../config/env';
 import { UserModel, type UserRole } from '../models/user.model';
 import { hashPassword } from '../utils/password';
 
-const seedEnvSchema = z.object({
-  SEED_TI_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
-  SEED_TI_PASSWORD: z.string().min(8),
-  SEED_SOLICITANTE_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
-  SEED_SOLICITANTE_PASSWORD: z.string().min(8),
-});
+/** An empty value in .env ("SEED_GESTOR_EMAIL=") counts as not set. */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+
+const seedEnvSchema = z
+  .object({
+    SEED_TI_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
+    SEED_TI_PASSWORD: z.string().min(8),
+    SEED_SOLICITANTE_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
+    SEED_SOLICITANTE_PASSWORD: z.string().min(8),
+    // Optional so existing .env files keep working: the gestor is created only when both are set.
+    SEED_GESTOR_EMAIL: optional(z.string().trim().toLowerCase().pipe(z.email())),
+    SEED_GESTOR_PASSWORD: optional(z.string().min(8)),
+  })
+  .superRefine((seedEnv, ctx) => {
+    const hasEmail = seedEnv.SEED_GESTOR_EMAIL !== undefined;
+    const hasPassword = seedEnv.SEED_GESTOR_PASSWORD !== undefined;
+    if (hasEmail !== hasPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [hasEmail ? 'SEED_GESTOR_PASSWORD' : 'SEED_GESTOR_EMAIL'],
+        message: 'Set both SEED_GESTOR_EMAIL and SEED_GESTOR_PASSWORD, or neither',
+      });
+    }
+  });
 
 interface DemoUser {
   name: string;
@@ -48,6 +67,15 @@ async function seed(): Promise<void> {
     },
   ];
 
+  if (seedEnv.SEED_GESTOR_EMAIL && seedEnv.SEED_GESTOR_PASSWORD) {
+    demoUsers.push({
+      name: 'Ana Ribeiro',
+      email: seedEnv.SEED_GESTOR_EMAIL,
+      password: seedEnv.SEED_GESTOR_PASSWORD,
+      role: 'gestor',
+    });
+  }
+
   await mongoose.connect(env.MONGODB_URI);
   // Make sure the unique email index exists before inserting.
   await UserModel.syncIndexes();
@@ -55,6 +83,9 @@ async function seed(): Promise<void> {
   console.log('Seeding demo users:');
   for (const user of demoUsers) {
     await ensureUser(user);
+  }
+  if (!seedEnv.SEED_GESTOR_EMAIL) {
+    console.log('- gestor: SEED_GESTOR_EMAIL/SEED_GESTOR_PASSWORD not set, skipped');
   }
 }
 

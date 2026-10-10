@@ -1,0 +1,97 @@
+{
+  "capturedAt": "2026-10-10T05:47:03.070Z",
+  "timezone": "America/Fortaleza",
+  "origin": "demo",
+  "mode": "read-only",
+  "tool": "Edge headless via Chrome DevTools Protocol",
+  "captures": [
+    {
+      "file": "login-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/login"
+    },
+    {
+      "file": "dashboard-solicitante-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/dashboard"
+    },
+    {
+      "file": "abertura-chamado-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets/new"
+    },
+    {
+      "file": "dashboard-ti-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/dashboard"
+    },
+    {
+      "file": "lista-chamados-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets?dataOrigin=demo&search=%5BDEMO%20GERENCIAL%20v1%5D"
+    },
+    {
+      "file": "auditoria-chamado-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets/237fa4f83b1fd6e26d524eda"
+    },
+    {
+      "file": "gestor-visao-geral-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/manager?dataOrigin=demo"
+    },
+    {
+      "file": "gestor-equipe-carga-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/manager?dataOrigin=demo"
+    },
+    {
+      "file": "gestor-solicitantes-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/manager?dataOrigin=demo"
+    },
+    {
+      "file": "gestor-graficos-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/manager?dataOrigin=demo"
+    },
+    {
+      "file": "gestor-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "path": "/manager?dataOrigin=demo"
+    }
+  ]
+}

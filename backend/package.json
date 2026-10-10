@@ -13,7 +13,9 @@
     "test:typecheck": "tsc -p tsconfig.tests.json",
     "test:e2e": "tsx tests/e2e.mjs",
     "seed:demo": "tsx src/scripts/seed-demo.ts",
-    "seed:manager": "tsx src/scripts/seed-manager.ts"
+    "seed:manager": "tsx src/scripts/seed-manager.ts",
+    "docs:capture": "node scripts/capture-docs.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "engines": {
     "node": ">=22.22.0"

@@ -2,6 +2,8 @@
 
 Central de chamados internos de TI com React, TypeScript, Node.js e MongoDB. Reúne abertura, atendimento e acompanhamento das solicitações, com autenticação, permissões por perfil e histórico persistido.
 
+O desafio técnico é entregar um fluxo fullstack verificável: autenticar três perfis, aplicar permissões no servidor, persistir chamados e manter rastreabilidade entre abertura, atendimento e acompanhamento. A visão gerencial distingue o estado atual das ações comprovadas no histórico.
+
 ## Navegação rápida
 
 - [Visão da solução](#visão-da-solução)
@@ -12,6 +14,7 @@ Central de chamados internos de TI com React, TypeScript, Node.js e MongoDB. Re�
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Credenciais demonstrativas](#credenciais-demonstrativas)
 - [Arquitetura](#arquitetura)
+- [Estrutura do repositório](#estrutura-do-repositório)
 - [Decisões técnicas](#decisões-técnicas)
 - [Testes](#testes)
 - [Documentação complementar](#documentação-complementar)
@@ -24,11 +27,13 @@ O solicitante acompanha seus pedidos; a TI classifica, atribui e atende; o gesto
 
 ## Demonstração visual
 
-Capturas reais da interface existente, com dados de demonstração:
+Capturas reais de **10/10/2026**, com dados fictícios do ambiente local:
 
-![Dashboard da equipe de TI](docs/screenshots/dashboard-ti.png)
+![Visão gerencial: filtros, alertas e indicadores de período e situação atual](docs/assets/screenshots/gestor-visao-geral-desktop.png)
 
-[Lista de chamados](docs/screenshots/lista-chamados.png) · [Detalhe e histórico](docs/screenshots/detalhe-chamado.png)
+O gestor separa demanda, carga atual e resoluções comprovadas. Os números da imagem são exemplos, não resultados operacionais.
+
+[Login e jornadas dos três perfis](docs/03-fluxos-e-api.md#capturas-por-perfil) · [Equipe, gráficos e mobile](docs/04-metricas-decisoes-e-limites.md#evidências-visuais) · [Autoria e histórico](docs/06-integridade-e-auditoria.md#evidência-visual-da-autoria)
 
 O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstração dos três perfis, da persistência e da autorização.
 
@@ -44,7 +49,7 @@ Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; T
 
 ## Stack
 
-- **Frontend:** React 19, Vite 8, TypeScript, React Router 8 e CSS próprio.
+- **Frontend:** React 19, Vite 8, TypeScript, React Router 8, Recharts e CSS próprio. Os gráficos adaptam os componentes de referência do shadcn/ui.
 - **Backend:** Node.js, Express 5, TypeScript, Zod, JWT, bcryptjs e express-rate-limit.
 - **Dados:** MongoDB 7 e Mongoose 9.
 - **Infra local:** Docker Compose apenas para MongoDB; API e frontend executados com npm.
@@ -58,7 +63,7 @@ Node.js **22.22 ou superior**, npm e Docker com Docker Compose. Docker é dispen
 
 ### Instalação
 
-Os comandos usam `cp`, disponível no Git Bash/macOS/Linux e como alias no PowerShell; neste último também pode usar `Copy-Item`.
+Os comandos usam `cp`, disponível no Git Bash/macOS/Linux e como alias no PowerShell; neste último também pode usar `Copy-Item`. Se o PowerShell bloquear `npm.ps1`, substitua `npm` por `npm.cmd` nos comandos, sem alterar a política de execução.
 
 ```bash
 git clone https://github.com/FIDEL7Z/it-helpdesk.git
@@ -88,6 +93,10 @@ cp .env.example .env
 ```
 
 O seed cria TI e solicitante; com as duas variáveis SEED_GESTOR preenchidas, cria também o gestor. Usuários existentes são pulados, sem trocar senha ou papel. O seed demo insere até 10 chamados de exemplo; se já existir o mesmo título para o mesmo solicitante, pula. Os scripts encerram com código 1 em caso de erro.
+
+Para avaliar os exemplos, configure **`DEMO_MODE=true`** em `backend/.env` e **`VITE_DEMO_MODE=true`** em `frontend/.env` antes de iniciar os serviços. Os exemplos vêm com `false`: sem essa opção, os indicadores começam no conjunto operacional e podem aparecer vazios. Após entrar, selecione **Demonstração** no controle de origem; a lista básica também possui esse filtro. Mantenha as opções desabilitadas em produção.
+
+Uma instalação nova usa os três perfis do seed e já permite percorrer criação, atendimento, reabertura e gestão. O conjunto ampliado de cinco contas é opcional, conforme as restrições abaixo.
 
 ### Execução
 
@@ -189,6 +198,24 @@ flowchart LR
 
 Controllers validam a entrada; services aplicam escopo, propriedade e regras; models representam os documentos. Middlewares tratam autenticação, permissão e erros. O app Express é separado da inicialização do servidor para permitir testes de integração. Veja [arquitetura e modelo de dados](docs/02-arquitetura-e-dados.md).
 
+## Estrutura do repositório
+
+```text
+backend/
+  src/              API, autenticação, controllers, services e models
+  src/scripts/      Seeds e manutenção local protegida
+  tests/            Integração e E2E em ambiente isolado
+  scripts/          Verificação documental e captura da aplicação
+frontend/
+  src/pages/        Telas dos três perfis
+  src/components/   Interface, controles e gráficos
+  src/auth/         Sessão e autenticação do cliente
+  src/services/     Cliente HTTP e contratos
+docs/               Produto, arquitetura, API, métricas e demonstração
+  assets/screenshots/  Capturas reais e metadados
+docker-compose.yml  MongoDB local
+```
+
 ## Decisões técnicas
 
 Solicitante, responsável atribuído e autor da resolução são identidades distintas. Resolver um chamado de outro responsável exige justificativa; reabrir exige motivo e inicia um novo ciclo. A tabela e o histórico apresentam autoria explícita. Eventos legados permanecem preservados, sem reconstrução presumida de autores ou datas.
@@ -209,6 +236,7 @@ Com dependências dos dois projetos instaladas, `.env` do backend válido e Mong
 cd backend
 npm test
 npm run test:typecheck
+npm run docs:check
 npm run build
 npm run test:e2e
 
@@ -222,6 +250,8 @@ A integração cobre autenticação, isolamento, permissões dos três perfis, v
 O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard básico três vezes por perfil; verifica o dashboard gerencial exclusivo, filtros, origem, autoria real, ciclos, analistas com zero chamados, retorno à fila e layout em 390 px/desktop. O E2E também cria o seed estruturado no banco temporário, repete-o sem duplicações e percorre os alertas até a fila e o histórico. Verifica também busca, loading, erro HTTP simulado, repetição da consulta e estado vazio da fila/gestão. Capturas claro/escuro e contraste dos botões são conferidos.
 
 Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável. Em falhas, os diagnósticos ficam em `backend/e2e-results/`, ignorado pelo Git, com tempos, URLs/status e captura quando disponível, sem senhas/tokens/headers. Esse E2E não substitui a revisão manual completa de acessibilidade nem identifica a causa do timeout antigo reportado. Consulte o [escopo das verificações](docs/05-demonstracao.md#o-que-os-testes-verificam).
+
+A verificação documental confere links relativos e âncoras, imagens, comandos npm, variáveis dos exemplos e as credenciais demonstrativas. Os quatro diagramas Mermaid também foram revisados contra o código; o verificador não renderiza Mermaid. Para gerar novamente as capturas, consulte a [preparação das evidências](docs/05-demonstracao.md#capturas-reproduzíveis).
 
 ## Documentação complementar
 

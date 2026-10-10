@@ -108,3 +108,42 @@ MongoDB local roda sem autenticação, publicado somente em loopback. Produção
 Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
+
+## Evidências visuais
+
+Capturas reais em 10/10/2026, com origem **Demonstração — dados fictícios**, mês atual e fuso America/Fortaleza. O conjunto local ampliado tinha cinco usuários e 64 chamados demonstrativos. Os indicadores têm populações diferentes: nem todo chamado foi criado no período e uma reabertura permite mais de uma resolução por chamado. Não use esses números como avaliação operacional.
+
+<details>
+<summary>Visão geral, equipe e carga</summary>
+
+![Visão geral do gestor com origem, período, alertas e indicadores](assets/screenshots/gestor-visao-geral-desktop.png)
+
+Os alertas levam às filas correspondentes; as contagens distinguem período e situação atual.
+
+![Equipe de suporte com pendências atuais, resoluções por autor e carga por prioridade](assets/screenshots/gestor-equipe-carga-desktop.png)
+
+João e Carlos têm a mesma carga, mas diferentes resoluções comprovadas. A gestora aparece como operadora com zero; a fila sem responsável continua separada.
+
+</details>
+
+<details>
+<summary>Solicitantes e gráficos</summary>
+
+![Volume de solicitações por usuário no período e categorias mais frequentes](assets/screenshots/gestor-solicitantes-desktop.png)
+
+O link do solicitante preserva o período de criação; TI também pode ser solicitante.
+
+![Gráficos de área para criações e resoluções, pizza de prioridades, barras de categorias e demanda horária](assets/screenshots/gestor-graficos-desktop.png)
+
+Área representa séries independentes; pizza e categorias descrevem o backlog atual; horários representam criações. Legendas e tabelas oferecem leitura além das cores.
+
+</details>
+
+<details>
+<summary>Gestor no celular — 390 × 844</summary>
+
+![Visão gerencial mobile com navegação, período, origem demonstrativa e alertas empilhados](assets/screenshots/gestor-mobile.png)
+
+A captura mostra o início do painel no celular; a inspeção automatizada também confere ausência de overflow horizontal.
+
+</details>

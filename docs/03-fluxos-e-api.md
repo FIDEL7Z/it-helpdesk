@@ -16,7 +16,7 @@ Menu **Visão gerencial** (`/manager`) separado de **Operação de chamados** (`
 
 `GET /dashboard/manager` aceita `period=today|week|month|year` (padrão `month`), `dataOrigin=operational|demo|legacy` (padrão `operational`), `analystId`, `requesterId`, `category`, `priority` e `status`. IDs devem ser ObjectId; campos desconhecidos/valores inválidos retornam 400. Limites, timezone e instante da consulta retornam em `range` e `asOf`.
 
-Resposta contém `current`, `period`, `distributions`, `team`, `requesters`, `trends`, `demand`, `coverage` e opções públicas de filtro. A interface mantém filtros gerenciais na URL. Links de equipe e solicitante abrem a fila **atual**, sem limitar pela data de criação do período. Cartões de backlog usam `pending=true`; nenhuma resolução é inferida do responsável atual.
+Resposta contém `current`, `period`, `alerts`, `workload`, `distributions`, `team`, `requesters`, `trends`, `demand`, `coverage` e opções públicas de filtro. A interface mantém filtros gerenciais na URL. Links de equipe e alertas abrem pendências atuais de qualquer data de criação. Links de solicitantes e criações incluem os limites exatos do período consultado. Cartões de backlog usam `pending=true`; nenhuma resolução é inferida do responsável atual.
 
 Consulte [definições dos indicadores](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
 
@@ -76,3 +76,39 @@ Erros têm `message`; validações também podem incluir `errors` por campo e `f
 `createdFrom` e `createdTo` aceitam datas ISO com horário UTC; início inclusivo e fim exclusivo. Os links de volume por solicitante incluem o intervalo exato retornado pela API. Carga atual e alertas não recebem esse intervalo, pois consideram pendências de qualquer data de abertura. Links de detalhe preservam a URL da fila ao retornar.
 
 `GET /api/dashboard/manager` também aceita os dois limiares de dias. Origens `demo`/`legacy` retornam 403 se `DEMO_MODE` estiver desabilitado ou `NODE_ENV=production`; a origem padrão é operacional.
+
+## Capturas por perfil
+
+Imagens reais do ambiente demonstrativo, em 10/10/2026, com viewport desktop de 1440 × 900. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores permanecem preservados; os números refletem aquele momento, não uma instalação nova.
+
+<details>
+<summary>Login e abertura pelo solicitante</summary>
+
+![Login sem credenciais preenchidas, com servidor disponível](assets/screenshots/login-desktop.png)
+
+O login autentica os três perfis; não há cadastro público.
+
+![Dashboard do solicitante com contagens restritas aos próprios chamados demonstrativos](assets/screenshots/dashboard-solicitante-desktop.png)
+
+O solicitante acompanha apenas seus pedidos, inclusive os tratados por outros operadores.
+
+![Formulário de abertura com título, descrição, categoria e prioridade](assets/screenshots/abertura-chamado-desktop.png)
+
+A captura mostra o formulário antes do envio; não representa um chamado criado pela automação.
+
+</details>
+
+<details>
+<summary>Atendimento da TI e listagem</summary>
+
+![Dashboard da TI com situação global, fila sem responsável e atendimento pessoal](assets/screenshots/dashboard-ti-desktop.png)
+
+O dashboard operacional da TI combina contagens globais e fila pessoal.
+
+![Lista de chamados demonstrativos com solicitante, responsável atribuído e autor da resolução](assets/screenshots/lista-chamados-desktop.png)
+
+A lista foi filtrada pelo título do conjunto gerencial fictício. As três identidades têm colunas próprias. Registros legados sem evidência estruturada, consultados em outras filas, continuam identificados como tal.
+
+</details>
+
+A jornada do gestor está nas [capturas dos indicadores](04-metricas-decisoes-e-limites.md#evidências-visuais). O [detalhe com histórico](06-integridade-e-auditoria.md#evidência-visual-da-autoria) demonstra autoria diferente da atribuição.

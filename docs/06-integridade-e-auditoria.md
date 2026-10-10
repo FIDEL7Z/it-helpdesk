@@ -52,3 +52,9 @@ Histórico embutido continua sujeito ao limite de tamanho do documento MongoDB. 
 ## Verificação
 
 `audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil e viewport de 390 px.
+
+## Evidência visual da autoria
+
+![Detalhe de chamado demonstrativo resolvido por Carlos Andrade, atribuído a João Silva, com eventos e justificativa no histórico](assets/screenshots/auditoria-chamado-desktop.png)
+
+No exemplo fictício, Mariana Souza é a solicitante, João Silva permanece responsável atribuído e Carlos Andrade é o autor autenticado da resolução. O histórico registra a justificativa e o ciclo; a resolução não transfere silenciosamente a atribuição. Esta captura apenas consultou o registro existente.

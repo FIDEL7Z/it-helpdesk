@@ -30,6 +30,8 @@ flowchart LR
 
 No login, bcryptjs compara a senha com o hash armazenado. O JWT usa HS256 e contém `sub` como identificação do usuário, além das claims temporais da biblioteca. `requireAuth` verifica assinatura/expiração e carrega o usuário atual do banco. O papel não fica no token. Uma resposta 401 em requisição autenticada encerra a sessão do frontend; 403 mantém a sessão.
 
+Erros de validação, permissão, estado e concorrência são convertidos pelo middleware em JSON com códigos HTTP próprios; falhas inesperadas retornam 500 sem stack ou detalhes internos. O registro de erro no servidor é diagnóstico operacional, não saída de depuração da interface. O cliente trata falhas de rede, encerra a sessão em 401 e mantém autenticação em 403. No detalhe, 409 informa que a revisão mudou e recarrega o estado antes de outra ação.
+
 Referências: [app](../backend/src/app.ts), [autenticação](../backend/src/middlewares/auth.middleware.ts), [permissões](../backend/src/auth/permissions.ts), [cliente HTTP](../frontend/src/services/api.ts).
 
 ## Coleções e referências
@@ -104,7 +106,7 @@ Detalhes do contrato e limites: [integridade e auditoria](06-integridade-e-audit
 - `tickets`: `{ dataOrigin: 1, assignee: 1, status: 1 }` para carga atual por origem/operador.
 - Cada coleção possui também o índice padrão de `_id`.
 
-Lista ordena por `createdAt` e `_id`, ambos descendentes. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.
+Por padrão, a lista ordena por `createdAt` e `_id`, ambos descendentes. O alerta `attention=oldest` usa ordem crescente para trazer as pendências mais antigas primeiro. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.
 
 ## Agregações gerenciais
 

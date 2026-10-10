@@ -7,6 +7,7 @@ export type UserRole = (typeof USER_ROLES)[number];
 export interface User {
   name: string;
   email: string;
+  active: boolean;
   passwordHash: string;
   role: UserRole;
   createdAt: Date;
@@ -30,6 +31,7 @@ const userSchema = new Schema<User>(
     // Excluded from queries by default; must be requested with .select('+passwordHash').
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, required: true },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true },
 );

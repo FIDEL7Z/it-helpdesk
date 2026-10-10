@@ -43,7 +43,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   const payload = decodeToken(readBearerToken(req));
 
   const user = isValidObjectId(payload.sub) ? await UserModel.findById(payload.sub) : null;
-  if (!user) {
+  if (!user || !user.active) {
     throw new HttpError(401, 'User no longer exists');
   }
 

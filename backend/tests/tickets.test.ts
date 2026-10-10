@@ -29,6 +29,11 @@ let otherTech: TestUser;
 type Body = Record<string, unknown>;
 
 async function api(method: string, path: string, user?: TestUser, body?: unknown) {
+  if (method === 'PATCH' && body && typeof body === 'object' && !('expectedRevision' in body)) {
+    const ticketPath = path.replace(/\/(status|assignee)$/, '');
+    const latest = await api('GET', ticketPath, user);
+    body = { ...body, expectedRevision: latest.body.ticket?.revision ?? 0, reason: 'Motivo explícito do cenário de teste' };
+  }
   const response = await fetch(`${baseUrl}/api${path}`, {
     method,
     headers: {

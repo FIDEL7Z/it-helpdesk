@@ -19,7 +19,7 @@ export async function login(email: string, password: string): Promise<LoginResul
     user?.passwordHash ?? (await dummyPasswordHash),
   );
 
-  if (!user || !passwordMatches) {
+  if (!user || !user.active || !passwordMatches) {
     throw new HttpError(401, 'Invalid email or password');
   }
 

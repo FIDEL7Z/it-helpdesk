@@ -31,6 +31,7 @@ const createTicketSchema = z.strictObject({
 });
 
 const listTicketsQuerySchema = z.object({
+  dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   category: z.enum(TICKET_CATEGORIES).optional(),
@@ -66,45 +67,50 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
   res.json({ ticket });
 }
 
+const mutationFields = { expectedRevision: z.number().int().min(0), reason: z.string().trim().min(5).max(1000).optional() };
+
 const updateTicketSchema = z
   .strictObject({
+    ...mutationFields,
     title: titleSchema.optional(),
     description: descriptionSchema.optional(),
     category: z.enum(TICKET_CATEGORIES).optional(),
     priority: z.enum(TICKET_PRIORITIES).optional(),
   })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+  .refine((input) => ['title', 'description', 'category', 'priority'].some(key => input[key as keyof typeof input] !== undefined), {
     message: 'Provide at least one field to update',
   });
 
 const changeStatusSchema = z.strictObject({
+  ...mutationFields,
   status: z.enum(TICKET_STATUSES),
 });
 
 const assignTicketSchema = z.strictObject({
+  ...mutationFields,
   assigneeId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid user id'),
 });
 
 export async function updateTicket(req: Request, res: Response): Promise<void> {
   const { id } = idParamsSchema.parse(req.params);
-  const input = updateTicketSchema.parse(req.body);
-  const ticket = await ticketService.updateTicket(id, input, getAuthenticatedUser(req));
+  const { expectedRevision, reason, ...input } = updateTicketSchema.parse(req.body);
+  const ticket = await ticketService.updateTicket(id, input, getAuthenticatedUser(req), expectedRevision, reason);
 
   res.json({ ticket });
 }
 
 export async function changeStatus(req: Request, res: Response): Promise<void> {
   const { id } = idParamsSchema.parse(req.params);
-  const { status } = changeStatusSchema.parse(req.body);
-  const ticket = await ticketService.changeStatus(id, status, getAuthenticatedUser(req));
+  const { status, expectedRevision, reason } = changeStatusSchema.parse(req.body);
+  const ticket = await ticketService.changeStatus(id, status, getAuthenticatedUser(req), expectedRevision, reason);
 
   res.json({ ticket });
 }
 
 export async function assignTicket(req: Request, res: Response): Promise<void> {
   const { id } = idParamsSchema.parse(req.params);
-  const { assigneeId } = assignTicketSchema.parse(req.body);
-  const ticket = await ticketService.assignTicket(id, assigneeId, getAuthenticatedUser(req));
+  const { assigneeId, expectedRevision, reason } = assignTicketSchema.parse(req.body);
+  const ticket = await ticketService.assignTicket(id, assigneeId, getAuthenticatedUser(req), expectedRevision, reason);
 
   res.json({ ticket });
 }

@@ -29,6 +29,11 @@ let otherTech: TestUser;
 let manager: TestUser;
 
 async function api(method: string, path: string, user?: TestUser, body?: unknown) {
+  if (method === 'PATCH' && body && typeof body === 'object' && !('expectedRevision' in body)) {
+    const ticketPath = path.replace(/\/(status|assignee)$/, '');
+    const latest = await api('GET', ticketPath, user);
+    body = { ...body, expectedRevision: latest.body.ticket?.revision ?? 0, reason: 'Motivo explícito do cenário de teste' };
+  }
   const response = await fetch(`${baseUrl}/api${path}`, {
     method,
     headers: {
@@ -105,8 +110,8 @@ describe('permission map (can)', () => {
     },
     gestor: {
       'tickets:view-all': true,
-      'tickets:operate': false,
-      'tickets:be-assigned': false,
+      'tickets:operate': true,
+      'tickets:be-assigned': true,
       'users:list-it-staff': true,
     },
   };
@@ -171,28 +176,28 @@ describe('route matrix: requester / IT / manager', () => {
     assert.equal((await api('GET', `/tickets/${requesterTicket}`, manager)).status, 200);
   });
 
-  it('triage (category/priority): 403 / 200 / 403', async () => {
+  it('triage (category/priority): 403 / 200 / 200', async () => {
     const change = (user: TestUser) =>
       api('PATCH', `/tickets/${requesterTicket}`, user, { priority: 'alta' });
     assert.equal((await change(requester)).status, 403);
-    assert.equal((await change(manager)).status, 403);
+    assert.equal((await change(manager)).status, 200);
     assert.equal((await change(tech)).status, 200);
   });
 
-  it('PATCH /:id/assignee: 403 / 200 / 403', async () => {
+  it('PATCH /:id/assignee: 403 / 200 / 200', async () => {
     const assign = (user: TestUser) =>
       api('PATCH', `/tickets/${requesterTicket}/assignee`, user, { assigneeId: otherTech.id });
     assert.equal((await assign(requester)).status, 403);
-    assert.equal((await assign(manager)).status, 403);
+    assert.equal((await assign(manager)).status, 200);
     assert.equal((await assign(tech)).status, 200);
   });
 
-  it('PATCH /:id/status: 403 / 200 / 403', async () => {
+  it('PATCH /:id/status: 403 / 200 / 200', async () => {
     const start = (user: TestUser) =>
       api('PATCH', `/tickets/${requesterTicket}/status`, user, { status: 'em_andamento' });
     assert.equal((await start(requester)).status, 403);
-    assert.equal((await start(manager)).status, 403);
-    assert.equal((await start(tech)).status, 200);
+    assert.equal((await start(manager)).status, 200);
+    assert.equal((await start(tech)).status, 409);
   });
 
   it('GET /users/it-staff: 403 / 200 / 200, listing only IT users', async () => {
@@ -203,8 +208,8 @@ describe('route matrix: requester / IT / manager', () => {
       assert.equal(status, 200);
       assert.deepEqual(
         body.users.map((u: any) => u.name),
-        ['Tech One', 'Tech Two'],
-        'the manager is not an assignable team member',
+        ['Manager One', 'Tech One', 'Tech Two'],
+        'operators include the manager',
       );
     }
   });
@@ -227,22 +232,23 @@ describe('manager-specific rules', () => {
     assert.equal(status, 403);
   });
 
-  it('cannot be assigned as responsible for a ticket', async () => {
+  it('can be assigned as responsible for a ticket', async () => {
     const id = await createTicket(requester, 'Chamado para atribuir');
     const { status, body } = await api('PATCH', `/tickets/${id}/assignee`, tech, { assigneeId: manager.id });
 
-    assert.equal(status, 400);
-    assert.equal(body.message, 'Assignee must be an IT team member');
+    assert.equal(status, 200);
+    assert.equal(body.ticket.assignee.id, manager.id);
   });
 
-  it('cannot start work, so nothing is auto-assigned to them', async () => {
+  it('starts work and is auto-assigned as authenticated operator', async () => {
     const id = await createTicket(requester, 'Chamado sem atendimento');
-    assert.equal((await api('PATCH', `/tickets/${id}/status`, manager, { status: 'em_andamento' })).status, 403);
+    assert.equal((await api('PATCH', `/tickets/${id}/status`, manager, { status: 'em_andamento' })).status, 200);
 
     const { body } = await api('GET', `/tickets/${id}`, manager);
-    assert.equal(body.ticket.status, 'aberto');
-    assert.equal(body.ticket.assignee, null);
-    assert.equal(body.ticket.history.length, 1);
+    assert.equal(body.ticket.status, 'em_andamento');
+    assert.equal(body.ticket.assignee.id, manager.id);
+    assert.equal(body.ticket.history.length, 3);
+    assert.equal(body.ticket.history.at(-1).audit.actorId, manager.id);
   });
 });
 

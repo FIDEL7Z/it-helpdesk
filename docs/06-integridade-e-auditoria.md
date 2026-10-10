@@ -4,7 +4,7 @@
 
 ## Identidades e autoria
 
-Solicitante abre o chamado; responsável é quem está atribuído; autor executa uma ação. Uma identidade não substitui a outra. TI e gestor podem operar e ser responsáveis. Resolver pelo responsável exige justificativa de 5–1000 caracteres. Reabertura, alteração de prioridade e reatribuição durante atendimento também exigem motivo.
+Solicitante abre o chamado; responsável é quem está atribuído; autor executa uma ação. Uma identidade não substitui a outra. TI e gestor podem operar e ser responsáveis. Resolver um chamado atribuído a outro responsável exige justificativa de 5–1000 caracteres. Reabertura, alteração de prioridade e reatribuição durante atendimento também exigem motivo.
 
 O backend valida o JWT e consulta o usuário ativo a cada requisição. Autor, snapshots e datas são gerados pelo servidor. O cliente não pode fornecer esses campos, editar o histórico nem modificar projeções de resolução.
 
@@ -39,7 +39,7 @@ Chamados legados sem esses campos não recebem autor/data de resolução presumi
 
 Dashboard e lista aceitam filtro por origem. O dashboard seleciona dados operacionais inicialmente. Dados simulados servem à demonstração e não sustentam medidas de produtividade real. Para registros antigos, classificação deve ser explícita e baseada em evidência; a manutenção local autorizada classifica chamados das contas reservadas de demonstração.
 
-Métricas de produtividade, duração por ciclo e ranking não foram implementadas. Sua futura implementação deve usar eventos estruturados comprováveis e informar cobertura do legado. `assignee` indica atribuição; não prova autoria de resolução. `updatedAt` não é data de resolução.
+A visão gerencial implementa resoluções por autor/ciclo, participação, reaberturas executadas e ranking de solicitações, usando apenas eventos estruturados consistentes para ações e informando cobertura do legado. Duração por ciclo e SLA não são calculados. [Definições e filtros](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva). `assignee` indica atribuição; não prova autoria de resolução. `updatedAt` não é data de resolução.
 
 ## Usuários e manutenção local
 
@@ -51,4 +51,4 @@ Histórico embutido continua sujeito ao limite de tamanho do documento MongoDB. 
 
 ## Verificação
 
-`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil e viewport de 390 px.
+`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil e viewport de 390 px.

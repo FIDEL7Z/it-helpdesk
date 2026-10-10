@@ -35,12 +35,12 @@ O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstraçã
 ## Funcionalidades e perfis
 
 - **Solicitante:** abre chamados, consulta apenas os próprios e edita título/descrição enquanto estão abertos.
-- **TI:** vê todos os chamados, atribui responsáveis da TI, faz triagem, inicia, resolve e reabre atendimentos.
-- **Gestor:** vê indicadores globais e também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
+- **TI:** vê todos os chamados, atribui responsáveis da TI ou gestores ativos, faz triagem, inicia, resolve e reabre atendimentos.
+- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, tendências e horários; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
 
-Todos utilizam login com e-mail/senha e dashboard após o login normal. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
+Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; TI e solicitante entram no dashboard de seu perfil. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL e retorno do detalhe para a fila consultada. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
 
-**Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Impacto, central operacional por perfil, carga por técnico e métricas históricas ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
+**Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Gestão possui períodos Hoje, Últimos sete dias, Mês atual e Ano atual; filtros de origem, analista, solicitante e classificação. Impacto, SLA, tempo médio de atendimento e backlog histórico ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
 
 ## Stack
 
@@ -138,6 +138,7 @@ Copie os exemplos para `.env`; arquivos de ambiente e variantes são ignorados p
 | `MONGODB_URI` | Obrigatória; exemplo `mongodb://localhost:27017/it-helpdesk` |
 | `JWT_SECRET` | Obrigatória; aleatória, pelo menos 32 caracteres |
 | `PORT` | Opcional; padrão `3000` |
+| `APP_TIMEZONE` | Opcional; fuso IANA válido, padrão `America/Fortaleza`; períodos e horários gerenciais |
 | `JWT_EXPIRES_IN` | Opcional; padrão `8h`; inteiro positivo seguido de `s`, `m`, `h` ou `d` |
 | `CORS_ORIGIN` | Opcional; padrão `http://localhost:5173`; origens separadas por vírgula |
 | `SEED_TI_EMAIL` / `SEED_TI_PASSWORD` | Obrigatórias para seed; valores demonstrativos no exemplo; senha com pelo menos 8 caracteres |
@@ -174,7 +175,9 @@ Controllers validam a entrada; services aplicam escopo, propriedade e regras; mo
 
 Solicitante, responsável atribuído e autor da resolução são identidades distintas. Resolver um chamado de outro responsável exige justificativa; reabrir exige motivo e inicia um novo ciclo. A tabela e o histórico apresentam autoria explícita. Eventos legados permanecem preservados, sem reconstrução presumida de autores ou datas.
 
-O dashboard começa com dados operacionais. Use **Origem dos indicadores → Demonstração** para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
+O dashboard começa com dados operacionais. Use **Origem dos dados → Demonstração** na visão gerencial ou **Origem dos indicadores → Demonstração** no dashboard para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
+
+Na visão gerencial, criações usam `createdAt`; resoluções usam eventos v2 por autor e ciclo, preservados após reabertura. Carga usa a atribuição atual. Histórico legado sem evidência não gera produtividade presumida. Consulte as [definições exatas e limites](docs/04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
 
 Permissões centralizadas no backend e usuário consultado a cada request mantêm o papel atual como autoridade. Validação Zod e rotas por ação restringem campos de escrita. Histórico e alterações são gravados juntos, com controle de concorrência pela revisão numérica consultada no frontend. Lista e dashboard compartilham os filtros de autorização, sem prometer um snapshot único durante alterações simultâneas.
 
@@ -198,7 +201,7 @@ npm run build
 
 A integração cobre autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboard e rate limit. Usa bancos separados `it-helpdesk-test*`, apagados ao final; não apaga o banco de desenvolvimento.
 
-O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard três vezes por perfil e confere sua largura gerencial em 390 px.
+O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard básico três vezes por perfil; verifica o dashboard gerencial exclusivo, filtros, origem, autoria real, ciclos, analistas com zero chamados, retorno à fila e layout em 390 px/desktop. Capturas claro/escuro e contraste dos botões são conferidos no E2E ampliado.
 
 Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável. Em falhas, os diagnósticos ficam em `backend/e2e-results/`, ignorado pelo Git, com tempos, URLs/status e captura quando disponível, sem senhas/tokens/headers. Esse E2E não substitui a revisão manual completa de acessibilidade nem identifica a causa do timeout antigo reportado. Consulte o [escopo das verificações](docs/05-demonstracao.md#o-que-os-testes-verificam).
 

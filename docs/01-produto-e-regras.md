@@ -26,9 +26,10 @@ Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de c
 | Atribuir responsável | Não | Se não resolvido; destino TI/gestor ativo | Mesma regra |
 | Ser responsável | Não | Sim | Sim |
 | Consultar equipe TI | Não | Sim | Sim |
-| Dashboard | Próprio | Global e fila pessoal | Global |
+| Dashboard básico | Próprio | Global e fila pessoal | Global (rota disponível) |
+| Visão gerencial e dados de equipe | Não | Não | Exclusiva |
 
-As permissões estão em [backend/src/auth/permissions.ts](../backend/src/auth/permissions.ts). O frontend mantém uma cópia apenas para controlar a interface. A API aplica a autorização mesmo em chamadas diretas. Status e atribuição exigem permissão na rota; consulta e edição aplicam escopo e propriedade no service.
+O endpoint gerencial exige o papel gestor, validado na rota após autenticação. As permissões operacionais estão em [backend/src/auth/permissions.ts](../backend/src/auth/permissions.ts). O frontend mantém uma cópia apenas para controlar a interface. A API aplica a autorização mesmo em chamadas diretas. Status e atribuição exigem permissão na rota; consulta e edição aplicam escopo e propriedade no service.
 
 O papel vem do usuário no banco a cada requisição, não do JWT. Usuário removido ou desativado é rejeitado. Para solicitante, consultar o chamado de outra pessoa retorna 404, evitando confirmar sua existência.
 
@@ -53,8 +54,8 @@ Novos eventos registram autor autenticado, snapshot de identidade, responsável 
 
 ## Escopo entregue e evolução futura
 
-**Implementado:** login, chamados persistidos, filtros/paginação, atribuição, triagem, ciclo de status, histórico, dashboard por permissão, temas seguindo o sistema e layout responsivo.
+**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, dashboards por perfil, visão gerencial exclusiva com filtros e métricas comprovadas, temas seguindo o sistema e layout responsivo.
 
-**Melhorias identificadas, ainda não implementadas:** preservar a fila ao voltar do detalhe, oferecer link direto após a criação e adaptar a linguagem da lista para supervisão.
+A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 
-**Planejado, fora desta entrega documental:** campo de impacto, abertura como área principal do solicitante, central operacional da TI, carga por técnico, métricas por período e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não fazem parte dos comandos ou telas demonstrados como disponíveis.
+**Ainda não implementado:** campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.

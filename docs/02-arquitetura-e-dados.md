@@ -100,9 +100,21 @@ Detalhes do contrato e limites: [integridade e auditoria](06-integridade-e-audit
 - `users`: `{ email: 1 }`, único.
 - `tickets`: `{ requester: 1, createdAt: -1 }` para consulta por solicitante.
 - `tickets`: `{ status: 1, createdAt: -1 }` para consulta por status.
+- `tickets`: `{ dataOrigin: 1, createdAt: -1 }` para consultas gerenciais por origem e criação.
+- `tickets`: `{ dataOrigin: 1, assignee: 1, status: 1 }` para carga atual por origem/operador.
 - Cada coleção possui também o índice padrão de `_id`.
 
 Lista ordena por `createdAt` e `_id`, ambos descendentes. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.
+
+## Agregações gerenciais
+
+`GET /dashboard/manager` exige gestor antes de validar a consulta. O [manager.service.ts](../backend/src/services/manager.service.ts) resolve limites de calendário com `APP_TIMEZONE` e consulta MongoDB; não agrega mensagens livres no frontend.
+
+Uma agregação com `$facet` calcula estado atual, carga, criações, solicitantes, categorias e horários. Outra filtra os eventos v2 consistentes, agrupa resoluções por chamado/ciclo e participação por chamado/autor. Autores contraditórios no mesmo ciclo são excluídos. Identidades são consultadas em lote; usuários sem carga entram com zero e referências removidas preservam ID/snapshot.
+
+O ranking agrupa por solicitante/categoria antes de limitar aos dez maiores volumes, evitando transportar todos os documentos à interface. Históricos continuam embutidos: sua análise exige percorrer os eventos dos documentos filtrados por origem/classificação. Os índices ajudam o filtro inicial; não tornam toda agregação coberta por índice. Em volumes elevados, medir `explain` e avaliar projeções ou coleção de eventos separada.
+
+As consultas compartilham um instante de corte para períodos, mas não uma transação de leitura entre estado, eventos e usuários. Não se promete snapshot único durante alterações concorrentes. Definições e filtros: [métricas](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva). Os quatro diagramas permanecem válidos: não houve nova coleção ou mudança no fluxo de escrita.
 
 ## Persistência e ambiente
 

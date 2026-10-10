@@ -193,7 +193,9 @@ Os dois scripts encerram com código 1 em caso de erro (variável inválida, ban
 ```bash
 cd backend
 npm test        # testes de integração: precisam do MongoDB rodando (docker compose up -d)
+npm run test:typecheck # checagem de tipos do backend e dos testes de integração
 npm run build   # checagem de tipos e compilação
+npm run test:e2e # regressão mínima no navegador: MongoDB + dependências dos dois projetos + Edge/Chrome
 
 cd ../frontend
 npm run lint    # oxlint
@@ -201,6 +203,12 @@ npm run build   # checagem de tipos e build de produção
 ```
 
 Os testes do backend usam o `node:test`, que já vem no Node. Cada teste sobe o app Express real e usa um MongoDB real, num banco separado (`it-helpdesk-test*`), que é apagado ao final. Os bancos de desenvolvimento não são tocados.
+
+O E2E mínimo (`backend/tests/e2e.mjs`) utiliza o Edge/Chrome headless instalado, o WebSocket nativo do Node e as dependências existentes, sem bibliotecas adicionais. Execute `npm run test:e2e` em `backend`, com o MongoDB acessível pela configuração local e as dependências de `frontend` instaladas. Não é necessário iniciar a API ou o Vite manualmente: o teste inicia ambos em portas locais livres, gera credenciais temporárias e usa um banco com nome exclusivo por execução. Ao terminar, encerra os serviços e remove esse banco e o perfil temporário do navegador. Não altera os arquivos `.env` nem os usuários de demonstração.
+
+No Windows, o teste procura Edge ou Chrome nos caminhos padrão; em outro ambiente, defina `E2E_BROWSER_PATH` com o caminho do executável, caso não seja encontrado automaticamente. O teste verifica redirecionamento de rota protegida, senha incorreta, login/logout, persistência da sessão após recarregar, isolamento da lista e do detalhe, dashboard dos três perfis e restrições do gestor na interface e na API. Para investigar instabilidade, recarrega o dashboard três vezes por perfil e registra os tempos de espera. Inclui uma verificação de largura do dashboard gerencial em 390 px; não substitui uma revisão visual completa de responsividade.
+
+As esperas verificam estados do DOM, com prazo de 15 segundos, e as chamadas auxiliares à API têm limite de 10 segundos. Se houver falha, salva `backend/e2e-results/diagnostics.json` com tempos e URLs/status das requisições, além de uma captura `failure.png` quando o navegador estiver acessível. Não registra senhas, tokens ou headers de autenticação. Esses artefatos são locais e ignorados pelo Git. Um resultado aprovado não determina a causa do timeout reportado anteriormente, cujos scripts e registros não estão disponíveis neste repositório.
 
 | Arquivo | O que cobre |
 |---|---|

@@ -10,6 +10,8 @@
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
     "test": "tsx --test tests/*.test.ts",
+    "test:typecheck": "tsc -p tsconfig.tests.json",
+    "test:e2e": "tsx tests/e2e.mjs",
     "seed:demo": "tsx src/scripts/seed-demo.ts"
   },
   "engines": {

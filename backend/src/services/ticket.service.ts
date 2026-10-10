@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { daysAgo, lastOperationalActivity } from './activity';
 import { Types, type QueryFilter } from 'mongoose';
 import { can } from '../auth/permissions';
 import { HttpError } from '../errors/http-error';
@@ -88,6 +89,10 @@ export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
 export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
 
 export interface TicketFilters {
+  createdFrom?: string; createdTo?: string;
+  attention?: 'high_unassigned' | 'oldest' | 'inactive';
+  inactivityDays?: number;
+  ageDays?: number;
   pending?: boolean;
   assigneeId?: string;
   requesterId?: string;
@@ -239,6 +244,17 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
   if (filters.category) filter.category = filters.category;
   if (filters.assignee === 'none') filter.assignee = null;
   if (filters.assignee === 'me') filter.assignee = actorId;
+  if (filters.createdFrom || filters.createdTo) filter.createdAt = { ...(filters.createdFrom && { $gte: new Date(filters.createdFrom) }), ...(filters.createdTo && { $lt: new Date(filters.createdTo) }) };
+  if (filters.attention) {
+    const now = new Date();
+    filter.$and = [{ status: { $in: ['aberto', 'em_andamento'] } }];
+    if (filters.attention === 'high_unassigned') filter.$and.push({ priority: 'alta', assignee: null });
+    if (filters.attention === 'oldest') filter.$and.push({ createdAt: { $type: 'date', $lte: daysAgo(filters.ageDays ?? 7, now) } });
+    if (filters.attention === 'inactive') filter.$and.push({ $expr: { $and: [
+      { $ne: [lastOperationalActivity(now), null] },
+      { $lte: [lastOperationalActivity(now), daysAgo(filters.inactivityDays ?? 3, now)] },
+    ] } });
+  }
   // User input is escaped so it is matched literally, not as a regular expression.
   if (filters.search) filter.title = { $regex: escapeRegex(filters.search), $options: 'i' };
 
@@ -274,7 +290,7 @@ export async function listTickets(
   const [total, tickets] = await Promise.all([
     TicketModel.countDocuments(filter),
     TicketModel.find(filter)
-      .sort({ createdAt: -1, _id: -1 })
+      .sort(query.attention === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .select('-description -history'),

@@ -31,6 +31,11 @@ const createTicketSchema = z.strictObject({
 });
 
 const listTicketsQuerySchema = z.object({
+  createdFrom: z.iso.datetime().optional(),
+  createdTo: z.iso.datetime().optional(),
+  attention: z.enum(['high_unassigned', 'oldest', 'inactive']).optional(),
+  inactivityDays: z.coerce.number().int().min(1).max(90).optional(),
+  ageDays: z.coerce.number().int().min(1).max(365).optional(),
   pending: z.enum(['true']).optional().transform(value => value === 'true' ? true : undefined),
   assigneeId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   requesterId: z.string().regex(/^[a-f\d]{24}$/i).optional(),

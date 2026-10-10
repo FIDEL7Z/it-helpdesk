@@ -1,3 +1,4 @@
+import { assertLocalDemoSeed, demoTickets, insertDemoTickets } from '../src/services/manager-demo';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
@@ -100,7 +101,9 @@ describe('Manager analytics and authorization', () => {
     await fixture('2026-06-15T03:10:00Z'); // Monday, 00h Fortaleza.
     await fixture('2026-06-15T02:59:00Z'); // Sunday, 23h Fortaleza.
     const result = await getManagerDashboard(base, now);
-    assert.deepEqual(result.demand.hours, [{ _id: 0, count: 1 }, { _id: 23, count: 1 }]);
+    assert.equal(result.demand.hours.length, 24);
+    assert.deepEqual(result.demand.hours.filter(row => row.count), [{ _id: 0, count: 1 }, { _id: 23, count: 1 }]);
+    assert.equal(result.demand.hours[12].count, 0);
     assert.deepEqual(result.demand.weekdays, [{ _id: 1, count: 1 }, { _id: 7, count: 1 }]);
   });
   it('attributes productivity to the real actor, preserves cycles and deduplicates resolutions', async () => {
@@ -176,5 +179,84 @@ describe('Manager analytics and authorization', () => {
     const result = await getManagerDashboard(base, new Date(Date.now() + 1000));
     assert.equal(result.team.find(u => u.id === tech.toString())?.resolutions, 1);
     assert.equal(result.team.find(u => u.id === otherTech.toString())?.resolutions, 0);
+  });
+});
+
+describe('Actionable alerts', () => {
+  it('distinguishes age, proved inactivity and unknown activity without relying on updatedAt', async () => {
+    await fixture('2026-06-01T12:00:00Z', { priority: 'alta', updatedAt: now });
+    await fixture('2026-06-02T12:00:00Z', { assignee: tech, priority: 'alta', status: 'em_andamento', history: [event('assigned', tech, '2026-06-03T12:00:00Z')], updatedAt: now });
+    await fixture('2026-06-03T12:00:00Z', { assignee: otherTech, history: [event('assigned', otherTech, '2026-06-15T12:00:00Z')] });
+    const result = await getManagerDashboard(base, now);
+    assert.equal(result.alerts.highUnassigned, 1);
+    assert.equal(result.alerts.oldPending, 3);
+    assert.equal(result.alerts.inactive, 1);
+    assert.equal(result.alerts.unknownActivity, 1);
+    assert.equal(result.alerts.oldest[0].ageDays, 14);
+    assert.equal(result.alerts.oldest[0].lastOperationalAt, null);
+    assert.equal(result.team.find(row => row.id === tech.toString())!.highPriority, 1);
+    assert.equal(result.workload.reduce((sum, row) => sum + row.alta + row.media + row.baixa, 0), result.current.backlog);
+    assert.equal((await getManagerDashboard({ ...base, inactivityDays: 14 }, now)).alerts.inactive, 0);
+  });
+  it('links to exactly the matching high priority, old and inactive queue', async () => {
+    const old = new Date(Date.now() - 10 * 86400000).toISOString();
+    await fixture(old, { priority: 'alta' });
+    await fixture(old, { assignee: tech, history: [event('assigned', tech, old)] });
+    const result = await getManagerDashboard(base);
+    for (const [attention, count] of [['high_unassigned', result.alerts.highUnassigned], ['oldest', result.alerts.oldPending], ['inactive', result.alerts.inactive]]) {
+      const response = await api('GET', `/tickets?dataOrigin=operational&attention=${attention}&ageDays=7&inactivityDays=3`, manager);
+      assert.equal(response.status, 200); assert.equal(response.body.pagination.total, count);
+    }
+  });
+  it('disables demo indicators without explicit configuration', async () => {
+    const before = env.DEMO_MODE;
+    try { env.DEMO_MODE = false; assert.equal((await api('GET', '/dashboard/manager?dataOrigin=demo', manager)).status, 403); }
+    finally { env.DEMO_MODE = before; }
+  });
+});
+
+describe('Local structured demonstration fixtures', () => {
+  it('refuses production, remote hosts and missing opt-in', () => {
+    assert.doesNotThrow(() => assertLocalDemoSeed('mongodb://127.0.0.1:27017/it-helpdesk', 'development', '1'));
+    for (const [uri, environment, enabled] of [['mongodb://127.0.0.1/it-helpdesk', 'production', '1'], ['mongodb://remote/it-helpdesk', 'development', '1'], ['mongodb://127.0.0.1/real-data', 'development', '1'], ['mongodb://127.0.0.1/it-helpdesk', 'development', undefined]]) assert.throws(() => assertLocalDemoSeed(uri!, environment, enabled));
+  });
+  it('creates coherent fictitious cycles idempotently without rewriting existing tickets', async () => {
+    const existing = await fixture('2026-06-01T12:00:00Z');
+    const before = await TicketModel.findById(existing).lean();
+    const users = await UserModel.find().select('name role').lean();
+    const fixtures = demoTickets(users, now);
+    for (const fixture of fixtures) {
+      assert.equal(fixture.dataOrigin, 'demo');
+      assert.equal(fixture.history.at(-1)!.audit!.revision, fixture.revision);
+      assert.equal(fixture.history.at(-1)!.audit!.cycleId, fixture.activeCycleId);
+      assert.ok(fixture.createdAt >= periodRange('month', now).start);
+      for (let i = 0; i < fixture.history.length; i++) {
+        assert.equal(fixture.history[i].audit!.revision, i);
+        assert.ok(fixture.history[i].at! <= now);
+        if (i) assert.ok(fixture.history[i].at! > fixture.history[i - 1].at!);
+      }
+      if (fixture.status === 'resolvido') { assert.equal(fixture.history.at(-1)!.type, 'resolved'); assert.ok(fixture.resolvedBy!.equals(fixture.history.at(-1)!.author!)); }
+      else { assert.equal(fixture.resolvedAt, null); assert.equal(fixture.resolvedBy, null); }
+    }
+    assert.deepEqual(await insertDemoTickets(fixtures), { created: 24, skipped: 0 });
+    const stored = await TicketModel.find({ dataOrigin: 'demo' }).sort({ _id: 1 }).lean();
+    assert.deepEqual(await insertDemoTickets(demoTickets(users, new Date(now.getTime() + 60000))), { created: 0, skipped: 24 });
+    assert.deepEqual(await TicketModel.find({ dataOrigin: 'demo' }).sort({ _id: 1 }).lean(), stored);
+    assert.deepEqual(await TicketModel.findById(existing).lean(), before);
+    const demo = await getManagerDashboard({ ...base, dataOrigin: 'demo' }, now);
+    assert.equal(demo.current.total, 24); assert.ok(demo.period.resolutions > 10); assert.equal(demo.coverage.resolvedWithoutStructuredHistory, 0); assert.equal(demo.coverage.conflictingResolutionCycles, 0); assert.ok(demo.period.reopenings > 0);
+    assert.equal((await getManagerDashboard(base, now)).current.total, 1);
+  });
+});
+
+describe('Creation interval drill-down', () => {
+  it('keeps period boundaries and requester authorization on list links', async () => {
+    await fixture('2026-06-01T03:00:00Z');
+    await fixture('2026-05-31T23:00:00Z');
+    await fixture('2026-06-15T15:00:00Z');
+    const result = await api('GET', `/tickets?createdFrom=2026-06-01T03:00:00.000Z&createdTo=2026-06-15T15:00:00.000Z&requesterId=${requester}`, manager);
+    assert.equal(result.status, 200); assert.equal(result.body.pagination.total, 1);
+    assert.equal((await api('GET', `/tickets?requesterId=${otherRequester}&createdFrom=2026-06-01T03:00:00.000Z`, requester)).status, 403);
+    assert.equal((await api('GET', '/tickets?createdFrom=bad', manager)).status, 400);
   });
 });

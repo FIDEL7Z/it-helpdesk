@@ -1,4 +1,5 @@
 import { Types, type PipelineStage } from 'mongoose';
+import { daysAgo, lastOperationalActivity } from './activity';
 import { env } from '../config/env';
 import { TicketModel, type TicketCategory, type TicketPriority, type TicketStatus } from '../models/ticket.model';
 import { UserModel } from '../models/user.model';
@@ -6,7 +7,7 @@ import { UserModel } from '../models/user.model';
 export const PERIODS = ['today', 'week', 'month', 'year'] as const;
 export type ManagerFilters = {
   period: (typeof PERIODS)[number]; dataOrigin: 'operational' | 'demo' | 'legacy';
-  analystId?: string; requesterId?: string; category?: TicketCategory; priority?: TicketPriority; status?: TicketStatus;
+  ageDays?: number; inactivityDays?: number; analystId?: string; requesterId?: string; category?: TicketCategory; priority?: TicketPriority; status?: TicketStatus;
 };
 
 /** Calendar boundaries in an IANA zone, including zones with daylight saving time. */
@@ -31,7 +32,7 @@ export function periodRange(period: ManagerFilters['period'], now = new Date(), 
 }
 
 type Count = { _id: string | number | null; count: number };
-type Load = { _id: Types.ObjectId | null; assigned: number; inProgress: number; pending: number };
+type Load = { _id: Types.ObjectId | null; assigned: number; inProgress: number; pending: number; highPriority: number; lowPriority: number; mediumPriority: number };
 type Requester = { _id: Types.ObjectId; created: number; pending: number; categories: { category: string; count: number }[] };
 type Actor = { _id: Types.ObjectId; count: number; name: string; role: string };
 type EventFacets = { resolutions: Actor[]; participation: Actor[]; reopenings: Actor[]; trends: Count[]; conflicts: Count[]; uniqueTickets: Count[]; currentVerified: Count[] };
@@ -62,12 +63,17 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
   const [[snapshot], [events], users] = await Promise.all([
     TicketModel.aggregate<{
       states: Count[]; priority: Count[]; category: Count[]; loads: Load[]; created: Count[];
-      requesters: Requester[]; trends: Count[]; hours: Count[]; weekdays: Count[]; incomplete: Count[];
-    }>([{ $match: current }, { $facet: {
+      requesters: Requester[]; trends: Count[]; hours: Count[]; weekdays: Count[]; incomplete: Count[]; highUnassigned: Count[]; oldPending: Count[]; inactive: Count[]; unknownActivity: Count[]; oldest: { _id: Types.ObjectId; title: string; createdAt: Date; lastOperationalAt: Date | null }[];
+    }>([{ $match: current }, { $addFields: { lastOperationalAt: lastOperationalActivity(now) } }, { $facet: {
       states: grouped('$status'),
+      highUnassigned: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, priority: 'alta', assignee: null } }, { $count: 'count' }],
+      oldPending: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, createdAt: { $type: 'date', $lte: daysAgo(filters.ageDays ?? 7, now) } } }, { $count: 'count' }],
+      inactive: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, lastOperationalAt: { $type: 'date', $lte: daysAgo(filters.inactivityDays ?? 3, now) } } }, { $count: 'count' }],
+      unknownActivity: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, lastOperationalAt: null } }, { $count: 'count' }],
+      oldest: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, createdAt: { $type: 'date', $lte: now } } }, { $sort: { createdAt: 1, _id: 1 } }, { $limit: 5 }, { $project: { title: 1, createdAt: 1, lastOperationalAt: 1 } }],
       priority: [{ $match: { status: { $in: ['aberto', 'em_andamento'] } } }, ...grouped('$priority')],
       category: [{ $match: { status: { $in: ['aberto', 'em_andamento'] } } }, ...grouped('$category')],
-      loads: [{ $group: { _id: '$assignee', assigned: { $sum: 1 }, pending: { $sum: { $cond: [pending, 1, 0] } }, inProgress: { $sum: { $cond: [{ $eq: ['$status', 'em_andamento'] }, 1, 0] } } } }],
+      loads: [{ $group: { _id: '$assignee', assigned: { $sum: 1 }, highPriority: { $sum: { $cond: [{ $and: [pending, { $eq: ['$priority', 'alta'] }] }, 1, 0] } }, mediumPriority: { $sum: { $cond: [{ $and: [pending, { $eq: ['$priority', 'media'] }] }, 1, 0] } }, lowPriority: { $sum: { $cond: [{ $and: [pending, { $eq: ['$priority', 'baixa'] }] }, 1, 0] } }, pending: { $sum: { $cond: [pending, 1, 0] } }, inProgress: { $sum: { $cond: [{ $eq: ['$status', 'em_andamento'] }, 1, 0] } } } }],
       created: [created, { $count: 'count' }],
       requesters: [created, { $group: { _id: { requester: '$requester', category: '$category' }, count: { $sum: 1 }, pending: { $sum: { $cond: [pending, 1, 0] } } } }, { $sort: { count: -1, '_id.category': 1 } }, { $group: { _id: '$_id.requester', created: { $sum: '$count' }, pending: { $sum: '$pending' }, categories: { $push: { category: '$_id.category', count: '$count' } } } }, { $sort: { created: -1, _id: 1 } }, { $limit: 10 }],
       trends: [created, { $group: { _id: bucket('$createdAt'), count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
@@ -101,20 +107,22 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     const evidence = eventRow(events.resolutions, id) ?? eventRow(events.participation, id) ?? eventRow(events.reopenings, id);
     const load = snapshot.loads.find(row => row._id?.toString() === id);
     return { id, name: user?.name ?? evidence?.name ?? 'Usuário indisponível', role: user?.role ?? evidence?.role ?? 'desconhecido', active: user ? user.active !== false : false,
-      assigned: load?.assigned ?? 0, inProgress: load?.inProgress ?? 0, pending: load?.pending ?? 0,
+      highPriority: load?.highPriority ?? 0, assigned: load?.assigned ?? 0, inProgress: load?.inProgress ?? 0, pending: load?.pending ?? 0,
       resolutions: eventRow(events.resolutions, id)?.count ?? 0, participation: eventRow(events.participation, id)?.count ?? 0, reopenings: eventRow(events.reopenings, id)?.count ?? 0 };
   }).sort((a, b) => b.pending - a.pending || a.name.localeCompare(b.name, 'pt-BR'));
   const periods = new Map<string, { period: string; created: number; resolved: number }>();
   for (const row of snapshot.trends) periods.set(String(row._id), { period: String(row._id), created: row.count, resolved: 0 });
   for (const row of events.trends) { const key = String(row._id); const entry = periods.get(key) ?? { period: key, created: 0, resolved: 0 }; entry.resolved = row.count; periods.set(key, entry); }
   return {
-    filters, range, asOf: now,
+    filters, range, asOf: now, demoControlsEnabled: env.DEMO_MODE && process.env.NODE_ENV !== 'production',
+    alerts: { highUnassigned: count(snapshot.highUnassigned), oldPending: count(snapshot.oldPending), inactive: count(snapshot.inactive), unknownActivity: count(snapshot.unknownActivity), ageDays: filters.ageDays ?? 7, inactivityDays: filters.inactivityDays ?? 3, oldest: snapshot.oldest.map(row => ({ id: row._id.toString(), title: row.title, createdAt: row.createdAt, lastOperationalAt: row.lastOperationalAt ?? null, ageDays: Math.floor((now.getTime() - row.createdAt.getTime()) / 86400000) })) },
+    workload: snapshot.loads.map(row => ({ id: row._id?.toString() ?? null, name: row._id ? userMap.get(row._id.toString())?.name ?? 'Usuário indisponível' : 'Não atribuído', pending: row.pending, alta: row.highPriority, media: row.mediumPriority, baixa: row.lowPriority })).sort((a, b) => b.pending - a.pending),
     current: { total: snapshot.states.reduce((sum, row) => sum + row.count, 0), inProgress: state('em_andamento'), backlog: state('aberto') + state('em_andamento'), unassigned: snapshot.loads.find(row => row._id === null)?.pending ?? 0 },
     period: { created: count(snapshot.created), resolutions: events.resolutions.reduce((sum, row) => sum + row.count, 0), resolvedTickets: count(events.uniqueTickets), reopenings: events.reopenings.reduce((sum, row) => sum + row.count, 0) },
     distributions: { priority: snapshot.priority, category: snapshot.category }, team,
     requesters: snapshot.requesters.map(row => ({ id: row._id.toString(), name: userMap.get(row._id.toString())?.name ?? 'Usuário indisponível', created: row.created, pending: row.pending, categories: row.categories })),
     options: { analysts: users.filter(u => ['ti', 'gestor'].includes(u.role)).map(u => ({ id: u._id.toString(), name: u.name })), requesters: users.map(u => ({ id: u._id.toString(), name: u.name })) },
-    trends: [...periods.values()].sort((a, b) => a.period.localeCompare(b.period)), demand: { hours: snapshot.hours, weekdays: snapshot.weekdays },
+    trends: [...periods.values()].sort((a, b) => a.period.localeCompare(b.period)), demand: { hours: Array.from({ length: 24 }, (_, hour) => ({ _id: hour, count: snapshot.hours.find(row => row._id === hour)?.count ?? 0 })), weekdays: snapshot.weekdays },
     coverage: { resolvedWithoutStructuredHistory: Math.max(0, state('resolvido') - count(events.currentVerified)), conflictingResolutionCycles: count(events.conflicts) },
   };
 }

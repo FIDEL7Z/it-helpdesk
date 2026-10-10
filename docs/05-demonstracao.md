@@ -57,8 +57,8 @@ Verificação por leitura na API do GitHub em **09/10/2026**, durante a prepara�
 O convite pendente não equivale a acesso ativo. O avaliador precisa aceitá-lo. Conferir novamente em **Settings → Collaborators** antes da entrega e confirmar que a conta consegue abrir o repositório. Esta etapa não enviou nem reenviou convites e não alterou permissões.
 
 - [ ] Confirmar aceitação do convite pelo avaliador.
-- [ ] Revisar/aprovar o rascunho em primeira pessoa.
-- [ ] Autorizar separadamente merge e publicação da branch documental, caso aprovada.
+- [x] Texto em primeira pessoa revisado e confirmado pelo autor.
+- [x] Merge e publicação da documentação autorizados pelo autor.
 
 ## Solução de problemas
 

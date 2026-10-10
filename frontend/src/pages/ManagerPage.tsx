@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { PieChart, TrendLineChart } from '../components/ManagerCharts'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getManagerDashboard, type ManagerDashboard, type Count } from '../services/manager'
 import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tickets'
@@ -83,8 +84,8 @@ function ManagerContent() {
           </div>
         </section>
         <div className="dashboard__grid">
-          <Distribution title="Backlog por prioridade" rows={data.distributions.priority} label={id => PRIORITY_LABELS[id as keyof typeof PRIORITY_LABELS] ?? id} />
-          <Distribution title="Backlog por categoria" rows={data.distributions.category} label={id => CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ?? id} />
+          <PieChart title="Backlog por prioridade" rows={data.distributions.priority} label={id => PRIORITY_LABELS[id as keyof typeof PRIORITY_LABELS] ?? id} />
+          <PieChart title="Backlog por categoria" rows={data.distributions.category} label={id => CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ?? id} />
         </div>
         {(data.coverage.resolvedWithoutStructuredHistory > 0 || data.coverage.conflictingResolutionCycles > 0) && <div className="alert alert--info" role="status">
           {data.coverage.resolvedWithoutStructuredHistory} chamados atualmente resolvidos sem evidência válida no ciclo atual; {data.coverage.conflictingResolutionCycles} ciclos com autores contraditórios no período. Resolvidos sem evidência não entram na produtividade; ciclos anteriores comprovados são preservados. Histórico legado permanece disponível no detalhe.
@@ -105,6 +106,7 @@ function ManagerContent() {
           {data.requesters.length === 0 ? <p className="text-muted">Nenhuma solicitação criada neste período com os filtros selecionados.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Ranking de solicitantes"><table className="manager-table"><thead><tr><th>Solicitante</th><th>Solicitações</th><th>Ainda pendentes</th><th>Categorias mais solicitadas</th></tr></thead><tbody>{data.requesters.map(row => <tr key={row.id}><th scope="row"><Link to={tickets({ requesterId: row.id })}>{row.name}</Link></th><td>{row.created}</td><td>{row.pending}</td><td>{row.categories.slice(0, 3).map(c => `${CATEGORY_LABELS[c.category as keyof typeof CATEGORY_LABELS] ?? c.category} (${c.count})`).join(', ')}</td></tr>)}</tbody></table></div>}
         </section>
         <section className="card" aria-labelledby="manager-trends"><h2 id="manager-trends" className="card__title">Tendências e horários</h2><p className="card__description">Criação pela data real; resoluções por evento comprovado. Agrupamento {data.range.bucket === 'month' ? 'mensal' : 'diário'} no fuso {data.range.timezone}. Ausência de registros não produz valores simulados.</p>
+          <TrendLineChart rows={data.trends} />
           {data.trends.length === 0 ? <p className="text-muted">Sem criações ou resoluções comprovadas no período.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Evolução de chamados"><table className="manager-table manager-table--trends"><thead><tr><th>Período</th><th>Criados</th><th>Resoluções</th><th>Evolução</th></tr></thead><tbody>{data.trends.map(row => <tr key={row.period}><th scope="row">{row.period}</th><td>{row.created}</td><td>{row.resolved}</td><td><div className="trend-bars" aria-hidden="true"><span className="trend-bars__created" style={{ width: `${row.created / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /><span className="trend-bars__resolved" style={{ width: `${row.resolved / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /></div></td></tr>)}</tbody></table></div>}
           <p className="field__hint">Azul: criados · Verde: resoluções. Uma reabertura preserva a resolução anterior; outra resolução conta um novo ciclo.</p>
         </section>

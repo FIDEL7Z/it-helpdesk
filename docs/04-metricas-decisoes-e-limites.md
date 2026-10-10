@@ -41,13 +41,13 @@ Solicitante filtra `requester`; categoria, prioridade e status filtram o **estad
 - **Em andamento agora:** documentos com status `em_andamento`; não depende da data de criação.
 - **Backlog atual:** abertos + em andamento, sob filtros atuais. Não é backlog reconstruído de meses anteriores.
 - **Pendentes sem responsável:** backlog com `assignee=null` ou ausente. Difere do cartão básico TI, que inclui todos os status sem responsável. O link gerencial acrescenta `pending=true` à fila.
-- **Distribuições por prioridade/categoria:** classificação atual do backlog, sem corte por criação.
+- **Distribuições por prioridade/categoria:** classificação atual do backlog, sem corte por criação. Gráficos de pizza mostram quantidades e percentuais sobre o backlog filtrado; legenda identifica cada fatia. Total zero apresenta estado vazio.
 - **Atribuídos agora por operador:** documentos de todos os status com seu `assignee`. **Pendentes** exclui resolvidos; **em andamento** é um subconjunto das pendências.
 - **Resoluções por operador:** ações comprovadas pelo `actorId`, nunca pelo responsável atual ou `resolvedBy` isolado. Um gestor que resolve aparece como gestor operador.
 - **Participação:** chamados distintos com ao menos uma ação v2 válida do operador no período. Várias ações no mesmo chamado contam uma participação por autor; o mesmo chamado pode ter participação de vários operadores, portanto não somar como total de chamados únicos da equipe.
 - **Reaberturas por operador:** eventos v2 `reopened`, uma vez por chamado e novo ciclo, executados pelo próprio autor no período. Não atribuem falha/culpa ao resolvedor anterior ou responsável atual.
 - **Solicitantes:** até dez maiores volumes de criação no período, com empate por ID estável. Categorias são agrupadas nos mesmos documentos; a tela mostra as três mais frequentes. Pendências pertencem a esse conjunto criado no período. Usuários TI/gestor também podem abrir solicitações.
-- **Tendências:** criações por `createdAt` e resoluções por data do evento; exibem somente períodos com registros. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
+- **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de linhas e tabela exibem somente períodos com registros. As posições horizontais respeitam o espaçamento entre datas; linhas conectam pontos observados, sem preencher lacunas. Um período único aparece como pontos. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
 - **Demanda horária/semanal:** criações no período agrupadas por hora local (0–23) e dia ISO da semana (segunda–domingo), sem extrair horário de mensagens ou `updatedAt`.
 
 Equipe inclui TI, gestores operadores e referências históricas/atribuídas pertinentes. Operadores sem chamados aparecem com zero; removidos usam ID/snapshot disponível, sem inventar identidade. A ordem por pendências auxilia triagem, sem premiar baixo volume de resolução ou penalizar alta carga. Links da equipe/solicitantes consultam a fila atual, **sem período de criação**.

@@ -324,6 +324,8 @@ async function run() {
       await go('/manager');
       await waitDom('manager analytics loaded', 'document.querySelectorAll(".manager-page .stat-card__value").length === 6');
       const report = (await browserApi('GET', '/dashboard/manager')).body.dashboard;
+      check(await evaluate(`document.querySelectorAll('.pie-chart svg').length === 2 && document.querySelectorAll('.line-chart svg circle').length === 2`), 'Manager renders two real backlog pie charts and single-period trend points');
+      check(await evaluate(`Array.from(document.querySelectorAll('.pie-chart .chart-legend li')).every(el => el.textContent.includes('%')) && !Array.from(document.querySelectorAll('.pie-chart path, .line-chart polyline')).some(el => /NaN|Infinity/.test(el.getAttribute('d') ?? el.getAttribute('points'))) `), 'Charts expose percentages and contain valid finite coordinates');
       check(report.current.total === 4 && report.period.created === 4, 'Manager counts exclude demonstration by default');
       check(report.period.resolutions === 2 && report.period.resolvedTickets === 2 && report.period.reopenings === 1, 'Manager resolutions survive reopen and count one event per cycle');
       check(report.team.find(row => row.id === users.ti.id).resolutions === 1 && report.team.find(row => row.id === secondAnalyst.id).resolutions === 0, 'Manager productivity uses resolver rather than current assignee');
@@ -371,6 +373,8 @@ async function run() {
       await writeFile(join(output, 'manager-desktop-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
       await evaluate('document.getElementById("manager-team").scrollIntoView({ block: "start" })');
       await writeFile(join(output, 'manager-team-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await evaluate('document.getElementById("manager-trends").scrollIntoView({ block: "start" })');
+      await writeFile(join(output, 'manager-lines-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
       await evaluate('window.scrollTo(0,0)');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits desktop without page overflow');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });

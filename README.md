@@ -36,7 +36,7 @@ O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstraçã
 
 - **Solicitante:** abre chamados, consulta apenas os próprios e edita título/descrição enquanto estão abertos.
 - **TI:** vê todos os chamados, atribui responsáveis da TI ou gestores ativos, faz triagem, inicia, resolve e reabre atendimentos.
-- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, tendências e horários; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
+- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, tendências em linhas, distribuições em pizza e horários; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
 
 Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; TI e solicitante entram no dashboard de seu perfil. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL e retorno do detalhe para a fila consultada. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
 

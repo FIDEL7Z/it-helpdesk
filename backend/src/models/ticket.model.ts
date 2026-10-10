@@ -38,6 +38,7 @@ export interface AuditEvent {
   from: Record<string, unknown>;
   to: Record<string, unknown>;
   assigneeAtEvent: Types.ObjectId | null;
+  assigneeSnapshot?: { id: string; name: string; role: string } | null;
   reason?: string;
   dataOrigin: 'operational' | 'demo' | 'legacy';
 }
@@ -45,9 +46,9 @@ export interface AuditEvent {
 export interface TicketEvent {
   audit?: AuditEvent;
   type: TicketEventType;
-  author: Types.ObjectId;
+  author?: Types.ObjectId;
   message: string;
-  at: Date;
+  at?: Date;
 }
 
 export interface Ticket {
@@ -78,12 +79,13 @@ const auditSchema = new Schema<AuditEvent>({
   actorSnapshot: { name: { type: String, required: true }, role: { type: String, required: true } },
   eventType: { type: String, enum: TICKET_EVENT_TYPES, required: true },
   occurredAt: { type: Date, required: true },
-  revision: { type: Number, required: true, min: 0 },
-  eventIndex: { type: Number, required: true, min: 0 },
-  cycleId: { type: Number, required: true, min: 1 },
+  revision: { type: Number, required: true, min: 0, validate: Number.isInteger },
+  eventIndex: { type: Number, required: true, min: 0, validate: Number.isInteger },
+  cycleId: { type: Number, required: true, min: 1, validate: Number.isInteger },
   from: { type: Schema.Types.Mixed, required: true },
   to: { type: Schema.Types.Mixed, required: true },
   assigneeAtEvent: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  assigneeSnapshot: { type: new Schema({ id: String, name: String, role: String }, { _id: false }), default: null },
   reason: { type: String, maxlength: 1000 },
   dataOrigin: { type: String, enum: ['operational', 'demo', 'legacy'], required: true },
 }, { _id: false, minimize: false });
@@ -92,12 +94,21 @@ const ticketEventSchema = new Schema<TicketEvent>(
   {
     audit: { type: auditSchema, required: false },
     type: { type: String, enum: TICKET_EVENT_TYPES, required: true },
-    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     message: { type: String, required: true },
-    at: { type: Date, default: Date.now },
+    at: { type: Date, required: false },
   },
   { _id: false },
 );
+
+ticketEventSchema.pre('validate', function () {
+  if (!this.audit) return; // Legacy events are preserved without invented metadata.
+  if (!this.author || !this.author.equals(this.audit.actorId)) this.invalidate('audit.actorId', 'Actor must match authenticated event author');
+  if (!this.at || this.at.getTime() !== this.audit.occurredAt.getTime() || this.at.getTime() > Date.now()) {
+    this.invalidate('audit.occurredAt', 'Audit date must match event date and cannot be in the future');
+  }
+  if (this.type !== this.audit.eventType) this.invalidate('audit.eventType', 'Event types must agree');
+});
 
 const ticketSchema = new Schema<Ticket>(
   {

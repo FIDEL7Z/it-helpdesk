@@ -40,10 +40,28 @@ export const TICKET_LIMITS = {
 export const PAGE_SIZE = 10
 
 export type TicketEvent = {
-  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned'
+  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved'
   message: string
-  at: string
+  at: string | null
   author: User | null
+  authorId: string | null
+  assigneeAtEvent: User | null
+  audit?: {
+    eventId: string
+    actorId: string
+    actorSnapshot: { name: string; role: string }
+    eventType: string
+    occurredAt: string
+    revision: number
+    eventIndex: number
+    cycleId: number
+    from: Record<string, unknown>
+    to: Record<string, unknown>
+    assigneeAtEvent: string | null
+    assigneeSnapshot?: { id: string; name: string; role: string } | null
+    reason?: string
+    dataOrigin: 'operational' | 'demo' | 'legacy'
+  }
 }
 
 export type TicketSummary = {
@@ -54,8 +72,16 @@ export type TicketSummary = {
   status: TicketStatus
   requester: User | null
   assignee: User | null
-  createdAt: string
-  updatedAt: string
+  assigneeId: string | null
+  requesterId: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  revision: number
+  activeCycleId: number
+  resolvedAt: string | null
+  resolvedBy: User | null
+  resolvedById: string | null
+  dataOrigin: 'operational' | 'demo' | 'legacy'
 }
 
 export type TicketDetail = TicketSummary & {
@@ -79,6 +105,7 @@ export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
 }
 
 export type TicketFilters = {
+  dataOrigin?: 'operational' | 'demo' | 'legacy'
   status?: TicketStatus
   priority?: TicketPriority
   category?: TicketCategory
@@ -94,7 +121,7 @@ export type CreateTicketInput = {
   priority: TicketPriority
 }
 
-export type UpdateTicketInput = Partial<CreateTicketInput>
+export type UpdateTicketInput = Partial<CreateTicketInput> & { reason?: string }
 
 export function listTickets(
   filters: TicketFilters,
@@ -115,18 +142,18 @@ export function createTicket(input: CreateTicketInput): Promise<{ ticket: Ticket
   return apiRequest('/tickets', { method: 'POST', body: input })
 }
 
-export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ ticket: TicketDetail }> {
-  return apiRequest(`/tickets/${encodeURIComponent(id)}`, { method: 'PATCH', body: input })
+export function updateTicket(id: string, input: UpdateTicketInput, expectedRevision: number): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}`, { method: 'PATCH', body: { ...input, expectedRevision } })
 }
 
-export function changeTicketStatus(id: string, status: TicketStatus): Promise<{ ticket: TicketDetail }> {
-  return apiRequest(`/tickets/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } })
+export function changeTicketStatus(id: string, status: TicketStatus, expectedRevision: number, reason?: string): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, expectedRevision, ...(reason ? { reason } : {}) } })
 }
 
-export function assignTicket(id: string, assigneeId: string): Promise<{ ticket: TicketDetail }> {
+export function assignTicket(id: string, assigneeId: string, expectedRevision: number, reason?: string): Promise<{ ticket: TicketDetail }> {
   return apiRequest(`/tickets/${encodeURIComponent(id)}/assignee`, {
     method: 'PATCH',
-    body: { assigneeId },
+    body: { assigneeId, expectedRevision, ...(reason ? { reason } : {}) },
   })
 }
 

@@ -122,9 +122,10 @@ async function run() {
   for (const role of ['solicitante', 'ti', 'gestor']) {
     users[role] = await UserModel.create({ name: `E2E ${role}`, email: `${role}@e2e.local`, role, passwordHash });
   }
+  const secondAnalyst = await UserModel.create({ name: 'Carlos Andrade', email: 'second-ti@e2e.local', role: 'ti', passwordHash });
   const other = await UserModel.create({ name: 'Other requester', email: 'other@e2e.local', role: 'solicitante', passwordHash });
   const ticket = (title, requester, status = 'aberto', assignee = null) => TicketModel.create({
-    title, description: 'Problema de teste com descrição suficiente.', category: 'software', priority: 'media',
+    dataOrigin: 'operational', title, description: 'Problema de teste com descrição suficiente.', category: 'software', priority: 'media',
     requester: requester._id, status, assignee: assignee?._id ?? null,
     history: [{ type: 'created', author: requester._id, message: 'Chamado aberto' }],
   });
@@ -178,11 +179,16 @@ async function run() {
   };
   const fill = (id, value) => evaluate(`(() => {
     const input = document.getElementById(${JSON.stringify(id)});
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+    Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
   const submit = () => evaluate('document.querySelector("form").requestSubmit()');
-  const browserApi = (method, path, body) => evaluate(`(async () => {
+  const browserApi = async (method, path, body) => {
+    if (method === 'PATCH' && body && body.expectedRevision === undefined) {
+      const read = await browserApi('GET', path.replace(/\/(status|assignee)$/, ''));
+      body = { ...body, expectedRevision: read.body.ticket?.revision ?? 0 };
+    }
+    return evaluate(`(async () => {
     const response = await fetch(${JSON.stringify(apiUrl + path)}, {
       method: ${JSON.stringify(method)},
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') },
@@ -191,6 +197,7 @@ async function run() {
     });
     return { status: response.status, body: await response.json() };
   })()`);
+  };
   const dashboard = async (expected, role) => {
     await waitDom(`${role} dashboard data`, 'document.querySelectorAll(".stat-card__value").length >= 4');
     const values = await evaluate('Array.from(document.querySelectorAll(".stat-card__value")).slice(0,4).map(el => Number(el.textContent))');
@@ -218,7 +225,7 @@ async function run() {
     await waitDom(`${role} login`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
     await evaluate('Array.from(document.querySelectorAll(".app-nav a")).find(el => el.getAttribute("href") === "/dashboard").click()');
     await waitDom(`${role} dashboard route`, 'location.pathname === "/dashboard"');
-    const expected = role === 'solicitante' ? [2, 1, 0, 1] : [4, 2, 1, 1];
+    let expected = role === 'solicitante' ? [2, 1, 0, 1] : role === 'gestor' ? [4, 1, 1, 2] : [4, 2, 1, 1];
     await dashboard(expected, role);
     for (let reload = 1; reload <= 3; reload++) {
       const previousOrigin = await evaluate('performance.timeOrigin');
@@ -235,35 +242,58 @@ async function run() {
     const titles = await evaluate('Array.from(document.querySelectorAll(".ticket-table__title a")).map(el => el.textContent)');
     check(titles.length === expected[0] && titles.includes('Other requester private ticket') === (role !== 'solicitante'), `${role}: visible ticket list isolation`);
 
+    if (role === 'ti') {
+      await go(`/tickets/${own.id}`);
+      await waitDom('TI assignment form', '!!document.getElementById("assignee")');
+      const stale = await browserApi('PATCH', `/tickets/${own.id}`, { category: 'hardware' });
+      check(stale.status === 200, 'Concurrent API action changes the revision loaded by the UI');
+      await evaluate(`(() => { const select = document.getElementById('assignee'); select.value = ${JSON.stringify(secondAnalyst.id)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate('document.getElementById("assignee").closest("form").requestSubmit()');
+      await waitDom('stale UI action rejected', 'document.querySelector("[role=alert]")?.textContent.includes("Os dados foram atualizados")');
+      check((await browserApi('GET', `/tickets/${own.id}`)).body.ticket.assignee === null, 'Stale frontend revision cannot assign or append a successful event');
+      await waitDom('conflict reload finishes', 'document.getElementById("triage-category")?.value === "hardware"');
+      await evaluate(`(() => { const select = document.getElementById('assignee'); select.value = ${JSON.stringify(secondAnalyst.id)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate('document.getElementById("assignee").closest("form").requestSubmit()');
+      await waitDom('TI assigned to Carlos', 'Array.from(document.querySelectorAll("dd")).some(el => el.textContent === "Carlos Andrade")');
+      await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Iniciar atendimento").click()');
+      await waitDom('TI resolution justification input', '!!document.getElementById("status-reason")');
+      check(await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Marcar como resolvido").disabled'), 'Resolution by another operator requires justification in the UI');
+      check((await browserApi('PATCH', `/tickets/${own.id}/status`, { status: 'resolvido' })).status === 400, 'API rejects unjustified resolution by another operator');
+      await fill('status-reason', 'Realizei a correção em colaboração com Carlos.');
+      await evaluate('document.getElementById("status-reason").closest("form").requestSubmit()');
+      await waitDom('explicit resolver in history', 'Array.from(document.querySelectorAll(".timeline__message")).some(el => el.textContent === "Resolvido por E2E ti")');
+      const resolution = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+      check(resolution.assignee.id === secondAnalyst.id && resolution.resolvedBy.id === users.ti.id, 'Responsible Carlos and authenticated resolver TI remain distinct');
+      check(resolution.history.at(-1).audit.reason.includes('Carlos') && resolution.history.at(-1).audit.assigneeAtEvent === secondAnalyst.id, 'Resolution persists structured justification and assignee at event');
+      await go('/tickets');
+      await waitDom('resolver column', 'Array.from(document.querySelectorAll(".ticket-table tbody tr")).some(el => el.textContent.includes("Carlos Andrade"))');
+      check(await evaluate('Array.from(document.querySelectorAll("td")).some(el => el.dataset.label === "Resolvido por" && el.textContent === "E2E ti")'), 'Ticket table identifies the resolver separately');
+    }
+
     if (role === 'gestor') {
       await go(`/tickets/${own.id}`);
       await waitDom('manager foreign detail', 'document.querySelector("h1")?.textContent === "Requester open ticket"');
-      check(await evaluate('!document.querySelector(".action-stack") && !Array.from(document.querySelectorAll("button")).some(el => el.textContent.trim() === "Editar chamado")'), 'Manager cannot see operation or foreign text editing controls');
-      for (const [path, body] of [
-        [`/${own.id}/status`, { status: 'em_andamento' }],
-        [`/${own.id}/assignee`, { assigneeId: users.ti.id }],
-        [`/${own.id}`, { priority: 'alta' }],
-        [`/${own.id}`, { category: 'hardware' }],
-        [`/${own.id}`, { title: 'Forbidden manager edit' }],
-      ]) {
-        check((await browserApi('PATCH', `/tickets${path}`, body)).status === 403, `Manager API rejects ${Object.keys(body)[0]} change`);
-      }
+      check(await evaluate('!!document.querySelector(".action-stack") && !Array.from(document.querySelectorAll("button")).some(el => el.textContent.trim() === "Editar chamado")'), 'Manager sees operational controls without foreign text editing');
+      check((await browserApi('PATCH', `/tickets/${own.id}`, { title: 'Forbidden manager edit' })).status === 403, 'Manager still cannot edit foreign text');
       await go(`/tickets/${managerOwn.id}`);
       await waitDom('manager own detail', 'document.querySelector("h1")?.textContent === "Manager own open ticket"');
       await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Editar chamado").click()');
       await waitDom('manager own edit form', '!!document.getElementById("edit-title")');
-      check(await evaluate('!!document.querySelector(".ticket-layout__main form") && !document.querySelector(".action-stack")'), 'Manager sees own text editing controls without operation controls');
+      check(await evaluate('!!document.querySelector(".ticket-layout__main form") && !!document.querySelector(".action-stack")'), 'Manager sees own text editing and operational controls');
       await fill('edit-title', 'Manager edited own ticket');
       await submit();
       await waitDom('manager own edit saved', 'document.querySelector("h1")?.textContent === "Manager edited own ticket"');
       const saved = await browserApi('GET', `/tickets/${managerOwn.id}`);
       check(saved.status === 200 && saved.body.ticket.title === 'Manager edited own ticket', 'Manager can edit own open ticket through the UI with real persistence');
-      const assignment = await fetch(`${apiUrl}/tickets/${own.id}/assignee`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signAccessToken(users.ti.id)}` },
-        body: JSON.stringify({ assigneeId: users.gestor.id }), signal: AbortSignal.timeout(10000),
-      });
-      check(assignment.status === 400, 'IT cannot assign a manager');
-      await assignment.text();
+      const assignment = await browserApi('PATCH', `/tickets/${managerOwn.id}/assignee`, { assigneeId: users.gestor.id });
+      check(assignment.status === 200, 'Manager can assign and assume responsibility');
+      const started = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'em_andamento' });
+      check(started.status === 200 && started.body.ticket.history.at(-1).audit.actorId === users.gestor.id, 'Manager starts work as authenticated actor');
+      const completed = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'resolvido' });
+      check(completed.status === 200 && completed.body.ticket.resolvedBy.id === users.gestor.id, 'Manager resolves with explicit authenticated authorship');
+      const reopened = await browserApi('PATCH', `/tickets/${managerOwn.id}/status`, { status: 'em_andamento', reason: 'Problema reapareceu no teste do segundo ciclo.' });
+      check(reopened.status === 200 && reopened.body.ticket.activeCycleId === 2 && reopened.body.ticket.resolvedBy === null, 'Manager reopens into a new cycle without deleting prior resolution');
+      expected = [4, 0, 2, 2];
       await go('/dashboard');
       await dashboard(expected, role);
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });

@@ -113,7 +113,7 @@ export function TicketDetailPage() {
 
   const canOperate = can(user?.role, 'tickets:operate')
   const isSupervisor = can(user?.role, 'tickets:view-all') && !canOperate
-  const isOwner = ticket.requester?.id === user?.id
+  const isOwner = ticket.requesterId === user?.id
   const canEditText = isOwner && ticket.status === 'aberto'
   const isResolved = ticket.status === 'resolvido'
 
@@ -150,7 +150,7 @@ export function TicketDetailPage() {
                 key={ticket.updatedAt}
                 ticket={ticket}
                 busy={busy}
-                onSave={(input) => runAction(() => updateTicket(ticket.id, input), 'Chamado atualizado.')}
+                onSave={(input) => runAction(() => updateTicket(ticket.id, input, ticket.revision), 'Chamado atualizado.')}
               />
             ) : (
               <p className="ticket-description">{ticket.description}</p>
@@ -161,13 +161,21 @@ export function TicketDetailPage() {
             <h2 className="card__title">Histórico</h2>
             <ol className="timeline">
               {ticket.history.map((event, index) => (
-                <li key={`${event.at}-${index}`} className={`timeline__item timeline__item--${event.type}`}>
+                <li key={event.audit?.eventId ?? `${event.at}-${index}`} className={`timeline__item timeline__item--${event.type}`}>
                   <span className="timeline__dot" aria-hidden="true" />
                   <div className="timeline__content">
-                    <p className="timeline__message">{event.message}</p>
+                    <p className="timeline__message">
+                      {event.type === 'resolved' ? `Resolvido por ${event.audit?.actorSnapshot.name ?? event.author?.name ?? 'autor indisponível'}` : event.message}
+                    </p>
+                    {event.audit && <>
+                      <p>Responsável no momento: {event.audit.assigneeSnapshot?.name ?? event.assigneeAtEvent?.name ?? (event.audit.assigneeAtEvent ? `Usuário indisponível (${event.audit.assigneeAtEvent})` : 'Não atribuído')} · Ciclo {event.audit.cycleId}</p>
+                      {event.audit.reason && <p>Justificativa: {event.audit.reason}</p>}
+                      {typeof event.audit.from.status === 'string' && typeof event.audit.to.status === 'string' && <p>{event.audit.from.status} → {event.audit.to.status}</p>}
+                    </>}
+                    {!event.audit && <p className="field__hint">Registro legado: contexto estruturado indisponível.</p>}
                     <p className="timeline__meta">
-                      {event.author?.name ?? 'Usuário removido'} ·{' '}
-                      <time dateTime={event.at}>{formatDateTime(event.at)}</time>
+                      {event.audit?.actorSnapshot.name ?? event.author?.name ?? (event.authorId ? `Usuário indisponível (${event.authorId})` : 'Autor não registrado')} ·{' '}
+                      {event.at ? <time dateTime={event.at}>{formatDateTime(event.at)}</time> : 'Data não registrada'}
                     </p>
                   </div>
                 </li>
@@ -201,11 +209,21 @@ export function TicketDetailPage() {
                 <dd>{ticket.requester?.name ?? 'Usuário removido'}</dd>
               </div>
               <div className="details__row">
-                <dt>Responsável</dt>
+                <dt>Responsável atribuído</dt>
                 <dd className={ticket.assignee ? undefined : 'text-muted'}>
-                  {ticket.assignee?.name ?? 'Não atribuído'}
+                  {ticket.assignee?.name ?? (ticket.assigneeId ? `Usuário indisponível (${ticket.assigneeId})` : 'Não atribuído')}
                 </dd>
               </div>
+              <div className="details__row">
+                <dt>Resolvido por</dt>
+                <dd>{ticket.status === 'resolvido' ? ticket.resolvedBy?.name ?? (ticket.resolvedById ? `Usuário indisponível (${ticket.resolvedById})` : 'Sem autoria estruturada; consulte o histórico') : 'Sem resolução no ciclo atual'}</dd>
+              </div>
+              <div className="details__row">
+                <dt>Resolvido em</dt>
+                <dd>{ticket.resolvedAt ? formatDateTime(ticket.resolvedAt) : 'Não registrado no ciclo atual'}</dd>
+              </div>
+              <div className="details__row"><dt>Ciclo atual</dt><dd>{ticket.activeCycleId}</dd></div>
+              <div className="details__row"><dt>Origem</dt><dd>{ticket.dataOrigin === 'demo' ? 'Demonstração — não usar como produtividade real' : ticket.dataOrigin === 'legacy' ? 'Legado — origem não comprovada' : 'Operacional'}</dd></div>
               <div className="details__row">
                 <dt>Atualizado</dt>
                 <dd>{formatDateTime(ticket.updatedAt)}</dd>
@@ -218,28 +236,29 @@ export function TicketDetailPage() {
               <h2 className="card__title">Atendimento</h2>
               <div className="action-stack">
                 <StatusAction
+                  key={`status-${ticket.revision}`}
                   ticket={ticket}
                   busy={busy}
-                  onChange={(status, success) =>
-                    runAction(() => changeTicketStatus(ticket.id, status), success)
+                  onChange={(status, success, reason) =>
+                    runAction(() => changeTicketStatus(ticket.id, status, ticket.revision, reason), success)
                   }
                 />
                 {!isResolved && (
                   <>
                     <AssigneeForm
-                      key={`assignee-${ticket.assignee?.id ?? 'none'}`}
+                      key={`assignee-${ticket.revision}`}
                       ticket={ticket}
                       busy={busy}
-                      onAssign={(assigneeId) =>
-                        runAction(() => assignTicket(ticket.id, assigneeId), 'Responsável atualizado.')
+                      onAssign={(assigneeId, reason) =>
+                        runAction(() => assignTicket(ticket.id, assigneeId, ticket.revision, reason), 'Responsável atualizado.')
                       }
                     />
                     <TriageForm
-                      key={`triage-${ticket.category}-${ticket.priority}`}
+                      key={`triage-${ticket.revision}`}
                       ticket={ticket}
                       busy={busy}
                       onSave={(input) =>
-                        runAction(() => updateTicket(ticket.id, input), 'Classificação atualizada.')
+                        runAction(() => updateTicket(ticket.id, input, ticket.revision), 'Classificação atualizada.')
                       }
                     />
                   </>
@@ -272,38 +291,47 @@ export function TicketDetailPage() {
 type StatusActionProps = {
   ticket: TicketDetail
   busy: boolean
-  onChange: (status: TicketStatus, successText: string) => Promise<boolean>
+  onChange: (status: TicketStatus, successText: string, reason?: string) => Promise<boolean>
 }
 
 function StatusAction({ ticket, busy, onChange }: StatusActionProps) {
+  const { user } = useAuth()
+  const [reason, setReason] = useState('')
+  const requiresReason = ticket.status === 'resolvido' || (ticket.status === 'em_andamento' && ticket.assigneeId !== user?.id)
   const action = STATUS_ACTIONS[ticket.status]
-  const willSelfAssign = action.to === 'em_andamento' && !ticket.assignee
+  const willSelfAssign = action.to === 'em_andamento' && !ticket.assigneeId
 
   return (
-    <div className="action">
+    <form className="action" onSubmit={event => { event.preventDefault(); void onChange(action.to, action.success, reason.trim() || undefined) }}>
+      {requiresReason && <div className="field">
+        <label className="field__label" htmlFor="status-reason">Justificativa obrigatória</label>
+        <textarea id="status-reason" className="field__input" value={reason} onChange={event => setReason(event.target.value)} minLength={5} maxLength={1000} required disabled={busy} />
+        <p className="field__hint">Informe o motivo da reabertura ou da resolução por outro operador.</p>
+      </div>}
       <button
-        type="button"
+        type="submit"
         className="button button--primary button--block"
-        disabled={busy}
-        onClick={() => onChange(action.to, action.success)}
+        disabled={busy || (requiresReason && reason.trim().length < 5)}
       >
         {action.label}
       </button>
       {willSelfAssign && <p className="field__hint">Você será definido como responsável.</p>}
-    </div>
+    </form>
   )
 }
 
 type AssigneeFormProps = {
   ticket: TicketDetail
   busy: boolean
-  onAssign: (assigneeId: string) => Promise<boolean>
+  onAssign: (assigneeId: string, reason?: string) => Promise<boolean>
 }
 
 function AssigneeForm({ ticket, busy, onAssign }: AssigneeFormProps) {
   const [staff, setStaff] = useState<User[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [selected, setSelected] = useState(ticket.assignee?.id ?? '')
+  const [reason, setReason] = useState('')
+  const requiresReason = ticket.status === 'em_andamento' && !!ticket.assigneeId
 
   useEffect(() => {
     const controller = new AbortController()
@@ -317,7 +345,7 @@ function AssigneeForm({ ticket, busy, onAssign }: AssigneeFormProps) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (selected) void onAssign(selected)
+    if (selected) void onAssign(selected, reason.trim() || undefined)
   }
 
   return (
@@ -325,6 +353,7 @@ function AssigneeForm({ ticket, busy, onAssign }: AssigneeFormProps) {
       <label htmlFor="assignee" className="field__label">
         Responsável
       </label>
+      {requiresReason && <div className="field"><label className="field__label" htmlFor="assignment-reason">Motivo da reatribuição</label><textarea id="assignment-reason" className="field__input" value={reason} onChange={event => setReason(event.target.value)} required minLength={5} maxLength={1000} disabled={busy} /></div>}
       {loadError ? (
         <p className="field__error">Não foi possível carregar a equipe de TI.</p>
       ) : (
@@ -348,7 +377,7 @@ function AssigneeForm({ ticket, busy, onAssign }: AssigneeFormProps) {
           <button
             type="submit"
             className="button button--secondary"
-            disabled={busy || !selected || selected === ticket.assignee?.id}
+            disabled={busy || !selected || selected === ticket.assignee?.id || (requiresReason && reason.trim().length < 5)}
           >
             Atribuir
           </button>
@@ -361,17 +390,18 @@ function AssigneeForm({ ticket, busy, onAssign }: AssigneeFormProps) {
 type TriageFormProps = {
   ticket: TicketDetail
   busy: boolean
-  onSave: (input: { category: TicketDetail['category']; priority: TicketDetail['priority'] }) => Promise<boolean>
+  onSave: (input: { category: TicketDetail['category']; priority: TicketDetail['priority']; reason?: string }) => Promise<boolean>
 }
 
 function TriageForm({ ticket, busy, onSave }: TriageFormProps) {
   const [category, setCategory] = useState(ticket.category)
   const [priority, setPriority] = useState(ticket.priority)
+  const [reason, setReason] = useState('')
   const changed = category !== ticket.category || priority !== ticket.priority
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (changed) void onSave({ category, priority })
+    if (changed) void onSave({ category, priority, ...(reason.trim() ? { reason: reason.trim() } : {}) })
   }
 
   return (
@@ -418,7 +448,8 @@ function TriageForm({ ticket, busy, onSave }: TriageFormProps) {
           </select>
         </div>
       </div>
-      <button type="submit" className="button button--secondary" disabled={busy || !changed}>
+      {priority !== ticket.priority && <div className="field"><label className="field__label" htmlFor="priority-reason">Motivo da mudança de prioridade</label><textarea id="priority-reason" className="field__input" value={reason} onChange={event => setReason(event.target.value)} minLength={5} maxLength={1000} required disabled={busy} /></div>}
+      <button type="submit" className="button button--secondary" disabled={busy || !changed || (priority !== ticket.priority && reason.trim().length < 5)}>
         Salvar classificação
       </button>
     </form>

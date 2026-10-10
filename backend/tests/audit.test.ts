@@ -118,6 +118,20 @@ describe('structured ticket audit', () => {
     assert.equal(record!.history.length, 2);
   });
 
+  it('does not record state, revision or history when the atomic write fails', async context => {
+    const ticket = await create();
+    const before = await TicketModel.findById(ticket.id).lean();
+    const failure = context.mock.method(TicketModel, 'findOneAndUpdate', () => {
+      throw new Error('Injected isolated audit write failure');
+    });
+    try {
+      assert.equal((await request(analyst, 'PATCH', `/tickets/${ticket.id}`, { category: 'rede', expectedRevision: 0 })).status, 500);
+      assert.deepEqual(await TicketModel.findById(ticket.id).lean(), before);
+    } finally {
+      failure.mock.restore();
+    }
+  });
+
   it('preserves raw legacy events and initializes revision without inventing resolution evidence', async () => {
     const id = new mongoose.Types.ObjectId();
     const at = new Date('2020-01-01');
@@ -141,6 +155,34 @@ describe('structured ticket audit', () => {
     assert.equal((await mutate(analyst, ticket.id, '', { category: 'rede' })).status, 409);
   });
 
+  it('returns unknown legacy authors and dates without manufacturing them on read or write', async () => {
+    const id = new mongoose.Types.ObjectId();
+    const history = [{ type: 'created', message: 'Registro incompleto preservado' }];
+    await TicketModel.collection.insertOne({ _id: id, title: 'Legado incompleto', description: 'Sem evidência de autoria ou datas.', category: 'rede', priority: 'media', status: 'aberto', requester: new mongoose.Types.ObjectId(requester.id), assignee: null, history });
+    const read = await request(analyst, 'GET', `/tickets/${id}`);
+    assert.equal(read.body.ticket.history[0].authorId, null);
+    assert.equal(read.body.ticket.history[0].at, null);
+    assert.equal(read.body.ticket.createdAt, null);
+    assert.equal(read.body.ticket.updatedAt, null);
+    assert.equal((await mutate(analyst, String(id), '', { category: 'software' })).status, 200);
+    const raw = await TicketModel.collection.findOne({ _id: id });
+    assert.deepEqual(raw!.history[0], history[0]);
+    assert.equal(raw!.createdAt, undefined);
+  });
+
+  it('validates actor, type and date consistency of structured events', async () => {
+    const ticket = await create();
+    const record = await TicketModel.findById(ticket.id);
+    record!.history[0].audit!.actorId = new mongoose.Types.ObjectId(other.id);
+    await assert.rejects(record!.validate(), /Actor must match/);
+    record!.history[0].audit!.actorId = new mongoose.Types.ObjectId(requester.id);
+    record!.history[0].audit!.occurredAt = new Date(Date.now() + 86400000);
+    await assert.rejects(record!.validate(), /Audit date/);
+    record!.history[0].audit!.occurredAt = record!.history[0].at!;
+    record!.history[0].audit!.eventType = 'resolved';
+    await assert.rejects(record!.validate(), /Event types must agree/);
+  });
+
   it('blocks disabled actors and assignees while retaining old audit references', async () => {
     const disabled = await user('disabled', 'ti');
     const ticket = await create();
@@ -162,6 +204,8 @@ describe('structured ticket audit', () => {
     assert.equal(event.author, null);
     assert.equal(event.authorId, temporary.id);
     assert.equal(event.audit.actorSnapshot.name, 'temporary');
+    assert.equal(detail.assigneeId, temporary.id);
+    assert.equal(detail.history.at(-1).audit.assigneeSnapshot.name, 'temporary');
   });
 
   it('separates demonstration and unclassified legacy data from operational indicators', async () => {

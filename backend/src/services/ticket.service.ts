@@ -35,8 +35,8 @@ const CATEGORY_LABELS: Record<TicketCategory, string> = {
 export interface TicketEventView {
   type: TicketEventType;
   message: string;
-  at: Date;
-  authorId: string;
+  at: Date | null;
+  authorId: string | null;
   audit?: AuditEvent;
   assigneeAtEvent: PublicUser | null;
   /** null when the author was deleted. */
@@ -51,8 +51,10 @@ export interface TicketSummary {
   status: TicketStatus;
   requester: PublicUser | null;
   assignee: PublicUser | null;
-  createdAt: Date;
-  updatedAt: Date;
+  assigneeId: string | null;
+  requesterId: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
   revision: number;
   activeCycleId: number;
   resolvedAt: Date | null;
@@ -105,13 +107,13 @@ export interface ListTicketsQuery extends TicketFilters {
 type UserMap = Map<string, PublicUser>;
 
 /** Loads every referenced user in a single query (avoids one query per ticket/event). */
-async function loadUsers(ids: (Types.ObjectId | null)[]): Promise<UserMap> {
-  const uniqueIds = [...new Set(ids.filter((id) => id !== null).map((id) => id.toString()))];
+async function loadUsers(ids: (Types.ObjectId | null | undefined)[]): Promise<UserMap> {
+  const uniqueIds = [...new Set(ids.filter((id): id is Types.ObjectId => id != null).map((id) => id.toString()))];
   const users = await UserModel.find({ _id: { $in: uniqueIds } });
   return new Map(users.map((user) => [user.id, toPublicUser(user)]));
 }
 
-function userFrom(users: UserMap, id: Types.ObjectId | null): PublicUser | null {
+function userFrom(users: UserMap, id: Types.ObjectId | null | undefined): PublicUser | null {
   return id ? (users.get(id.toString()) ?? null) : null;
 }
 
@@ -124,14 +126,16 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
     status: ticket.status,
     requester: userFrom(users, ticket.requester),
     assignee: userFrom(users, ticket.assignee),
-    createdAt: ticket.createdAt,
-    updatedAt: ticket.updatedAt,
+    assigneeId: ticket.assignee?.toString() ?? null,
+    requesterId: ticket.requester?.toString() ?? null,
+    createdAt: ticket.createdAt ?? null,
+    updatedAt: ticket.updatedAt ?? null,
     revision: ticket.revision ?? 0,
     activeCycleId: ticket.activeCycleId ?? 1,
     resolvedAt: ticket.resolvedAt ?? null,
     resolvedBy: userFrom(users, ticket.resolvedBy),
     resolvedById: ticket.resolvedBy?.toString() ?? null,
-    dataOrigin: ticketOrigin(ticket, users),
+    dataOrigin: ticket.dataOrigin ?? 'legacy',
   };
 }
 
@@ -148,12 +152,12 @@ export async function toTicketDetail(ticket: TicketDocument): Promise<TicketDeta
     ...toSummary(ticket, users),
     description: ticket.description,
     history: ticket.history.map((event) => ({
-      authorId: event.author.toString(),
+      authorId: event.author?.toString() ?? null,
       audit: event.audit,
       assigneeAtEvent: userFrom(users, event.audit?.assigneeAtEvent ?? null),
       type: event.type,
       message: event.message,
-      at: event.at,
+      at: event.at ?? null,
       author: userFrom(users, event.author),
     })),
   };
@@ -171,10 +175,11 @@ function ticketOrigin(ticket: TicketDocument, users: UserMap): Ticket['dataOrigi
 }
 function auditEvent(actor: PublicUser, type: TicketEventType, at: Date, revision: number,
   cycleId: number, from: Record<string, unknown>, to: Record<string, unknown>,
-  assignee: Types.ObjectId | null, origin: Ticket['dataOrigin'], operationId: string, eventIndex: number, reason?: string): AuditEvent {
+  assignee: Types.ObjectId | null, origin: Ticket['dataOrigin'], operationId: string, eventIndex: number, reason?: string, responsible?: PublicUser | null): AuditEvent {
   return { eventId: randomUUID(), operationId, schemaVersion: 2, actorId: new Types.ObjectId(actor.id),
     actorSnapshot: { name: actor.name, role: actor.role }, eventType: type, occurredAt: at,
     revision, eventIndex, cycleId, from, to, assigneeAtEvent: assignee, dataOrigin: origin,
+    assigneeSnapshot: responsible ? { id: responsible.id, name: responsible.name, role: responsible.role } : null,
     ...(reason ? { reason } : {}) };
 }
 function assertRevision(ticket: TicketDocument, expectedRevision: number): void {
@@ -294,8 +299,8 @@ interface NewEvent {
 
 /**
  * Applies the changes and appends history events in one atomic update.
- * The filter on updatedAt is an optimistic lock: if someone changed the ticket
- * after we read it, nothing is written and the client gets 409.
+ * The filter on the client-validated numeric revision is an optimistic lock:
+ * stale/concurrent writes do not change state or history and receive 409.
  */
 async function saveChanges(
   ticket: TicketDocument,
@@ -305,11 +310,11 @@ async function saveChanges(
   reason?: string,
 ): Promise<TicketDetail> {
   const at = new Date();
-  if (at < ticket.updatedAt || ticket.history.some(event => event.at > at)) {
+  if ((ticket.updatedAt && at < ticket.updatedAt) || ticket.history.some(event => event.at && event.at > at)) {
     throw new HttpError(409, 'Ticket contains future dates. Review data integrity before updating');
   }
   const revision = ticket.revision ?? 0;
-  const users = await loadUsers([ticket.requester]);
+  const users = await loadUsers([ticket.requester, ticket.assignee, changes.assignee ?? null]);
   const origin = ticketOrigin(ticket, users);
   const operationId = randomUUID();
   if (changes.resolvedAt) changes.resolvedAt = at;
@@ -322,7 +327,7 @@ async function saveChanges(
       $push: { history: { $each: events.map((event, index) => ({ type: event.type, message: event.message, author: actor.id, at,
         audit: auditEvent(actor, event.type, at, revision + 1, changes.activeCycleId ?? ticket.activeCycleId ?? 1,
           event.from ?? {}, event.to ?? {}, changes.assignee === undefined ? ticket.assignee : changes.assignee,
-          origin, operationId, index, reason),
+          origin, operationId, index, reason, userFrom(users, changes.assignee === undefined ? ticket.assignee : changes.assignee)),
       })) } },
     },
     { returnDocument: 'after', runValidators: true },
@@ -400,7 +405,7 @@ export async function updateTicket(
     from: Object.fromEntries(Object.keys(changes).map(key => [key, ticket.get(key)])), to: { ...changes } }], actor, reason);
 }
 
-/** IT only (enforced by the route). Follows STATUS_TRANSITIONS. */
+/** TI/manager operators (enforced by the route). Follows STATUS_TRANSITIONS. */
 export async function changeStatus(
   id: string,
   status: TicketStatus,
@@ -448,7 +453,7 @@ export async function changeStatus(
   return saveChanges(ticket, changes, events, actor, reason);
 }
 
-/** IT only (enforced by the route). The assignee must be an IT user. */
+/** TI/manager operators (enforced by the route). The assignee must be an IT user. */
 export async function assignTicket(
   id: string,
   assigneeId: string,

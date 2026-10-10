@@ -26,6 +26,7 @@ const PRIORITY_ORDER: TicketPriority[] = ['alta', 'media', 'baixa']
 export function DashboardPage() {
   useDocumentTitle('Dashboard')
   const { user } = useAuth()
+  const [dataOrigin, setDataOrigin] = useState<'operational' | 'demo' | 'legacy'>('operational')
   const [reloadCount, setReloadCount] = useState(0)
   const [state, setState] = useState<LoadState>({ key: -1, summary: null, error: null })
   const loading = state.key !== reloadCount
@@ -33,7 +34,7 @@ export function DashboardPage() {
   useEffect(() => {
     const controller = new AbortController()
 
-    getDashboardSummary(controller.signal)
+    getDashboardSummary(controller.signal, dataOrigin)
       .then(({ summary }) => setState({ key: reloadCount, summary, error: null }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -42,7 +43,7 @@ export function DashboardPage() {
       })
 
     return () => controller.abort()
-  }, [reloadCount])
+  }, [reloadCount, dataOrigin])
 
   if (!user) return null
 
@@ -65,6 +66,13 @@ export function DashboardPage() {
         </Link>
       </header>
 
+      <div className="field">
+        <label className="field__label" htmlFor="dashboard-origin">Origem dos indicadores</label>
+        <select id="dashboard-origin" className="field__input field__select" value={dataOrigin} onChange={event => { setDataOrigin(event.target.value as typeof dataOrigin); setReloadCount(n => n + 1) }}>
+          <option value="operational">Operacionais</option><option value="demo">Demonstração — dados fictícios</option><option value="legacy">Legado — origem não comprovada</option>
+        </select>
+        <p className="field__hint">Demonstração e legado são separados dos indicadores operacionais. As contagens mostram o estado atual, não produtividade histórica.</p>
+      </div>
       {!summary ? (
         loading ? (
           <div className="card card--empty" role="status">
@@ -83,16 +91,16 @@ export function DashboardPage() {
         <div className="dashboard">
           {/* Each card opens the ticket list with the same filter, so the numbers match. */}
           <div className="stats" aria-label="Chamados por status">
-            <StatCard to="/tickets" label="Total" value={summary.byStatus.total} />
-            <StatCard to="/tickets?status=aberto" label="Abertos" value={summary.byStatus.aberto} tone="aberto" />
+            <StatCard to={`/tickets?dataOrigin=${dataOrigin}`} label="Total" value={summary.byStatus.total} />
+            <StatCard to={`/tickets?status=aberto&dataOrigin=${dataOrigin}`} label="Abertos" value={summary.byStatus.aberto} tone="aberto" />
             <StatCard
-              to="/tickets?status=em_andamento"
+              to={`/tickets?status=em_andamento&dataOrigin=${dataOrigin}`}
               label="Em andamento"
               value={summary.byStatus.em_andamento}
               tone="em_andamento"
             />
             <StatCard
-              to="/tickets?status=resolvido"
+              to={`/tickets?status=resolvido&dataOrigin=${dataOrigin}`}
               label="Resolvidos"
               value={summary.byStatus.resolvido}
               tone="resolvido"
@@ -102,14 +110,14 @@ export function DashboardPage() {
           {summary.workload && (
             <div className="stats stats--workload" aria-label="Fila da equipe de TI">
               <StatCard
-                to="/tickets?assignee=none"
+                to={`/tickets?assignee=none&dataOrigin=${dataOrigin}`}
                 label="Sem responsável"
                 value={summary.workload.unassigned}
                 hint="Aguardando alguém assumir"
                 tone="attention"
               />
               <StatCard
-                to="/tickets?assignee=me&status=em_andamento"
+                to={`/tickets?assignee=me&status=em_andamento&dataOrigin=${dataOrigin}`}
                 label="Em atendimento comigo"
                 value={summary.workload.inProgressAssignedToMe}
                 hint="Chamados em andamento sob sua responsabilidade"
@@ -173,7 +181,7 @@ export function DashboardPage() {
                         <p className="recent-list__meta">
                           {seesAllTickets && <>{ticket.requester?.name ?? 'Usuário removido'} · </>}
                           {CATEGORY_LABELS[ticket.category]} ·{' '}
-                          <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
+                          <time dateTime={ticket.createdAt ?? undefined}>{formatDateTime(ticket.createdAt)}</time>
                         </p>
                       </div>
                       <div className="recent-list__badges">

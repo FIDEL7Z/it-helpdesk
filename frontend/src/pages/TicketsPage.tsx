@@ -25,7 +25,7 @@ import {
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search'
+type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin'
 
 type ListState = {
   key: string
@@ -43,6 +43,7 @@ function readFilters(params: URLSearchParams): TicketFilters {
   const page = Number(params.get('page'))
 
   return {
+    dataOrigin: ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
     category: isTicketCategory(category) ? category : undefined,
@@ -83,7 +84,7 @@ export function TicketsPage() {
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   const hasFilters = Boolean(
-    filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+    filters.dataOrigin || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
 
   useEffect(() => {
@@ -192,6 +193,13 @@ export function TicketsPage() {
         </div>
       </div>
 
+        <div className="field">
+          <label className="field__label" htmlFor="list-origin">Origem dos dados</label>
+          <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
+            <option value="">Todos (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
+          </select>
+        </div>
+
       {error ? (
         <div className="alert alert--error" role="alert">
           <p>{error}</p>
@@ -235,7 +243,8 @@ export function TicketsPage() {
                 <th scope="col">Prioridade</th>
                 <th scope="col">Status</th>
                 <th scope="col">Solicitante</th>
-                <th scope="col">Responsável</th>
+                <th scope="col">Responsável atribuído</th>
+                <th scope="col">Resolvido por</th>
                 <th scope="col">Aberto em</th>
               </tr>
             </thead>
@@ -254,10 +263,11 @@ export function TicketsPage() {
                   </td>
                   <td data-label="Solicitante">{ticket.requester?.name ?? 'Usuário removido'}</td>
                   <td data-label="Responsável" className={ticket.assignee ? undefined : 'text-muted'}>
-                    {ticket.assignee?.name ?? 'Não atribuído'}
+                    {ticket.assignee?.name ?? (ticket.assigneeId ? 'Usuário indisponível' : 'Não atribuído')}
                   </td>
+                  <td data-label="Resolvido por">{ticket.status === 'resolvido' ? ticket.resolvedBy?.name ?? (ticket.resolvedById ? 'Usuário indisponível' : 'Sem autoria estruturada (legado)') : '—'}</td>
                   <td data-label="Aberto em" className="ticket-table__date">
-                    <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time>
+                    {ticket.createdAt ? <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time> : 'Data não registrada'}
                   </td>
                 </tr>
               ))}

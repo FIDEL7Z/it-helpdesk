@@ -6,8 +6,8 @@ import type { UserRole } from '../services/auth'
  */
 const PERMISSIONS = {
   'tickets:view-all': ['ti', 'gestor'],
-  'tickets:operate': ['ti'],
-  'tickets:be-assigned': ['ti'],
+  'tickets:operate': ['ti', 'gestor'],
+  'tickets:be-assigned': ['ti', 'gestor'],
   'users:list-it-staff': ['ti', 'gestor'],
 } as const satisfies Record<string, readonly UserRole[]>
 

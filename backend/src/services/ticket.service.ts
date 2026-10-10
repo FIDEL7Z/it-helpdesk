@@ -88,6 +88,8 @@ export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
 export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
 
 export interface TicketFilters {
+  assigneeId?: string;
+  requesterId?: string;
   dataOrigin?: Ticket['dataOrigin'];
   status?: TicketStatus;
   priority?: TicketPriority;
@@ -217,6 +219,14 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
   const filter: QueryFilter<Ticket> = {};
 
   if (!can(actor.role, 'tickets:view-all')) filter.requester = actorId;
+  if (filters.requesterId) {
+    if (!can(actor.role, 'tickets:view-all') && filters.requesterId.toLowerCase() !== actor.id) throw new HttpError(403, 'You do not have permission to access this resource');
+    filter.requester = new Types.ObjectId(filters.requesterId);
+  }
+  if (filters.assigneeId) {
+    if (!can(actor.role, 'tickets:view-all')) throw new HttpError(403, 'You do not have permission to access this resource');
+    filter.assignee = new Types.ObjectId(filters.assigneeId);
+  }
   if (filters.dataOrigin === 'legacy') filter.$or = [{ dataOrigin: 'legacy' }, { dataOrigin: { $exists: false } }];
   else if (filters.dataOrigin) filter.dataOrigin = filters.dataOrigin;
   if (filters.status) filter.status = filters.status;

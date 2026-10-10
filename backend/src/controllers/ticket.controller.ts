@@ -31,6 +31,8 @@ const createTicketSchema = z.strictObject({
 });
 
 const listTicketsQuerySchema = z.object({
+  assigneeId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  requesterId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),

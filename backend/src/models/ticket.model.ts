@@ -145,5 +145,8 @@ const ticketSchema = new Schema<Ticket>(
 // Requesters list their own tickets; IT filters by status. Both sorted by newest first.
 ticketSchema.index({ requester: 1, createdAt: -1 });
 ticketSchema.index({ status: 1, createdAt: -1 });
+// Management reads separate origins before aggregating creation and current load.
+ticketSchema.index({ dataOrigin: 1, createdAt: -1 });
+ticketSchema.index({ dataOrigin: 1, assignee: 1, status: 1 });
 
 export const TicketModel = model<Ticket>('Ticket', ticketSchema);

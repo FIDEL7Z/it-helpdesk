@@ -70,8 +70,16 @@ for (const capture of manifest.captures) {
   assert.equal(capture.file, capture.file.split('/').pop());
   const png = readFileSync(`docs/assets/screenshots/${capture.file}`);
   assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-  assert.equal(png.readUInt32BE(16), capture.viewport.width);
-  assert.equal(png.readUInt32BE(20), capture.viewport.height);
+  const dimensions = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+  assert.equal(dimensions.width, capture.viewport.width);
+  if (capture.fullPage) {
+    assert.ok(dimensions.height >= capture.viewport.height);
+    assert.deepEqual(dimensions, capture.imageDimensions);
+    const manager = capture.file.startsWith('gestor-');
+    assert.equal(capture.path.split('?')[0], manager ? '/manager' : '/dashboard');
+    assert.equal(capture.user.role, manager ? 'gestor' : capture.file.includes('solicitante') ? 'solicitante' : 'ti');
+    assert.ok(capture.title.startsWith(manager ? 'Visão gerencial' : 'Dashboard'));
+  } else assert.equal(dimensions.height, capture.viewport.height);
   assert.deepEqual(capture.viewport, capture.file.endsWith('-mobile.png') ? { width: 390, height: 844 } : { width: 1440, height: 900 });
 }
 assert.equal(diagrams, 4);

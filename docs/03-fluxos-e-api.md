@@ -79,7 +79,7 @@ Erros têm `message`; validações também podem incluir `errors` por campo e `f
 
 ## Capturas por perfil
 
-Imagens reais do ambiente demonstrativo, em 10/10/2026, com viewport desktop de 1440 × 900. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores permanecem preservados; os números refletem aquele momento, não uma instalação nova.
+Imagens reais do ambiente demonstrativo, em 10/10/2026, com viewport desktop de 1440 × 900. Os dashboards foram recapturados como páginas completas, preservando título, usuário e final do conteúdo; as demais imagens representam seus respectivos trechos de tela. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores permanecem preservados; os números refletem aquele momento, não uma instalação nova.
 
 <details>
 <summary>Login e abertura pelo solicitante</summary>

@@ -140,10 +140,10 @@ O link do solicitante preserva o período de criação; TI também pode ser soli
 </details>
 
 <details>
-<summary>Gestor no celular — 390 × 844</summary>
+<summary>Gestor no celular — página completa, viewport 390 × 844</summary>
 
 ![Visão gerencial mobile com navegação, período, origem demonstrativa e alertas empilhados](assets/screenshots/gestor-mobile.png)
 
-A captura mostra o início do painel no celular; a inspeção automatizada também confere ausência de overflow horizontal.
+A captura mostra a página inteira no celular, incluindo alertas, indicadores e gráficos. A viewport é 390 × 844; a imagem tem a altura total da página. As tabelas mantêm sua rolagem horizontal interna, conforme a interface real, sem overflow horizontal da página.
 
 </details>

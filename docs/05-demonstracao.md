@@ -105,7 +105,7 @@ Os testes gerenciais validam seed idempotente, preservação de documentos anter
 
 ## Capturas reproduzíveis
 
-As 11 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores. Desktop usa 1440 × 900 e mobile 390 × 844, tema claro. [capture-info.json](assets/screenshots/capture-info.json) registra rotas, viewports, origem e instante de conclusão. A rota de detalhe identifica um registro fictício; não é uma credencial.
+As 11 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores. Desktop usa viewport 1440 × 900 e mobile 390 × 844, tema claro. Os três dashboards e o gestor mobile usam captura de página inteira; sua altura PNG é maior que a viewport. [capture-info.json](assets/screenshots/capture-info.json) registra rotas, viewports, origem e instante de conclusão. As quatro capturas refeitas incluem dimensões da imagem, título, cabeçalho e identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício; não é uma credencial.
 
 Para conferir somente a documentação, em `backend`:
 
@@ -124,4 +124,12 @@ O script usa Edge/Chrome headless instalado, Node/WebSocket e um perfil temporá
 
 A captura aguarda dados e gráficos renderizados e rejeita estados visíveis de erro, modal ou carregamento. Não execute em produção. Respeite o limite de dez logins por IP em quinze minutos ao repetir. Se necessário, defina E2E_BROWSER_PATH com o executável local. A ferramenta substitui as imagens da documentação; revise-as antes de qualquer commit.
 
-As três imagens anteriores de `docs/screenshots/` ficam preservadas como registros da interface anterior; o README agora aponta às evidências atuais.
+O README apresenta diretamente os dashboards de gestor, TI e solicitante. Os quatro arquivos principais foram substituídos nos mesmos caminhos; imagens antigas duplicadas de `docs/screenshots/` foram removidas, mantendo o registro no histórico Git.
+
+Para refazer somente os três dashboards e o gestor mobile, mantendo as outras evidências:
+
+```bash
+npm run docs:capture -- --profiles-only
+```
+
+Antes de cada captura de dashboard, o script confere perfil em `/auth/me`, identidade no cabeçalho, URL e título. Nos dashboards básicos, compara totais e escopo com a API, confere a fila da TI e o botão de abertura. Na gestão, aguarda os quatro gráficos. As imagens são inspecionadas visualmente antes da publicação; dados não são modificados para melhorar a apresentação.

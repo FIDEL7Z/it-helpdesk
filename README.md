@@ -1,41 +1,42 @@
 # IT Helpdesk
 
-Central de chamados internos de TI com React, TypeScript, Node.js e MongoDB. Reúne abertura, atendimento e acompanhamento das solicitações, com autenticação, permissões por perfil e histórico persistido.
+Central de chamados internos de TI: abertura, atendimento e acompanhamento em um só lugar, com permissões por perfil, histórico auditável e indicadores gerenciais.
 
-O desafio técnico é entregar um fluxo fullstack verificável: autenticar três perfis, aplicar permissões no servidor, persistir chamados e manter rastreabilidade entre abertura, atendimento e acompanhamento. A visão gerencial distingue o estado atual das ações comprovadas no histórico.
+## Tecnologias
 
-## Navegação rápida
+- **Frontend:** React 19, Vite 8, TypeScript, React Router 8, Recharts e CSS próprio. Os gráficos adaptam os componentes de referência do shadcn/ui.
+- **Backend:** Node.js, Express 5, TypeScript, Zod, JWT, bcryptjs e express-rate-limit.
+- **Dados:** MongoDB 7 e Mongoose 9.
+- **Infra local:** Docker Compose apenas para MongoDB; API e frontend executados com npm.
+- **Validação:** node:test com Express/MongoDB reais, typecheck, oxlint, builds e E2E mínimo em Edge/Chrome headless.
 
-- [Visão da solução](#visão-da-solução)
-- [Demonstração visual](#demonstração-visual)
-- [Funcionalidades e perfis](#funcionalidades-e-perfis)
-- [Stack](#stack)
-- [Como executar](#como-executar)
-- [Variáveis de ambiente](#variáveis-de-ambiente)
-- [Credenciais demonstrativas](#credenciais-demonstrativas)
-- [Arquitetura](#arquitetura)
-- [Estrutura do repositório](#estrutura-do-repositório)
-- [Decisões técnicas](#decisões-técnicas)
-- [Testes](#testes)
-- [Documentação complementar](#documentação-complementar)
+[Conheça o produto](#conheça-o-it-helpdesk) · [Como executar](#como-executar) · [Credenciais demo](#credenciais-demonstrativas) · [Documentação técnica](#documentação-técnica)
 
-## Visão da solução
+## Conheça o IT-Helpdesk
 
-O setor de TI recebe muitas solicitações internas, com dificuldade para organizar a fila e acompanhar cada atendimento. A solução centraliza os chamados, identifica solicitante e responsável, registra alterações e oferece uma visão do volume e da situação atual das demandas.
+O projeto organiza o fluxo entre quem solicita ajuda, quem atende e quem acompanha a operação. O desafio técnico reúne autenticação, autorização no backend, persistência MongoDB e rastreabilidade das ações.
 
-O solicitante acompanha seus pedidos; a TI classifica, atribui e atende; o gestor consulta o conjunto da operação e também pode executar o atendimento. O backend aplica as permissões independentemente dos controles exibidos na interface.
+As telas abaixo são da aplicação real, com logins separados e dados fictícios. Capturas completas, sem cortar o final das páginas; os registros de testes manuais existentes foram preservados.
 
-## Demonstração visual
+### Gestor — visão gerencial
 
-Capturas reais de **10/10/2026**, com dados fictícios do ambiente local:
+**Ana Ribeiro · Gestor · `/manager`**. Acompanha indicadores, alertas acionáveis, carga da equipe, solicitações e gráficos. Carga atual e resoluções comprovadas por autor são conceitos distintos.
 
-![Visão gerencial: filtros, alertas e indicadores de período e situação atual](docs/assets/screenshots/gestor-visao-geral-desktop.png)
+![Dashboard completo do gestor Ana Ribeiro, com indicadores, alertas, equipe, solicitantes e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
 
-O gestor separa demanda, carga atual e resoluções comprovadas. Os números da imagem são exemplos, não resultados operacionais.
+### Suporte TI — atendimento
 
-[Login e jornadas dos três perfis](docs/03-fluxos-e-api.md#capturas-por-perfil) · [Equipe, gráficos e mobile](docs/04-metricas-decisoes-e-limites.md#evidências-visuais) · [Autoria e histórico](docs/06-integridade-e-auditoria.md#evidência-visual-da-autoria)
+**Carlos Andrade · Suporte TI · `/dashboard`**. Visualiza os chamados da empresa, a fila sem responsável e os atendimentos sob sua responsabilidade, além de prioridades, categorias e chamados recentes.
 
-O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstração dos três perfis, da persistência e da autorização.
+![Dashboard completo do suporte TI Carlos Andrade, com fila de atendimento e chamados recentes](docs/assets/screenshots/dashboard-ti-desktop.png)
+
+### Solicitante — meus chamados
+
+**Mariana Souza · Solicitante · `/dashboard`**. Consulta somente suas solicitações, acompanha os status e abre um novo chamado pelo botão **Abrir chamado**. Compartilha a rota com a TI, mas o escopo e os controles seguem seu perfil autenticado.
+
+![Dashboard completo da solicitante Mariana Souza, com seus chamados e a opção Abrir chamado](docs/assets/screenshots/dashboard-solicitante-desktop.png)
+
+Veja também [login e abertura de chamados](docs/03-fluxos-e-api.md#capturas-por-perfil), [detalhes dos gráficos e versão mobile](docs/04-metricas-decisoes-e-limites.md#evidências-visuais) e [histórico de autoria](docs/06-integridade-e-auditoria.md#evidência-visual-da-autoria). O [roteiro de demonstração](docs/05-demonstracao.md) orienta a avaliação dos três perfis.
 
 ## Funcionalidades e perfis
 
@@ -46,14 +47,6 @@ O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstraçã
 Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; TI e solicitante entram no dashboard de seu perfil. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL e retorno do detalhe para a fila consultada. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
 
 **Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Gestão possui períodos Hoje, Últimos sete dias, Mês atual e Ano atual; filtros de analista, solicitante e classificação. O seletor de origem é habilitado apenas por configuração demonstrativa. Impacto, SLA, tempo médio de atendimento e backlog histórico ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
-
-## Stack
-
-- **Frontend:** React 19, Vite 8, TypeScript, React Router 8, Recharts e CSS próprio. Os gráficos adaptam os componentes de referência do shadcn/ui.
-- **Backend:** Node.js, Express 5, TypeScript, Zod, JWT, bcryptjs e express-rate-limit.
-- **Dados:** MongoDB 7 e Mongoose 9.
-- **Infra local:** Docker Compose apenas para MongoDB; API e frontend executados com npm.
-- **Validação:** node:test com Express/MongoDB reais, typecheck, oxlint, builds e E2E mínimo em Edge/Chrome headless.
 
 ## Como executar
 
@@ -253,7 +246,7 @@ Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável.
 
 A verificação documental confere links relativos e âncoras, imagens, comandos npm, variáveis dos exemplos e as credenciais demonstrativas. Os quatro diagramas Mermaid também foram revisados contra o código; o verificador não renderiza Mermaid. Para gerar novamente as capturas, consulte a [preparação das evidências](docs/05-demonstracao.md#capturas-reproduzíveis).
 
-## Documentação complementar
+## Documentação técnica
 
 - [Produto, regras e raciocínio do autor](docs/01-produto-e-regras.md)
 - [Arquitetura, coleções, referências e índices](docs/02-arquitetura-e-dados.md)

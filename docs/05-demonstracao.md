@@ -4,7 +4,7 @@
 
 ## Preparação
 
-- [ ] MongoDB disponível; API em `http://localhost:3000`; frontend em `http://localhost:5173`.
+- [ ] MongoDB disponível; API em `http://localhost:3000`; frontend em `http://localhost:5173`. Selecionar origem Demonstração no dashboard para os exemplos.
 - [ ] `.env` configurado conforme README, com JWT_SECRET preenchido e origens CORS corretas.
 - [ ] `npm run seed` executado em backend; opcionalmente `npm run seed:demo` para exemplos.
 - [ ] Credenciais dos três perfis disponíveis. Seed não muda senha/papel de um usuário existente.
@@ -19,9 +19,9 @@ As caixas representam ações para a apresentação, não uma alegação de que 
 1. **Login e dashboard:** mostrar uma tentativa incorreta e depois entrar como solicitante. Explicar que o dashboard e a lista mostram só seus chamados. Não repetir muitas tentativas: o login tem limite por IP.
 2. **Abertura:** enviar o formulário vazio para mostrar validação. Criar “Projetor da sala 3 sem imagem”, descrição suficiente, categoria Hardware e prioridade Alta. A escolha de prioridade existe nesta versão; impacto ainda é uma proposta.
 3. **Acompanhamento:** mostrar confirmação na lista, abrir o detalhe, editar o texto enquanto aberto e consultar o evento no histórico. Anotar/copiar a URL do chamado para a demonstração de isolamento.
-4. **Atendimento TI:** sair e entrar como TI. Localizar o chamado ainda aberto e sem responsável; escolher o usuário TI no seletor e salvar a atribuição. Ajustar categoria/prioridade, salvar a classificação, iniciar atendimento e resolver. Mostrar os eventos. Opcionalmente, iniciar outro chamado sem responsável para mostrar a atribuição automática; reabertura também é opcional.
+4. **Atendimento TI:** sair e entrar como TI. Localizar o chamado ainda aberto e sem responsável; escolher o usuário TI no seletor e salvar a atribuição. Ajustar categoria/prioridade, informar motivo da prioridade e salvar a classificação, iniciar atendimento e resolver. Mostrar os eventos. Opcionalmente, iniciar outro chamado sem responsável para mostrar a atribuição automática; reabertura também é opcional e exige motivo. Para resolução por outro responsável, informar justificativa e conferir as duas identidades.
 5. **Retorno ao solicitante:** sair e entrar como solicitante. Mostrar o mesmo chamado atualizado e sem controles de triagem/status. Para isolamento, tentar a URL de um chamado aberto pela TI ou por outro solicitante: deve aparecer como não encontrado.
-6. **Gestor:** entrar como gestor; mostrar dashboard global, chamado da outra pessoa e ausência dos controles de atendimento. Explicar que pode abrir/editar os próprios chamados abertos, mas não assumir atendimento.
+6. **Gestor:** entrar como gestor; mostrar dashboard global e os controles de atendimento. Demonstrar que pode assumir e operar; edição de texto permanece limitada aos próprios chamados abertos.
 7. **Persistência:** recarregar a página e relogar, mostrando que o chamado e histórico permanecem. Para evidenciar MongoDB diretamente, usar a consulta abaixo; opcionalmente reiniciar apenas a API em ambiente de demonstração e repetir a consulta pela interface.
 
 Com o banco padrão do `.env.example` e Docker Compose, na raiz do projeto, consulte o chamado criado mais recentemente e confira seu título:
@@ -38,7 +38,7 @@ Se o banco tiver outro nome ou for externo, consultar o banco definido em MONGOD
 |---|---|
 | Login, token e sessão | `auth.test.ts`; E2E testa senha incorreta, login/logout e restauração após reload |
 | Criação e persistência | `tickets.test.ts` cria e consulta no MongoDB real; E2E edita um chamado pela UI e confirma na API |
-| Isolamento e RBAC | `tickets.test.ts` e `permissions.test.ts`; E2E compara acesso/listas dos três perfis e bloqueios do gestor |
+| Isolamento e RBAC | `tickets.test.ts` e `permissions.test.ts`; E2E compara acesso/listas dos três perfis e operações do gestor |
 | Triagem, atribuição, resolução e reabertura | `tickets.test.ts`, incluindo eventos e transições |
 | Dashboard | `dashboard.test.ts` e `permissions.test.ts`; E2E verifica contagens e três reloads por perfil |
 | Rate limit e hardening | `security.test.ts`, incluindo 429, isolamento de outras rotas, ausência de X-Powered-By e limite JSON |

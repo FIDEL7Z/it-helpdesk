@@ -20,7 +20,7 @@ Central de chamados internos de TI com React, TypeScript, Node.js e MongoDB. Re�
 
 O setor de TI recebe muitas solicitações internas, com dificuldade para organizar a fila e acompanhar cada atendimento. A solução centraliza os chamados, identifica solicitante e responsável, registra alterações e oferece uma visão do volume e da situação atual das demandas.
 
-O solicitante acompanha seus pedidos; a TI classifica, atribui e atende; o gestor consulta o conjunto da operação. O backend aplica as permissões independentemente dos controles exibidos na interface.
+O solicitante acompanha seus pedidos; a TI classifica, atribui e atende; o gestor consulta o conjunto da operação e também pode executar o atendimento. O backend aplica as permissões independentemente dos controles exibidos na interface.
 
 ## Demonstração visual
 
@@ -36,7 +36,7 @@ O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstraçã
 
 - **Solicitante:** abre chamados, consulta apenas os próprios e edita título/descrição enquanto estão abertos.
 - **TI:** vê todos os chamados, atribui responsáveis da TI, faz triagem, inicia, resolve e reabre atendimentos.
-- **Gestor:** vê chamados e indicadores globais, sem triagem, atribuição ou mudança de status. Pode abrir e editar o texto dos próprios chamados abertos.
+- **Gestor:** vê indicadores globais e também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
 
 Todos utilizam login com e-mail/senha e dashboard após o login normal. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
 
@@ -172,7 +172,11 @@ Controllers validam a entrada; services aplicam escopo, propriedade e regras; mo
 
 ## Decisões técnicas
 
-Permissões centralizadas no backend e usuário consultado a cada request mantêm o papel atual como autoridade. Validação Zod e rotas por ação restringem campos de escrita. Histórico e alterações são gravados juntos, com controle de concorrência por updatedAt. Lista e dashboard compartilham os filtros de autorização, sem prometer um snapshot único durante alterações simultâneas.
+Solicitante, responsável atribuído e autor da resolução são identidades distintas. Resolver um chamado de outro responsável exige justificativa; reabrir exige motivo e inicia um novo ciclo. A tabela e o histórico apresentam autoria explícita. Eventos legados permanecem preservados, sem reconstrução presumida de autores ou datas.
+
+O dashboard começa com dados operacionais. Use **Origem dos indicadores → Demonstração** para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
+
+Permissões centralizadas no backend e usuário consultado a cada request mantêm o papel atual como autoridade. Validação Zod e rotas por ação restringem campos de escrita. Histórico e alterações são gravados juntos, com controle de concorrência pela revisão numérica consultada no frontend. Lista e dashboard compartilham os filtros de autorização, sem prometer um snapshot único durante alterações simultâneas.
 
 JWT fica no localStorage, com risco de exposição por XSS e logout apenas local. Login limita 10 tentativas por IP em 15 minutos. Esses tradeoffs, o modelo local do MongoDB e os limites das métricas estão detalhados em [métricas, decisões e limites](docs/04-metricas-decisoes-e-limites.md).
 
@@ -194,7 +198,7 @@ npm run build
 
 A integração cobre autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboard e rate limit. Usa bancos separados `it-helpdesk-test*`, apagados ao final; não apaga o banco de desenvolvimento.
 
-O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, bloqueios do gestor e edição própria persistida. Recarrega o dashboard três vezes por perfil e confere sua largura gerencial em 390 px.
+O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard três vezes por perfil e confere sua largura gerencial em 390 px.
 
 Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável. Em falhas, os diagnósticos ficam em `backend/e2e-results/`, ignorado pelo Git, com tempos, URLs/status e captura quando disponível, sem senhas/tokens/headers. Esse E2E não substitui a revisão manual completa de acessibilidade nem identifica a causa do timeout antigo reportado. Consulte o [escopo das verificações](docs/05-demonstracao.md#o-que-os-testes-verificam).
 
@@ -204,4 +208,5 @@ Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável.
 - [Arquitetura, coleções, referências e índices](docs/02-arquitetura-e-dados.md)
 - [Jornadas, ciclo de vida e referência da API](docs/03-fluxos-e-api.md)
 - [Definições das métricas, decisões técnicas e limitações](docs/04-metricas-decisoes-e-limites.md)
+- [Auditoria estruturada, ciclos, compatibilidade e limitações](docs/06-integridade-e-auditoria.md)
 - [Checklist de apresentação, acesso do avaliador e solução de problemas](docs/05-demonstracao.md)

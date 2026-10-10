@@ -4,7 +4,7 @@
 
 ## Indicadores implementados
 
-O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo atual não recebe período ou filtros. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
+O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. O frontend seleciona operacional inicialmente; demonstração e legado ficam separados. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
 
 | Indicador / pergunta | Definição e campos | Filtros e limitações |
 |---|---|---|
@@ -27,7 +27,7 @@ Fonte: [dashboard.service.ts](../backend/src/services/dashboard.service.ts).
 - **Pendências atuais:** soma de abertos e em andamento, calculável com a resposta existente. Seria um novo destaque visual, não uma nova regra.
 - **Carga atual por técnico:** contagem por `assignee` e `status`, limitada a aberto/em andamento. Precisa de agregação/contrato e representação da equipe, sem novo campo; incluir técnicos com zero e separar não atribuídos/referências ausentes. Não comparar qualidade pelo número de chamados.
 - **Entradas mensais:** contagem por `createdAt` em intervalo `[início, fim)`, com timezone definido. Precisa de nova consulta e parâmetros validados; não exige alteração de schema. Mede entradas, não backlog histórico.
-- **Tempo de resolução e evolução do backlog:** dependem de definições sobre reabertura, primeira/última resolução e tempo corrido/útil. Não usar `updatedAt` como data de resolução. `status_changed` não guarda origem/destino em campos estruturados; interpretar frases do histórico torna a métrica frágil. Não disponíveis nesta versão.
+- **Tempo de resolução e evolução do backlog:** dependem de definições sobre reabertura, primeira/última resolução e tempo corrido/útil. Não usar `updatedAt` como data de resolução. Eventos v2 registram transições e ciclos estruturados. Eventos legados ainda podem depender de frases incompletas; métricas históricas e sua cobertura não estão implementadas. Não disponíveis nesta versão.
 
 Dados dos seeds são demonstrativos e não sustentam conclusões sobre uma operação real.
 
@@ -37,11 +37,11 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 
 - **SPA React/Vite:** navegação interna sem necessidade atual de SSR; execução de frontend e API separadas. Não há renderização no servidor.
 - **JWT Bearer no localStorage:** integração simples; assinatura verifica autenticidade, não criptografa o conteúdo. XSS pode expor o token. Logout limpa a sessão local, sem revogar uma cópia já emitida.
-- **Usuário consultado a cada requisição:** papel atualizado e rejeição de usuário removido, com custo de uma consulta por ID.
+- **Usuário consultado a cada requisição:** papel atualizado e rejeição de usuário removido/desativado, com custo de uma consulta por ID.
 - **Permissões centralizadas no backend:** revisão objetiva do RBAC; a cópia do frontend precisa ser mantida coerente e não concede acesso por si só.
 - **Zod e endpoints por ação:** entrada validada e restrição dos campos de escrita. Edição, status e atribuição têm contratos separados.
 - **Histórico embutido e escrita atômica:** evento e alteração do chamado são gravados juntos. Crescimento do histórico aumenta o documento; o porte atual não motivou coleção separada.
-- **Bloqueio por updatedAt:** evita sobrescrita em disputas durante leitura/escrita do service; não substitui versão explícita enviada pela tela.
+- **Revisão numérica:** toda mutação exige a revisão consultada pelo frontend; conflitos retornam 409. Eventos e projeções são gravados atomicamente com incremento de revisão.
 - **Filtro compartilhado e facet:** reaproveita escopo e concentra contagens. Não garante snapshot único entre todas as consultas.
 - **Busca literal com regex escapada:** evita tratar entrada como expressão regular; sem índice de texto, volumes altos podem exigir outra estratégia.
 - **bcryptjs e node:test:** hash em JavaScript e testes sem biblioteca de testes adicional. Integração exige MongoDB real.

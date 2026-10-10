@@ -5,6 +5,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from './ui/chart'
 import type { Count, ManagerDashboard } from '../services/manager'
 const COLORS: Record<string, string> = { hardware: 'var(--chart-blue)', software: 'var(--chart-violet)', rede: 'var(--chart-teal)', acesso: 'var(--chart-amber)', outros: 'var(--chart-rose)', alta: 'var(--chart-rose)', media: 'var(--chart-amber)', baixa: 'var(--chart-teal)' }
 export function PieChart({ title, rows, label }: { title: string; rows: Count[]; label: (id: string) => string }) {
+  // Keep the same semantic priority order even when the API returns sparse or alphabetical groups.
   const ordered = ['alta', 'media', 'baixa'].map(id => ({ name: label(id), count: rows.find(r => r._id === id)?.count ?? 0, fill: COLORS[id] }))
   const total = ordered.reduce((sum, r) => sum + r.count, 0)
   return <section className="card"><h2 className="card__title">{title}</h2><p className="card__description">Prioridade dos chamados pendentes agora.</p>
@@ -16,6 +17,7 @@ export function PieChart({ title, rows, label }: { title: string; rows: Count[];
   </section>
 }
 // Area chart pattern adapted from shadcn/ui: container, configured colors and tooltip.
+/** Independent series must not be stacked: creation and resolution are different populations. */
 export function TrendLineChart({ rows }: { rows: ManagerDashboard['trends'] }) {
   const id = useId().replace(/:/g, '')
   if (!rows.length) return null

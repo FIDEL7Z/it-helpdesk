@@ -1,4 +1,6 @@
-/** Only consistent structured actions performed by support/management prove activity. */
+/** Returns a MongoDB expression shared by alerts and their queue filters.
+ * Creation, requester edits and updatedAt cannot prove operational attendance.
+ * Null means unknown activity, not inactivity since opening. */
 export function lastOperationalActivity(now: Date): Record<string, unknown> {
   return { $max: { $map: {
     input: { $filter: { input: { $ifNull: ['$history', []] }, as: 'event', cond: { $and: [

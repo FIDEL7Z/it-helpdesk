@@ -181,6 +181,7 @@ function ticketOrigin(ticket: TicketDocument, users: UserMap): Ticket['dataOrigi
   if (ticket.dataOrigin !== 'legacy') return ticket.dataOrigin;
   return DEMO_EMAILS.has(userFrom(users, ticket.requester)?.email ?? '') || ticket.title.startsWith('[DEMO-EQUIPE]') ? 'demo' : 'legacy';
 }
+/** Snapshots preserve the identity at the action; the actor comes only from requireAuth. */
 function auditEvent(actor: PublicUser, type: TicketEventType, at: Date, revision: number,
   cycleId: number, from: Record<string, unknown>, to: Record<string, unknown>,
   assignee: Types.ObjectId | null, origin: Ticket['dataOrigin'], operationId: string, eventIndex: number, reason?: string, responsible?: PublicUser | null): AuditEvent {
@@ -201,7 +202,7 @@ export function isRequester(ticket: TicketDocument, actor: PublicUser): boolean 
 }
 
 /**
- * IT sees every ticket; anyone else only their own. Other people's tickets
+ * Operators with tickets:view-all (TI and manager) see every ticket; requesters see only their own. Other people's tickets
  * answer 404 (not 403) so the API does not reveal that they exist.
  */
 export async function findAccessibleTicket(id: string, actor: PublicUser): Promise<TicketDocument> {
@@ -349,6 +350,7 @@ async function saveChanges(
   const origin = ticketOrigin(ticket, users);
   const operationId = randomUUID();
   if (changes.resolvedAt) changes.resolvedAt = at;
+  // Missing legacy revision is treated as zero, but a later write cannot reuse that baseline.
   const revisionFilter = revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision };
   const updated = await TicketModel.findOneAndUpdate(
     { _id: ticket._id, ...revisionFilter },
@@ -373,7 +375,7 @@ async function saveChanges(
 
 /**
  * - Title and description: only the requester, and only while the ticket is open.
- * - Category and priority (triage): only IT, while the ticket is not resolved.
+ * - Category and priority: TI/manager operators, while the ticket is not resolved.
  * Status and assignee have their own endpoints.
  */
 export async function updateTicket(
@@ -464,6 +466,7 @@ export async function changeStatus(
   const reopening = from === 'resolvido';
   const changes: TicketChanges = { status };
   if (status === 'resolvido') { changes.resolvedAt = new Date(); changes.resolvedBy = new Types.ObjectId(actor.id); }
+  // Current projection describes one cycle; immutable history remains the source for earlier resolutions.
   if (reopening) { changes.resolvedAt = null; changes.resolvedBy = null; changes.activeCycleId = (ticket.activeCycleId ?? 1) + 1; }
   const events: NewEvent[] = [
     {
@@ -484,7 +487,7 @@ export async function changeStatus(
   return saveChanges(ticket, changes, events, actor, reason);
 }
 
-/** TI/manager operators (enforced by the route). The assignee must be an IT user. */
+/** TI/manager operators (enforced by the route). The assignee must be an active TI/manager operator. */
 export async function assignTicket(
   id: string,
   assigneeId: string,

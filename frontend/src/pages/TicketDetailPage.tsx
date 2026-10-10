@@ -25,7 +25,7 @@ import {
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-/** Buttons shown to IT for each status. The backend enforces the same transitions. */
+/** Buttons shown to TI/manager operators for each status. The backend enforces the same transitions. */
 const STATUS_ACTIONS: Record<TicketStatus, { to: TicketStatus; label: string; success: string }> = {
   aberto: { to: 'em_andamento', label: 'Iniciar atendimento', success: 'Atendimento iniciado.' },
   em_andamento: { to: 'resolvido', label: 'Marcar como resolvido', success: 'Chamado resolvido.' },
@@ -42,6 +42,7 @@ type ActionResult = Promise<{ ticket: TicketDetail }>
 
 export function TicketDetailPage() {
   const location = useLocation()
+  // Restrict return destinations to internal queues; preserve the operator's URL without open redirects.
   const candidate: unknown = location.state?.returnTo
   const returnTo = typeof candidate === 'string' && /^\/tickets(?:\?|$)/.test(candidate) ? candidate : '/tickets'
   const { id = '' } = useParams()

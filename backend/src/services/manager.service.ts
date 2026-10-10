@@ -37,6 +37,7 @@ type Requester = { _id: Types.ObjectId; created: number; pending: number; catego
 type Actor = { _id: Types.ObjectId; count: number; name: string; role: string };
 type EventFacets = { resolutions: Actor[]; participation: Actor[]; reopenings: Actor[]; trends: Count[]; conflicts: Count[]; uniqueTickets: Count[]; currentVerified: Count[] };
 
+/** Current assignee measures load; historical actor measures actions, so they use separate scopes. */
 export async function getManagerDashboard(filters: ManagerFilters, now = new Date()) {
   const range = periodRange(filters.period, now);
   const common: Record<string, unknown> = filters.dataOrigin === 'legacy'
@@ -57,6 +58,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     // One proved resolution per ticket and cycle; contradictory actors are excluded.
     { $group: { _id: { ticket: '$_id', cycle: '$history.audit.cycleId' }, actors: { $addToSet: '$history.audit.actorId' }, actor: { $first: '$history.audit.actorId' }, snapshot: { $first: '$history.audit.actorSnapshot' }, at: { $min: '$history.audit.occurredAt' }, currentStatus: { $first: '$status' }, activeCycle: { $first: '$activeCycleId' }, assignee: { $first: '$assignee' } } },
   ];
+  // Apply the period after cycle deduplication so repeated evidence cannot shift productivity to another period.
   const verified: PipelineStage.FacetPipelineStage[] = [
     { $match: { 'actors.1': { $exists: false }, at: dates, ...(filters.analystId && { actor: new Types.ObjectId(filters.analystId) }) } },
   ];
@@ -122,6 +124,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     distributions: { priority: snapshot.priority, category: snapshot.category }, team,
     requesters: snapshot.requesters.map(row => ({ id: row._id.toString(), name: userMap.get(row._id.toString())?.name ?? 'Usuário indisponível', created: row.created, pending: row.pending, categories: row.categories })),
     options: { analysts: users.filter(u => ['ti', 'gestor'].includes(u.role)).map(u => ({ id: u._id.toString(), name: u.name })), requesters: users.map(u => ({ id: u._id.toString(), name: u.name })) },
+    // Hour zeros are factual absence in the selected set; no synthetic historical events are introduced.
     trends: [...periods.values()].sort((a, b) => a.period.localeCompare(b.period)), demand: { hours: Array.from({ length: 24 }, (_, hour) => ({ _id: hour, count: snapshot.hours.find(row => row._id === hour)?.count ?? 0 })), weekdays: snapshot.weekdays },
     coverage: { resolvedWithoutStructuredHistory: Math.max(0, state('resolvido') - count(events.currentVerified)), conflictingResolutionCycles: count(events.conflicts) },
   };

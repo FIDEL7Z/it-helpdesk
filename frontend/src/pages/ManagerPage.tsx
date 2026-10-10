@@ -25,6 +25,7 @@ function ManagerContent() {
   const [retry, setRetry] = useState(0)
   const requestKey = `${key}#${retry}`
   const [state, setState] = useState<{ key: string; data: ManagerDashboard | null; error: string | null }>({ key: '', data: null, error: null })
+  // Keyed results prevent stale totals from being displayed under newly selected filters.
   const loading = state.key !== requestKey
   const data = loading ? null : state.data
   const error = loading ? null : state.error
@@ -43,6 +44,7 @@ function ManagerContent() {
   }
   const origin = DEMO_MODE ? params.get('dataOrigin') ?? 'operational' : 'operational'
   const options = state.data?.options
+  // Historical actor selection becomes current assignee selection only when opening an operational queue.
   function tickets(extra: Record<string, string> = {}) {
     const query = new URLSearchParams({ dataOrigin: origin })
     for (const name of ['category', 'priority', 'status', 'requesterId']) { const value = params.get(name); if (value) query.set(name, value) }

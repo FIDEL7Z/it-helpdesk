@@ -4,6 +4,7 @@ import { ResponsiveContainer, Tooltip } from 'recharts'
 // https://ui.shadcn.com/docs/components/chart (MIT). No Tailwind runtime required.
 export type ChartConfig = Record<string, { label: string; color?: string }>
 const ChartContext = createContext<ChartConfig>({})
+// A fixed CSS height gives ResponsiveContainer a measurable parent; accessible layers and text tables complement tooltips.
 export function ChartContainer({ config, children, ...props }: { config: ChartConfig; children: ReactNode; 'aria-label': string }) {
   const style = Object.fromEntries(Object.entries(config).filter(([, value]) => value.color).map(([key, value]) => [`--color-${key}`, value.color])) as CSSProperties
   return <ChartContext.Provider value={config}><div className="chart-container" style={style} {...props}><ResponsiveContainer width="100%" height="100%" minWidth={0}>{children}</ResponsiveContainer></div></ChartContext.Provider>

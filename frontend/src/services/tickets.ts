@@ -105,6 +105,11 @@ export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
 }
 
 export type TicketFilters = {
+  createdFrom?: string
+  createdTo?: string
+  attention?: 'high_unassigned' | 'oldest' | 'inactive'
+  ageDays?: number
+  inactivityDays?: number
   pending?: boolean
   assigneeId?: string
   requesterId?: string

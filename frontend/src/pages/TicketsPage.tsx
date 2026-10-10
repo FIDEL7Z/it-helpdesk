@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '../config/demo'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { can } from '../auth/permissions'
@@ -43,10 +44,15 @@ function readFilters(params: URLSearchParams): TicketFilters {
   const page = Number(params.get('page'))
 
   return {
+    createdFrom: params.get('createdFrom') ?? undefined,
+    createdTo: params.get('createdTo') ?? undefined,
+    attention: ['high_unassigned', 'oldest', 'inactive'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
+    ageDays: params.has('ageDays') ? Number(params.get('ageDays')) : undefined,
+    inactivityDays: params.has('inactivityDays') ? Number(params.get('inactivityDays')) : undefined,
     pending: params.get('pending') === 'true' ? true : undefined,
     assigneeId: /^[a-f\d]{24}$/i.test(params.get('assigneeId') ?? '') ? params.get('assigneeId')! : undefined,
     requesterId: /^[a-f\d]{24}$/i.test(params.get('requesterId') ?? '') ? params.get('requesterId')! : undefined,
-    dataOrigin: ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
+    dataOrigin: !DEMO_MODE ? 'operational' : ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
     category: isTicketCategory(category) ? category : undefined,
@@ -87,7 +93,7 @@ export function TicketsPage() {
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   const hasFilters = Boolean(
-    filters.pending || filters.assigneeId || filters.requesterId || filters.dataOrigin || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+    filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && filters.dataOrigin) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
 
   useEffect(() => {
@@ -155,7 +161,8 @@ export function TicketsPage() {
         <Link className="button button--secondary" to={`/tickets?assignee=me${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Atribuídos a mim</Link>
         <Link className="button button--secondary" to={`/tickets?status=em_andamento${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Em andamento</Link>
       </nav>}
-      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. O período gerencial não restringe esta fila atual. Use “Limpar filtros” para consultar todos.</p>}
+      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
+      {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
       {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       <div className="toolbar">
@@ -205,12 +212,12 @@ export function TicketsPage() {
         </div>
       </div>
 
-        <div className="field">
+        {DEMO_MODE && <div className="field">
           <label className="field__label" htmlFor="list-origin">Origem dos dados</label>
           <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
             <option value="">Todos (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
           </select>
-        </div>
+        </div>}
 
       {error ? (
         <div className="alert alert--error" role="alert">

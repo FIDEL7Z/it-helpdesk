@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '../config/demo'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { can } from '../auth/permissions'
@@ -66,13 +67,13 @@ export function DashboardPage() {
         </Link>
       </header>
 
-      <div className="field">
+      {DEMO_MODE && <div className="field">
         <label className="field__label" htmlFor="dashboard-origin">Origem dos indicadores</label>
         <select id="dashboard-origin" className="field__input field__select" value={dataOrigin} onChange={event => { setDataOrigin(event.target.value as typeof dataOrigin); setReloadCount(n => n + 1) }}>
           <option value="operational">Operacionais</option><option value="demo">Demonstração — dados fictícios</option><option value="legacy">Legado — origem não comprovada</option>
         </select>
         <p className="field__hint">Demonstração e legado são separados dos indicadores operacionais. As contagens mostram o estado atual, não produtividade histórica.</p>
-      </div>
+      </div>}
       {!summary ? (
         loading ? (
           <div className="card card--empty" role="status">

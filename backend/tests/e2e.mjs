@@ -107,6 +107,8 @@ function connectCdp(url) {
 async function run() {
   const executable = await findBrowser();
   // Set only this test process's signing secret; dotenv still supplies the MongoDB URI.
+  process.env.DEMO_MODE = 'true';
+  process.env.VITE_DEMO_MODE = 'true';
   process.env.JWT_SECRET = randomUUID();
   const [{ default: app }, { env }, { UserModel }, { TicketModel }, { hashPassword }, { signAccessToken }] =
     await Promise.all([
@@ -324,14 +326,14 @@ async function run() {
       await go('/manager');
       await waitDom('manager analytics loaded', 'document.querySelectorAll(".manager-page .stat-card__value").length === 6');
       const report = (await browserApi('GET', '/dashboard/manager')).body.dashboard;
-      check(await evaluate(`document.querySelectorAll('.pie-chart svg').length === 2 && document.querySelectorAll('.line-chart svg circle').length === 2`), 'Manager renders two real backlog pie charts and single-period trend points');
+      check(await evaluate(`document.querySelectorAll('.pie-chart svg').length >= 1 && document.querySelectorAll('.line-chart .recharts-area').length === 2 && document.querySelector('[data-chart=hours]').dataset.observations === '24'`), 'Manager renders shadcn-style area and priority charts with all 24 hours');
       check(await evaluate(`Array.from(document.querySelectorAll('.pie-chart .chart-legend li')).every(el => el.textContent.includes('%')) && !Array.from(document.querySelectorAll('.pie-chart path, .line-chart polyline')).some(el => /NaN|Infinity/.test(el.getAttribute('d') ?? el.getAttribute('points'))) `), 'Charts expose percentages and contain valid finite coordinates');
       check(report.current.total === 4 && report.period.created === 4, 'Manager counts exclude demonstration by default');
       check(report.period.resolutions === 2 && report.period.resolvedTickets === 2 && report.period.reopenings === 1, 'Manager resolutions survive reopen and count one event per cycle');
       check(report.team.find(row => row.id === users.ti.id).resolutions === 1 && report.team.find(row => row.id === secondAnalyst.id).resolutions === 0, 'Manager productivity uses resolver rather than current assignee');
       check(report.team.find(row => row.id === zeroAnalyst.id).assigned === 0 && await evaluate('document.getElementById("manager-team").parentElement.textContent.includes("Zero-load analyst")'), 'Zero-load analysts appear in the real manager table');
       check(report.requesters[0].created === 2 && report.requesters[0].name === users.solicitante.name, 'Requester ranking is based on persisted period creations');
-      check(report.coverage.resolvedWithoutStructuredHistory === 1 && await evaluate('document.querySelector(".manager-page [role=status]")?.textContent.includes("sem evidência válida")'), 'Legacy resolution is disclosed and excluded from productivity');
+      check(report.coverage.resolvedWithoutStructuredHistory === 1 && await evaluate(`Array.from(document.querySelectorAll('.manager-help')).some(el => el.textContent.includes('sem autoria comprovada'))`), 'Legacy resolution is disclosed and excluded from productivity');
       const select = (id, value) => evaluate(`(() => { const el = document.getElementById(${JSON.stringify(id)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
       for (const period of ['today', 'week', 'month', 'year']) {
         await select('manager-period', period);
@@ -359,6 +361,67 @@ async function run() {
       await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
       await waitDom('manager navigation from operation', 'location.pathname === "/manager" && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
       check(true, 'Manager navigation separates supervision and operation');
+      // Rich demonstration fixtures use the same valid audit schema, in the temporary DB only.
+      const { demoTickets, insertDemoTickets } = await import('../src/services/manager-demo.ts');
+      check((await insertDemoTickets(demoTickets([users.solicitante, other, users.ti, secondAnalyst, users.gestor]))).created === 24, 'Structured demonstration seed inserts 24 isolated new fixtures');
+      check((await insertDemoTickets(demoTickets([users.solicitante, other, users.ti, secondAnalyst, users.gestor]))).skipped === 24, 'Second seed run preserves all fixtures without duplicates');
+      const oldDate = new Date(Date.now() - 10 * 86400000);
+      await TicketModel.create({ dataOrigin: 'demo', title: '[DEMO] Aging and inactivity fixture', description: 'Explicitly fictitious isolated E2E fixture for alerts.', category: 'hardware', priority: 'alta', status: 'em_andamento', requester: other._id, assignee: secondAnalyst._id, createdAt: oldDate, updatedAt: new Date(), revision: 1, activeCycleId: 1, history: [{ type: 'assigned', author: users.gestor._id, at: oldDate, message: 'Fictitious assignment', audit: { schemaVersion: 2, eventId: randomUUID(), operationId: randomUUID(), actorId: users.gestor._id, actorSnapshot: { name: users.gestor.name, role: 'gestor' }, eventType: 'assigned', occurredAt: oldDate, revision: 1, eventIndex: 0, cycleId: 1, from: { assignee: null }, to: { assignee: secondAnalyst._id }, assigneeAtEvent: secondAnalyst._id, dataOrigin: 'demo' } }] });
+      await select('manager-dataOrigin', 'demo');
+      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && document.querySelector(".manager-page .stat-card__value")?.textContent !== "4"');
+      const demoReport = (await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard;
+      check(demoReport.current.total === 26 && demoReport.period.resolutions === 14 && demoReport.period.reopenings === 4, 'Demo aggregates reflect actual structured cycles and remain separate from four operational tickets');
+      for (const attention of ['high_unassigned', 'oldest', 'inactive']) {
+        const href = await evaluate(`Array.from(document.querySelectorAll('.alert-card')).find(el => el.href.includes('attention=${attention}')).getAttribute('href')`);
+        const result = await browserApi('GET', href);
+        const count = attention === 'high_unassigned' ? demoReport.alerts.highUnassigned : attention === 'oldest' ? demoReport.alerts.oldPending : demoReport.alerts.inactive;
+        check(result.status === 200 && result.body.pagination.total === count && count > 0, `Actionable ${attention} alert matches the authorized queue count`);
+      }
+      await evaluate(`Array.from(document.querySelectorAll('.alert-card')).find(el => el.href.includes('attention=inactive')).click()`);
+      await waitDom('inactive queue', 'location.pathname === "/tickets" && location.search.includes("attention=inactive") && !!document.querySelector(".ticket-table tbody tr")');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Inactivity alert loads the real queue using structured activity despite recent updatedAt');
+      await evaluate('document.querySelector(".ticket-table__title a").click()');
+      await waitDom('inactive history', '!!document.querySelector(".timeline")');
+      await evaluate('document.querySelector(".back-link").click()');
+      await waitDom('inactive queue restored', 'location.search.includes("attention=inactive") && !!document.querySelector(".ticket-table tbody tr")');
+      check(true, 'Activity and origin filters survive list-detail-return navigation');
+      await go('/manager?dataOrigin=demo');
+      await waitDom('demo restored for visual review', '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      // Controlled browser-only fetch failures exercise states without stopping any service.
+      await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/tickets?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E queue failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
+      await evaluate(`document.querySelector('.app-nav a[href="/tickets"]').click()`);
+      await waitDom('queue loading state', 'document.querySelector("[role=status]")?.textContent.includes("Carregando chamados")');
+      check(true, 'Queue exposes accessible loading state');
+      await waitDom('queue error state', 'document.querySelector("[role=alert]")?.textContent.includes("erro inesperado")');
+      check(true, 'Queue exposes error and recovery action');
+      await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
+      await waitDom('queue recovery', '!!document.querySelector(".ticket-table tbody tr")');
+      check(true, 'Queue retry recovers real persisted tickets');
+      await fill('ticket-search', 'Aging and inactivity fixture');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('literal queue search', 'location.search.includes("search=") && document.querySelectorAll(".ticket-table tbody tr").length === 1');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Search reaches the API and filters actual queue rows');
+      await fill('ticket-search', 'No matching fictitious ticket 987654321');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('queue empty state', '!document.querySelector(".ticket-table tbody tr") && document.querySelector(".card--empty")?.textContent.includes("Nenhum")');
+      check(true, 'Queue shows understandable empty search results');
+      await go('/tickets?dataOrigin=demo');
+      await waitDom('demo queue for mobile', '!!document.querySelector(".ticket-table tbody tr")');
+      await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      check(await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth && Array.from(document.querySelectorAll('select')).every(el => !!document.querySelector('label[for="' + el.id + '"]'))`), 'Real queue fits mobile and associates every selector with its label');
+      await writeFile(resolve(root, 'backend/e2e-results/tickets-mobile.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await command('Emulation.clearDeviceMetricsOverride');
+      await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/dashboard/manager?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E manager failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
+      await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
+      await waitDom('manager loading state', 'document.querySelector(".manager-page [role=status]")?.textContent.includes("Carregando")');
+      check(true, 'Manager exposes accessible loading state');
+      await waitDom('manager error state', 'document.querySelector(".manager-page [role=alert]")?.textContent.includes("erro inesperado")');
+      check(true, 'Manager exposes error and recovery action');
+      await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
+      await waitDom('manager recovery', 'document.querySelectorAll(".manager-page .stat-card__value").length === 6');
+      check(true, 'Manager retry recovers actual analytics');
+      await go('/manager?dataOrigin=demo');
+      await waitDom('rich dashboard for screenshots', '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".manager-page .stat-card__value").length === 6');
       const output = resolve(root, 'backend/e2e-results');
       await mkdir(output, { recursive: true });
       await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -374,10 +437,15 @@ async function run() {
       await evaluate('document.getElementById("manager-team").scrollIntoView({ block: "start" })');
       await writeFile(join(output, 'manager-team-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
       await evaluate('document.getElementById("manager-trends").scrollIntoView({ block: "start" })');
+      await waitDom('populated area chart for visual review', 'document.querySelectorAll(".line-chart .recharts-area-curve").length === 2');
+      check(await evaluate('Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100 && el.getBoundingClientRect().height > 100) && Array.from(document.querySelectorAll(".line-chart .recharts-area-curve")).every(el => el.getAttribute("d")?.length > 20)'), 'Rich area chart renders actual paths after navigation and resizing');
+      await evaluate('(async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
+      await writeFile(join(output, 'manager-chart-diagnostics.json'), JSON.stringify(await evaluate('Array.from(document.querySelectorAll(".chart-container")).map(el => ({ label: el.getAttribute("aria-label"), width: el.clientWidth, height: el.clientHeight, svgs: el.querySelectorAll("svg").length, paths: el.querySelectorAll("path").length }))'), null, 2));
       await writeFile(join(output, 'manager-lines-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
       await evaluate('window.scrollTo(0,0)');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits desktop without page overflow');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
       await writeFile(join(output, 'manager-mobile-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
       await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });

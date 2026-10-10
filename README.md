@@ -36,11 +36,11 @@ O [checklist de apresentação](docs/05-demonstracao.md) orienta a demonstraçã
 
 - **Solicitante:** abre chamados, consulta apenas os próprios e edita título/descrição enquanto estão abertos.
 - **TI:** vê todos os chamados, atribui responsáveis da TI ou gestores ativos, faz triagem, inicia, resolve e reabre atendimentos.
-- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, tendências em linhas, distribuições em pizza e horários; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
+- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, alertas acionáveis, tendências em área, pizza de prioridades, barras de categorias e as 24 horas de criação; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
 
 Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; TI e solicitante entram no dashboard de seu perfil. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL e retorno do detalhe para a fila consultada. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
 
-**Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Gestão possui períodos Hoje, Últimos sete dias, Mês atual e Ano atual; filtros de origem, analista, solicitante e classificação. Impacto, SLA, tempo médio de atendimento e backlog histórico ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
+**Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Gestão possui períodos Hoje, Últimos sete dias, Mês atual e Ano atual; filtros de analista, solicitante e classificação. O seletor de origem é habilitado apenas por configuração demonstrativa. Impacto, SLA, tempo médio de atendimento e backlog histórico ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
 
 ## Stack
 
@@ -138,6 +138,7 @@ Copie os exemplos para `.env`; arquivos de ambiente e variantes são ignorados p
 | `MONGODB_URI` | Obrigatória; exemplo `mongodb://localhost:27017/it-helpdesk` |
 | `JWT_SECRET` | Obrigatória; aleatória, pelo menos 32 caracteres |
 | `PORT` | Opcional; padrão `3000` |
+| `DEMO_MODE` | Opcional; padrão `false`; `true` libera origens demo/legado nos indicadores somente fora de produção |
 | `APP_TIMEZONE` | Opcional; fuso IANA válido, padrão `America/Fortaleza`; períodos e horários gerenciais |
 | `JWT_EXPIRES_IN` | Opcional; padrão `8h`; inteiro positivo seguido de `s`, `m`, `h` ou `d` |
 | `CORS_ORIGIN` | Opcional; padrão `http://localhost:5173`; origens separadas por vírgula |
@@ -145,9 +146,26 @@ Copie os exemplos para `.env`; arquivos de ambiente e variantes são ignorados p
 | `SEED_SOLICITANTE_EMAIL` / `SEED_SOLICITANTE_PASSWORD` | Obrigatórias para seed; mesmos requisitos |
 | `SEED_GESTOR_EMAIL` / `SEED_GESTOR_PASSWORD` | Opcionais para seed; preencher ambas ou nenhuma; senha com pelo menos 8 caracteres |
 
-No frontend, **VITE_API_URL** define a URL da API, incluindo `/api`: `http://localhost:3000/api`. Esse também é o fallback do cliente. Variáveis de configuração do backend são validadas com Zod; o seed valida suas próprias credenciais.
+No frontend, **VITE_DEMO_MODE** tem padrão `false`; habilite `true` somente no ambiente local de demonstração para mostrar os seletores de origem. **VITE_API_URL** define a URL da API, incluindo `/api`: `http://localhost:3000/api`. Esse também é o fallback do cliente. Variáveis de configuração do backend são validadas com Zod; o seed valida suas próprias credenciais.
 
 MongoDB no Compose roda sem autenticação e publica a porta apenas em `127.0.0.1`. Essa configuração é destinada ao desenvolvimento e à avaliação local. Um banco externo com credenciais exige uma MONGODB_URI adequada, mantida fora do Git.
+
+### Dados gerenciais fictícios opcionais
+
+O seed gerencial cria **24 novos chamados por mês**, com eventos v2, dois solicitantes, dois analistas, resoluções e reaberturas. Não transforma registros antigos em histórico comprovado, não altera contas e não gera credenciais.
+
+Requer as cinco contas demonstrativas já existentes no ambiente de apresentação: os três perfis abaixo e as contas adicionais `demo.ti2@helpdesk.local` e `demo.solicitante2@helpdesk.local`. O seed inicial cria apenas os três perfis; sem as duas contas adicionais, o seed gerencial interrompe. Consulte as instruções e restrições no [roteiro local](docs/05-demonstracao.md#seed-gerencial-local).
+
+Em PowerShell, a partir da raiz:
+
+```powershell
+cd backend
+$env:LOCAL_DEMO_SEED = '1'
+npm run seed:manager
+Remove-Item Env:LOCAL_DEMO_SEED
+```
+
+O comando recusa produção, bancos remotos e bancos diferentes de `it-helpdesk`. Repetir no mesmo mês não duplica nem atualiza exemplos existentes. Para visualizar: `http://localhost:5173/manager?dataOrigin=demo`, com os seletores habilitados e login do gestor.
 
 ## Credenciais demonstrativas
 
@@ -175,7 +193,7 @@ Controllers validam a entrada; services aplicam escopo, propriedade e regras; mo
 
 Solicitante, responsável atribuído e autor da resolução são identidades distintas. Resolver um chamado de outro responsável exige justificativa; reabrir exige motivo e inicia um novo ciclo. A tabela e o histórico apresentam autoria explícita. Eventos legados permanecem preservados, sem reconstrução presumida de autores ou datas.
 
-O dashboard começa com dados operacionais. Use **Origem dos dados → Demonstração** na visão gerencial ou **Origem dos indicadores → Demonstração** no dashboard para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
+O dashboard começa com dados operacionais. Somente no ambiente local, configure `DEMO_MODE=true` no backend e `VITE_DEMO_MODE=true` no frontend e reinicie ambos. Use **Origem dos dados → Demonstração** na visão gerencial ou **Origem dos indicadores → Demonstração** no dashboard para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
 
 Na visão gerencial, criações usam `createdAt`; resoluções usam eventos v2 por autor e ciclo, preservados após reabertura. Carga usa a atribuição atual. Histórico legado sem evidência não gera produtividade presumida. Consulte as [definições exatas e limites](docs/04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
 
@@ -201,7 +219,7 @@ npm run build
 
 A integração cobre autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboard e rate limit. Usa bancos separados `it-helpdesk-test*`, apagados ao final; não apaga o banco de desenvolvimento.
 
-O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard básico três vezes por perfil; verifica o dashboard gerencial exclusivo, filtros, origem, autoria real, ciclos, analistas com zero chamados, retorno à fila e layout em 390 px/desktop. Capturas claro/escuro e contraste dos botões são conferidos no E2E ampliado.
+O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard básico três vezes por perfil; verifica o dashboard gerencial exclusivo, filtros, origem, autoria real, ciclos, analistas com zero chamados, retorno à fila e layout em 390 px/desktop. O E2E também cria o seed estruturado no banco temporário, repete-o sem duplicações e percorre os alertas até a fila e o histórico. Verifica também busca, loading, erro HTTP simulado, repetição da consulta e estado vazio da fila/gestão. Capturas claro/escuro e contraste dos botões são conferidos.
 
 Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável. Em falhas, os diagnósticos ficam em `backend/e2e-results/`, ignorado pelo Git, com tempos, URLs/status e captura quando disponível, sem senhas/tokens/headers. Esse E2E não substitui a revisão manual completa de acessibilidade nem identifica a causa do timeout antigo reportado. Consulte o [escopo das verificações](docs/05-demonstracao.md#o-que-os-testes-verificam).
 

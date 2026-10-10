@@ -41,16 +41,28 @@ Solicitante filtra `requester`; categoria, prioridade e status filtram o **estad
 - **Em andamento agora:** documentos com status `em_andamento`; não depende da data de criação.
 - **Backlog atual:** abertos + em andamento, sob filtros atuais. Não é backlog reconstruído de meses anteriores.
 - **Pendentes sem responsável:** backlog com `assignee=null` ou ausente. Difere do cartão básico TI, que inclui todos os status sem responsável. O link gerencial acrescenta `pending=true` à fila.
-- **Distribuições por prioridade/categoria:** classificação atual do backlog, sem corte por criação. Gráficos de pizza mostram quantidades e percentuais sobre o backlog filtrado; legenda identifica cada fatia. Total zero apresenta estado vazio.
+- **Distribuições por prioridade/categoria:** classificação atual do backlog, sem corte por criação. Prioridades aparecem em pizza com ordem Alta/Média/Baixa, quantidades e percentuais. Categorias aparecem em barras horizontais por volume decrescente, com quantidades na legenda. Total zero apresenta estado vazio.
 - **Atribuídos agora por operador:** documentos de todos os status com seu `assignee`. **Pendentes** exclui resolvidos; **em andamento** é um subconjunto das pendências.
 - **Resoluções por operador:** ações comprovadas pelo `actorId`, nunca pelo responsável atual ou `resolvedBy` isolado. Um gestor que resolve aparece como gestor operador.
 - **Participação:** chamados distintos com ao menos uma ação v2 válida do operador no período. Várias ações no mesmo chamado contam uma participação por autor; o mesmo chamado pode ter participação de vários operadores, portanto não somar como total de chamados únicos da equipe.
 - **Reaberturas por operador:** eventos v2 `reopened`, uma vez por chamado e novo ciclo, executados pelo próprio autor no período. Não atribuem falha/culpa ao resolvedor anterior ou responsável atual.
 - **Solicitantes:** até dez maiores volumes de criação no período, com empate por ID estável. Categorias são agrupadas nos mesmos documentos; a tela mostra as três mais frequentes. Pendências pertencem a esse conjunto criado no período. Usuários TI/gestor também podem abrir solicitações.
-- **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de linhas e tabela exibem somente períodos com registros. As posições horizontais respeitam o espaçamento entre datas; linhas conectam pontos observados, sem preencher lacunas. Um período único aparece como pontos. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
-- **Demanda horária/semanal:** criações no período agrupadas por hora local (0–23) e dia ISO da semana (segunda–domingo), sem extrair horário de mensagens ou `updatedAt`.
+- **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de área adaptado do shadcn/ui com Recharts e tabela exibem somente períodos com registros, em ordem temporal. O eixo é categórico: intervalos de calendário ausentes não representam pontos medidos. As duas áreas são independentes, sem soma/empilhamento de criações e resoluções. Um período único aparece como pontos. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
+- **Demanda horária/semanal:** criações no período agrupadas por hora local (0–23) e dia ISO da semana (segunda–domingo), sem extrair horário de mensagens ou `updatedAt`. As 24 horas são retornadas: zero indica nenhuma criação naquela hora no conjunto consultado, sem simulação de dados.
 
-Equipe inclui TI, gestores operadores e referências históricas/atribuídas pertinentes. Operadores sem chamados aparecem com zero; removidos usam ID/snapshot disponível, sem inventar identidade. A ordem por pendências auxilia triagem, sem premiar baixo volume de resolução ou penalizar alta carga. Links da equipe/solicitantes consultam a fila atual, **sem período de criação**.
+Equipe inclui TI, gestores operadores e referências históricas/atribuídas pertinentes. Operadores sem chamados aparecem com zero; removidos usam ID/snapshot disponível, sem inventar identidade. A ordem por pendências auxilia triagem, sem premiar baixo volume de resolução ou penalizar alta carga. Links da equipe consultam a atribuição atual, sem restringir data de criação. Links dos solicitantes e do card de criações preservam `createdFrom` inclusivo e `createdTo` exclusivo, correspondentes ao período consultado.
+
+### Alertas, idade e movimentação
+
+- Alta prioridade sem responsável: chamado aberto/em andamento, prioridade `alta` e responsável nulo. Link `attention=high_unassigned`.
+- Idade: dias corridos desde `createdAt`, independente de alterações posteriores. Alerta de pendências com pelo menos `ageDays` (padrão 7, intervalo 1–365); link `attention=oldest`, ordenado do mais antigo para o mais recente. A lista de cinco pendências mais antigas usa qualquer idade.
+- Inatividade: desde o maior `occurredAt` de uma ação operacional v2 consistente (`updated`, `assigned`, `status_changed`, `resolved` ou `reopened`) realizada por TI/gestor. Criação e edição do solicitante não provam atendimento; eventos legados, inválidos, futuros ou com origem divergente não provam movimentação. `updatedAt` nunca substitui esse cálculo.
+- `inactivityDays` padrão 3 (1–90); link `attention=inactive`. Pendências sem ação comprovada ficam em `unknownActivity`, separadas do alerta. Não presumimos inatividade desde a abertura.
+- Carga por prioridade/responsável conta somente pendências atuais, incluindo responsável nulo. Alta/Média/Baixa mantêm cores e ordem. Maior carga atual indica apenas o maior número de pendências na equipe filtrada; empates recebem a mesma indicação, sem ranking de qualidade.
+
+Alertas respeitam origem, equipe, solicitante e classificação. Dias não representam SLA, atraso contratual ou duração útil de atendimento. A API da fila reaplica os mesmos predicados e a autorização. Consultas separadas podem divergir durante uma atualização concorrente.
+
+O controle de origem requer `DEMO_MODE=true` e ambiente diferente de produção na API; os seletores da interface requerem também `VITE_DEMO_MODE=true`. A configuração normal usa dados operacionais. Origem demonstrativa fica identificada como fictícia e não entra em produtividade operacional.
 
 ### Evidência e cobertura
 
@@ -80,6 +92,7 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **Filtro compartilhado e facet:** reaproveita escopo e concentra contagens. Não garante snapshot único entre todas as consultas.
 - **Busca literal com regex escapada:** evita tratar entrada como expressão regular; sem índice de texto, volumes altos podem exigir outra estratégia.
 - **bcryptjs e node:test:** hash em JavaScript e testes sem biblioteca de testes adicional. Integração exige MongoDB real.
+- **Gráficos shadcn/ui adaptados com Recharts:** contêiner e tooltip usam tokens CSS existentes, sem introduzir Tailwind ou reconstruir o frontend. Gráfico gerencial é carregado sob demanda; barras ordenam categorias e pizza mantém a ordem semântica de prioridades.
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
 
 ## Segurança e limites operacionais

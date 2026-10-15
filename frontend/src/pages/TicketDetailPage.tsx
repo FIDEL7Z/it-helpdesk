@@ -167,6 +167,9 @@ export function TicketDetailPage() {
             )}
           </div>
 
+          {/* Next to the description: what the team tells users about this same problem. */}
+          {can(user?.role, 'incidents:manage') && <IncidentPanel ticket={ticket} />}
+
           <div className="card">
             <h2 className="card__title">Histórico</h2>
             <ol className="timeline">
@@ -285,8 +288,6 @@ export function TicketDetailPage() {
               </div>
             </div>
           )}
-
-          {can(user?.role, 'incidents:manage') && <IncidentPanel ticket={ticket} />}
 
           {isSupervisor && !isOwner && (
             <p className="side-note">

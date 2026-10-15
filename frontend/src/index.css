@@ -1394,7 +1394,8 @@ textarea.field__input {
 .section-title { font-size: 1.15rem; margin-bottom: 12px; }
 .manager-source { padding: 10px 14px; border-left: 3px solid var(--color-primary); background: var(--color-surface-muted); font-size: .875rem; }
 .manager-source--demo { border-color: var(--color-warning); }
-.table-scroll { overflow-x: auto; max-width: 100%; margin: 16px 0; }
+/* position: relative keeps visually hidden (absolute) header text inside the scroll area. */
+.table-scroll { position: relative; overflow-x: auto; max-width: 100%; margin: 16px 0; }
 .manager-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .875rem; }
 .manager-table th, .manager-table td { padding: 12px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
 .manager-table thead { background: var(--color-surface-muted); }

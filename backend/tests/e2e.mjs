@@ -520,6 +520,9 @@ async function run() {
   const overview = '(document.querySelector(".incidents-overview dl")?.textContent ?? "")';
   await waitDom('manager incident block', `${overview}.includes("Ativos1") && ${overview}.includes("Pessoas afetadas nos ativos1")`);
   check(true, 'Manager sees active incidents and affected people');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  check(await evaluate('document.querySelector(".incidents-overview .table-scroll") && document.documentElement.scrollWidth <= 390'), 'Manager page with an incident table fits 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
   const closed = await browserApi('PATCH', `/tickets/${outage.id}/status`, { status: 'resolvido', reason: 'Switch substituído; rede normalizada.' });
   check(closed.status === 200, 'Manager resolves the main ticket');
   await go('/manager');

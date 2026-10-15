@@ -9,6 +9,7 @@ import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
 const STATUSES: ArticleStatus[] = ['published', 'draft', 'archived']
+const STATUS_TAB_LABELS: Record<ArticleStatus, string> = { published: 'Publicados', draft: 'Rascunhos', archived: 'Arquivados' }
 
 /** Knowledge base for the team: every status, authorship and how useful each article was. */
 export function ArticlesManagePage() {
@@ -17,7 +18,7 @@ export function ArticlesManagePage() {
 }
 
 function ArticlesManageContent() {
-  useDocumentTitle('Base de conhecimento')
+  useDocumentTitle('Gerenciar artigos')
   const [params, setParams] = useSearchParams()
   const statusParam = params.get('status') ?? ''
   const status = (STATUSES as string[]).includes(statusParam) ? (statusParam as ArticleStatus) : undefined
@@ -28,6 +29,16 @@ function ArticlesManageContent() {
     key: '', articles: [], pagination: null, error: null,
   })
   const loading = state.key !== key
+
+  // Totals per state for the tabs (one small request each, page size 1).
+  const [counts, setCounts] = useState<Record<ArticleStatus, number> | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.all(STATUSES.map((value) => searchManagedArticles({ status: value, limit: 1 }, controller.signal)))
+      .then(([published, draft, archived]) => setCounts({ published: published.pagination.total, draft: draft.pagination.total, archived: archived.pagination.total }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [reload])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -53,7 +64,7 @@ function ArticlesManageContent() {
     <section className="page">
       <header className="page__header page__header--with-action">
         <div>
-          <h1 className="page__title">Base de conhecimento</h1>
+          <h1 className="page__title">Gerenciar artigos</h1>
           <p className="page__subtitle">Orientações que os solicitantes consultam antes de abrir um pedido.</p>
         </div>
         <div className="page__actions">
@@ -62,13 +73,15 @@ function ArticlesManageContent() {
         </div>
       </header>
 
-      <div className="field field--inline">
-        <label htmlFor="article-status-filter" className="field__label">Situação</label>
-        <select id="article-status-filter" className="field__input field__select" value={status ?? ''} onChange={(event) => goTo({ status: event.target.value })}>
-          <option value="">Todas</option>
-          {STATUSES.map((value) => <option key={value} value={value}>{ARTICLE_STATUS_LABELS[value]}</option>)}
-        </select>
-      </div>
+      {/* Content management by state: what readers see, what is still being written, what was retired. */}
+      <nav className="status-tabs" aria-label="Situação dos artigos">
+        {([...STATUSES, ''] as const).map((value) => (
+          <button key={value || 'all'} type="button" className="status-tab" aria-pressed={(status ?? '') === value} onClick={() => goTo({ status: value })}>
+            {value ? STATUS_TAB_LABELS[value] : 'Todos'}
+            {counts && <span className="status-tab__count">{value ? counts[value] : counts.published + counts.draft + counts.archived}</span>}
+          </button>
+        ))}
+      </nav>
 
       {state.error ? (
         <div className="alert alert--error" role="alert">
@@ -92,6 +105,7 @@ function ArticlesManageContent() {
                 <th scope="col">Situação</th>
                 <th scope="col">Ajudou / não ajudou</th>
                 <th scope="col">Última edição</th>
+                <th scope="col"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody>
@@ -105,6 +119,10 @@ function ArticlesManageContent() {
                   <td data-label="Situação"><span className={`article-status article-status--${article.status}`}>{ARTICLE_STATUS_LABELS[article.status]}</span></td>
                   <td data-label="Ajudou / não ajudou">{article.helpfulCount} / {article.notHelpfulCount}</td>
                   <td data-label="Última edição">{article.updatedBy?.name ?? 'Usuário removido'} · {formatDateTime(article.updatedAt)}</td>
+                  <td data-label="Ações" className="article-table__actions">
+                    <Link to={`/help/manage/${article.id}`} className="button button--secondary button--small">Editar</Link>
+                    {article.status === 'published' && <Link to={`/help/${article.id}`} className="button button--ghost button--small">Ver</Link>}
+                  </td>
                 </tr>
               ))}
             </tbody>

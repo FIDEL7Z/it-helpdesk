@@ -3492,3 +3492,57 @@ a:hover {
 .manager-section .bar-list__item {
   grid-template-columns: minmax(120px, 190px) minmax(0, 1fr) 32px;
 }
+
+/* Article management: states as tabs with totals. */
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: -1px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-tab:hover {
+  color: var(--color-text);
+}
+
+.status-tab[aria-pressed='true'] {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.status-tab:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.status-tab__count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.article-table__actions {
+  white-space: nowrap;
+}
+
+.article-table__actions .button + .button {
+  margin-left: var(--space-1);
+}

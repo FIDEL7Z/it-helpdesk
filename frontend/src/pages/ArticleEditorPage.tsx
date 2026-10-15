@@ -95,7 +95,7 @@ function ArticleEditor() {
   return (
     <section className="page">
       <header className="page__header">
-        <Link to="/help/manage" className="back-link">← Voltar à Base de conhecimento</Link>
+        <Link to="/help/manage" className="back-link">← Voltar a Gerenciar artigos</Link>
         <h1 className="page__title">{isNew ? 'Novo artigo' : 'Editar artigo'}</h1>
         {saved && (
           <p className="page__subtitle">

@@ -1482,6 +1482,17 @@ textarea.field__input {
   z-index: 10;
 }
 
+/* Anchors and scrollIntoView stop below the sticky header instead of under it. */
+html {
+  scroll-padding-top: 84px;
+}
+
+@media (max-width: 720px) {
+  html {
+    scroll-padding-top: 124px;
+  }
+}
+
 .app-nav__link.active {
   font-weight: 600;
 }

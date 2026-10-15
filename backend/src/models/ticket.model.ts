@@ -3,7 +3,8 @@ import { Schema, model, type HydratedDocument, type Types } from 'mongoose';
 export const TICKET_CATEGORIES = ['hardware', 'software', 'rede', 'acesso', 'outros'] as const;
 export const TICKET_PRIORITIES = ['baixa', 'media', 'alta'] as const;
 export const TICKET_STATUSES = ['aberto', 'em_andamento', 'resolvido'] as const;
-export const TICKET_EVENT_TYPES = ['created', 'updated', 'status_changed', 'reopened', 'assigned', 'resolved'] as const;
+// resolution_confirmed / resolution_rated: the requester's answer to a resolution, in the same audited history.
+export const TICKET_EVENT_TYPES = ['created', 'updated', 'status_changed', 'reopened', 'assigned', 'resolved', 'resolution_confirmed', 'resolution_rated'] as const;
 
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];

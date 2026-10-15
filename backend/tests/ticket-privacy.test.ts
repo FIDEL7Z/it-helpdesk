@@ -15,9 +15,10 @@ const PRIORITY_REASON = 'Motivo interno: diretoria aguardando o equipamento';
 const RESOLUTION_REASON = 'Justificativa interna: resolvido por outro analista após diagnóstico';
 const REOPEN_REASON = 'Reabertura interna: falha voltou no teste de carga';
 
-const REQUESTER_SUMMARY_KEYS = ['assignee', 'category', 'createdAt', 'id', 'priority', 'requesterId', 'resolvedAt', 'revision', 'status', 'title', 'updatedAt'];
-// intake: the requester's own guided-form answers (null when there are none).
-const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'description', 'history', 'intake'].sort();
+// awaitingConfirmation: resolved and still waiting for the requester's "was it solved?" answer.
+const REQUESTER_SUMMARY_KEYS = ['assignee', 'awaitingConfirmation', 'category', 'createdAt', 'id', 'priority', 'requesterId', 'resolvedAt', 'revision', 'status', 'title', 'updatedAt'];
+// intake: their own guided-form answers; resolutionFeedback: their own answer to the resolution.
+const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'description', 'history', 'intake', 'resolutionFeedback'].sort();
 const REQUESTER_EVENT_KEYS = ['at', 'author', 'message', 'type'];
 
 let server: Server;

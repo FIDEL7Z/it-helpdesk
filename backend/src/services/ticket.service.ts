@@ -64,6 +64,8 @@ export interface TicketSummary {
   resolvedBy: PublicUser | null;
   resolvedById: string | null;
   dataOrigin: Ticket['dataOrigin'];
+  /** The requester said the last resolution did not solve the problem (current cycle). */
+  contested: boolean;
 }
 
 /** Guided-form answers as the team and the requester read them. */
@@ -73,9 +75,18 @@ export interface IntakeView {
   article: { id: string; title: string } | null;
 }
 
+/** The requester's answer to the resolution of the current cycle (or the one they contested). */
+export interface ResolutionFeedbackView {
+  cycleId: number;
+  status: 'pending' | 'confirmed' | 'contested';
+  rating: number | null;
+  comment: string | null;
+}
+
 export interface TicketDetail extends TicketSummary {
   description: string;
   intake: IntakeView | null;
+  resolutionFeedback: ResolutionFeedbackView | null;
   history: TicketEventView[];
 }
 
@@ -109,12 +120,15 @@ export interface RequesterTicketSummary {
   /** Needed to edit the text while the request is open. */
   revision: number;
   resolvedAt: Date | null;
+  /** Resolved and the requester has not said yet whether it worked. */
+  awaitingConfirmation: boolean;
 }
 
 export interface RequesterTicketDetail extends RequesterTicketSummary {
   description: string;
   /** Their own answers, as they gave them. */
   intake: IntakeView | null;
+  resolutionFeedback: ResolutionFeedbackView | null;
   history: RequesterEventView[];
 }
 
@@ -197,7 +211,25 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
     resolvedBy: userFrom(users, ticket.resolvedBy),
     resolvedById: ticket.resolvedBy?.toString() ?? null,
     dataOrigin: ticket.dataOrigin ?? 'legacy',
+    contested: resolutionFeedbackOf(ticket)?.status === 'contested',
   };
+}
+
+function resolutionFeedbackOf(ticket: TicketDocument): ResolutionFeedbackView | null {
+  const cycle = ticket.activeCycleId ?? 1;
+  const inCycle = (type: TicketEventType) => ticket.history?.find((event) => event.type === type && event.audit?.cycleId === cycle);
+  if (ticket.status === 'resolvido') {
+    const rated = inCycle('resolution_rated')?.audit?.to;
+    return {
+      cycleId: cycle,
+      status: inCycle('resolution_confirmed') ? 'confirmed' : 'pending',
+      rating: typeof rated?.rating === 'number' ? rated.rating : null,
+      comment: typeof rated?.comment === 'string' ? rated.comment : null,
+    };
+  }
+  const contest = ticket.history?.find((event) => event.type === 'reopened' && event.audit?.cycleId === cycle
+    && typeof event.audit.to?.contestedCycle === 'number');
+  return contest ? { cycleId: contest.audit!.to.contestedCycle as number, status: 'contested', rating: null, comment: null } : null;
 }
 
 function toIntakeView(ticket: TicketDocument): IntakeView | null {
@@ -226,6 +258,7 @@ function toRequesterSummary(ticket: TicketDocument, users: UserMap): RequesterTi
     updatedAt: ticket.updatedAt ?? null,
     revision: ticket.revision ?? 0,
     resolvedAt: ticket.resolvedAt ?? null,
+    awaitingConfirmation: resolutionFeedbackOf(ticket)?.status === 'pending',
   };
 }
 
@@ -248,6 +281,7 @@ export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser):
       ...toRequesterSummary(ticket, users),
       description: ticket.description,
       intake: toIntakeView(ticket),
+      resolutionFeedback: resolutionFeedbackOf(ticket),
       history: ticket.history.map((event) => ({
         type: event.type,
         message: event.message,
@@ -262,6 +296,7 @@ export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser):
     ...toSummary(ticket, users),
     description: ticket.description,
     intake: toIntakeView(ticket),
+    resolutionFeedback: resolutionFeedbackOf(ticket),
     history: ticket.history.map((event) => ({
       authorId: event.author?.toString() ?? null,
       audit: event.audit,
@@ -413,7 +448,8 @@ export async function listTickets(
       .sort(query.attention === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .select('-description -history'),
+      // History stays (without messages) to tell whether the requester contested the resolution.
+      .select('-description -history.message'),
   ]);
 
   const users = await loadUsers(tickets.flatMap((ticket) => [ticket.requester, ticket.assignee, ticket.resolvedBy]));
@@ -636,4 +672,57 @@ export async function assignTicket(
 
   return saveChanges(ticket, { assignee: assignee._id }, [{ type: 'assigned', message,
     from: { assigneeId: ticket.assignee?.toString() ?? null }, to: { assigneeId: assignee.id } }], actor, reason);
+}
+
+// ---------- Requester answer to a resolution ----------
+
+export const RATING_COMMENT_MAX = 500;
+
+/**
+ * Only the requester answers, for the resolution of the current cycle. The cycle sent by the
+ * client names the resolution being answered: an older cycle, or a ticket the team already
+ * reopened, gets 409 instead of acting on a different resolution.
+ */
+async function findAnswerableResolution(id: string, actor: PublicUser, cycleId: number): Promise<TicketDocument> {
+  const ticket = await findAccessibleTicket(id, actor);
+  if (!isRequester(ticket, actor)) throw new HttpError(403, 'Only the requester can answer about the resolution');
+  if (ticket.status !== 'resolvido' || (ticket.activeCycleId ?? 1) !== cycleId) {
+    throw new HttpError(409, 'This resolution is no longer current. Reload the ticket');
+  }
+  return ticket;
+}
+
+function cycleEvent(ticket: TicketDocument, type: TicketEventType, cycleId: number) {
+  return ticket.history.find((event) => event.type === type && event.audit?.cycleId === cycleId);
+}
+
+/** "Sim, foi resolvido." Repeating it (double click, retry) changes nothing. */
+export async function confirmResolution(id: string, cycleId: number, actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (cycleEvent(ticket, 'resolution_confirmed', cycleId)) return toTicketDetail(ticket, actor);
+  return saveChanges(ticket, {}, [{ type: 'resolution_confirmed', message: 'Solicitante confirmou que o problema foi resolvido',
+    from: { status: 'resolvido' }, to: { confirmedCycle: cycleId } }], actor);
+}
+
+/**
+ * "Não, o problema continua." Reopens into a new cycle with the requester as the audited author
+ * and the reason; the previous resolution and its author stay in the history. It does not give the
+ * requester any general status permission. A second request for the same cycle gets 409.
+ */
+export async function contestResolution(id: string, cycleId: number, reason: string, actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (cycleEvent(ticket, 'resolution_confirmed', cycleId)) throw new HttpError(409, 'This resolution was already confirmed');
+  return saveChanges(ticket, { status: 'em_andamento', resolvedAt: null, resolvedBy: null, activeCycleId: cycleId + 1 },
+    [{ type: 'reopened', message: 'Solicitante informou que o problema continua',
+      from: { status: 'resolvido', cycleId }, to: { status: 'em_andamento', contestedCycle: cycleId } }], actor, reason);
+}
+
+/** Optional 1-5 rating after confirming. One per resolution; not having one means nothing. */
+export async function rateResolution(id: string, cycleId: number, rating: number, comment: string | undefined,
+  actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (!cycleEvent(ticket, 'resolution_confirmed', cycleId)) throw new HttpError(409, 'Confirm the resolution before rating it');
+  if (cycleEvent(ticket, 'resolution_rated', cycleId)) throw new HttpError(409, 'This resolution was already rated');
+  return saveChanges(ticket, {}, [{ type: 'resolution_rated', message: 'Solicitante avaliou o atendimento',
+    from: {}, to: { rating, ratedCycle: cycleId, ...(comment ? { comment } : {}) } }], actor);
 }

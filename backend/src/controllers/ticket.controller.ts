@@ -109,6 +109,16 @@ const updateTicketSchema = z
     message: 'Provide at least one field to update',
   });
 
+// The cycle names the resolution being answered; the requester comes from the token.
+const cycleField = { cycleId: z.number().int().min(1) };
+const confirmSchema = z.strictObject(cycleField);
+const contestSchema = z.strictObject({ ...cycleField, reason: z.string().trim().min(5).max(1000) });
+const ratingSchema = z.strictObject({
+  ...cycleField,
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().max(ticketService.RATING_COMMENT_MAX).optional().transform((value) => value || undefined),
+});
+
 const changeStatusSchema = z.strictObject({
   ...mutationFields,
   status: z.enum(TICKET_STATUSES),
@@ -150,4 +160,22 @@ export async function assignTicket(req: Request, res: Response): Promise<void> {
   const ticket = await ticketService.assignTicket(id, assigneeId, getAuthenticatedUser(req), expectedRevision, reason);
 
   res.json({ ticket });
+}
+
+export async function confirmResolution(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const { cycleId } = confirmSchema.parse(req.body);
+  res.json({ ticket: await ticketService.confirmResolution(id, cycleId, getAuthenticatedUser(req)) });
+}
+
+export async function contestResolution(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const { cycleId, reason } = contestSchema.parse(req.body);
+  res.json({ ticket: await ticketService.contestResolution(id, cycleId, reason, getAuthenticatedUser(req)) });
+}
+
+export async function rateResolution(req: Request, res: Response): Promise<void> {
+  const { id } = idParamsSchema.parse(req.params);
+  const { cycleId, rating, comment } = ratingSchema.parse(req.body);
+  res.json({ ticket: await ticketService.rateResolution(id, cycleId, rating, comment, getAuthenticatedUser(req)) });
 }

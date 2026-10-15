@@ -158,7 +158,9 @@ export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
 export type TicketFilters = {
   createdFrom?: string
   createdTo?: string
-  attention?: 'high_unassigned' | 'oldest' | 'inactive'
+  attention?: 'high_unassigned' | 'oldest' | 'inactive' | 'contested'
+  /** Creation order; 'oldest' puts the next ticket to pick first. */
+  sort?: 'newest' | 'oldest'
   ageDays?: number
   inactivityDays?: number
   pending?: boolean

@@ -251,8 +251,9 @@ async function run() {
     await waitDom(`${role} dashboard data`, 'document.querySelectorAll(".stat-card__value").length >= 4');
     const values = await evaluate('Array.from(document.querySelectorAll(".stat-card__value")).slice(0,4).map(el => Number(el.textContent))');
     check(JSON.stringify(values) === JSON.stringify(expected), `${role}: dashboard counts match persisted fixtures`);
-    const workload = await evaluate('document.querySelectorAll(".stats--workload .stat-card").length');
-    check(workload === (role === 'ti' ? 2 : 0), `${role}: personal workload visibility`);
+    // The personal queue ("Meus atendimentos") is for people who can be assigned: TI and managers.
+    const personalQueue = await evaluate('document.querySelectorAll(".my-queue").length');
+    check(personalQueue === (role === 'solicitante' ? 0 : 1), `${role}: personal queue visibility`);
   };
 
   await go('/dashboard');

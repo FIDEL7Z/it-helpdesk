@@ -48,7 +48,8 @@ function readFilters(params: URLSearchParams): TicketFilters {
   return {
     createdFrom: params.get('createdFrom') ?? undefined,
     createdTo: params.get('createdTo') ?? undefined,
-    attention: ['high_unassigned', 'oldest', 'inactive'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
+    attention: ['high_unassigned', 'oldest', 'inactive', 'contested'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
+    sort: params.get('sort') === 'oldest' ? 'oldest' : undefined,
     ageDays: params.has('ageDays') ? Number(params.get('ageDays')) : undefined,
     inactivityDays: params.has('inactivityDays') ? Number(params.get('inactivityDays')) : undefined,
     pending: params.get('pending') === 'true' ? true : undefined,
@@ -137,6 +138,11 @@ export function TicketsPage() {
     setSearchParams(view === 'board' ? new URLSearchParams({ view: 'board' }) : new URLSearchParams())
   }
 
+  /** Quick queues keep the data origin and the current view (list or board). */
+  function shortcut(query: string): string {
+    return `/tickets?${query}${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}${view === 'board' ? '&view=board' : ''}`
+  }
+
   function setView(next: 'list' | 'board') {
     const params = new URLSearchParams(searchParams)
     if (next === 'board') params.set('view', 'board')
@@ -170,75 +176,86 @@ export function TicketsPage() {
         </div>
       )}
 
-      {canFilterByAssignee && <nav className="queue-links" aria-label="Atalhos da fila operacional">
-        <Link className="button button--secondary" to={`/tickets?assignee=none${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Sem responsável</Link>
-        <Link className="button button--secondary" to={`/tickets?assignee=me${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Atribuídos a mim</Link>
-        <Link className="button button--secondary" to={`/tickets?status=em_andamento${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}`}>Em andamento</Link>
-      </nav>}
-      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
-      {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
-      {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
+      {/* One panel, grouped by purpose: how to view, quick queues, then search and filters. */}
+      <div className="queue-panel">
+        {(seesAllTickets || canFilterByAssignee) && (
+          <div className="queue-panel__row">
+            {seesAllTickets && (
+              <div className="view-toggle" role="group" aria-label="Forma de exibição">
+                <button type="button" className="view-toggle__option" aria-pressed={view === 'list'} onClick={() => setView('list')}>Lista</button>
+                <button type="button" className="view-toggle__option" aria-pressed={view === 'board'} onClick={() => setView('board')}>Quadro</button>
+              </div>
+            )}
+            {canFilterByAssignee && <nav className="queue-links" aria-label="Filas rápidas">
+              <span className="queue-links__label">Filas rápidas</span>
+              <Link className="queue-link" to={shortcut('assignee=none&pending=true&sort=oldest')}>Sem responsável</Link>
+              <Link className="queue-link" to={shortcut('assignee=me&pending=true')}>Atribuídos a mim</Link>
+              <Link className="queue-link" to={shortcut('status=em_andamento')}>Em andamento</Link>
+              <Link className="queue-link" to={shortcut('attention=contested')}>Reabertos pelo solicitante</Link>
+            </nav>}
+          </div>
+        )}
 
-      {seesAllTickets && (
-        <div className="view-toggle" role="group" aria-label="Forma de exibição">
-          <button type="button" className="view-toggle__option" aria-pressed={view === 'list'} onClick={() => setView('list')}>Lista</button>
-          <button type="button" className="view-toggle__option" aria-pressed={view === 'board'} onClick={() => setView('board')}>Quadro</button>
-        </div>
-      )}
+        <div className="toolbar">
+          {/* Remounted when the URL search changes (e.g. back button, clear filters). */}
+          <SearchForm
+            key={filters.search ?? ''}
+            initialValue={filters.search ?? ''}
+            onSearch={(value) => updateFilter('search', value)}
+          />
 
-      <div className="toolbar">
-        {/* Remounted when the URL search changes (e.g. back button, clear filters). */}
-        <SearchForm
-          key={filters.search ?? ''}
-          initialValue={filters.search ?? ''}
-          onSearch={(value) => updateFilter('search', value)}
-        />
-
-        <div className="toolbar__filters">
-          <FilterSelect
-            id="filter-status"
-            label="Status"
-            value={filters.status ?? ''}
-            options={TICKET_STATUSES.map((value) => [value, STATUS_LABELS[value]])}
-            onChange={(value) => updateFilter('status', value)}
-          />
-          <FilterSelect
-            id="filter-priority"
-            label="Prioridade"
-            value={filters.priority ?? ''}
-            options={TICKET_PRIORITIES.map((value) => [value, PRIORITY_LABELS[value]])}
-            onChange={(value) => updateFilter('priority', value)}
-          />
-          <FilterSelect
-            id="filter-category"
-            label="Categoria"
-            value={filters.category ?? ''}
-            options={TICKET_CATEGORIES.map((value) => [value, CATEGORY_LABELS[value]])}
-            onChange={(value) => updateFilter('category', value)}
-          />
-          {canFilterByAssignee && (
+          <div className="toolbar__filters">
             <FilterSelect
-              id="filter-assignee"
-              label="Responsável"
-              value={filters.assignee ?? ''}
-              options={ASSIGNEE_FILTERS.map((value) => [value, ASSIGNEE_FILTER_LABELS[value]])}
-              onChange={(value) => updateFilter('assignee', value)}
+              id="filter-status"
+              label="Status"
+              value={filters.status ?? ''}
+              options={TICKET_STATUSES.map((value) => [value, STATUS_LABELS[value]])}
+              onChange={(value) => updateFilter('status', value)}
             />
-          )}
-          {hasFilters && (
-            <button type="button" className="button button--ghost" onClick={clearFilters}>
-              Limpar filtros
-            </button>
-          )}
+            <FilterSelect
+              id="filter-priority"
+              label="Prioridade"
+              value={filters.priority ?? ''}
+              options={TICKET_PRIORITIES.map((value) => [value, PRIORITY_LABELS[value]])}
+              onChange={(value) => updateFilter('priority', value)}
+            />
+            <FilterSelect
+              id="filter-category"
+              label="Categoria"
+              value={filters.category ?? ''}
+              options={TICKET_CATEGORIES.map((value) => [value, CATEGORY_LABELS[value]])}
+              onChange={(value) => updateFilter('category', value)}
+            />
+            {canFilterByAssignee && (
+              <FilterSelect
+                id="filter-assignee"
+                label="Responsável"
+                value={filters.assignee ?? ''}
+                options={ASSIGNEE_FILTERS.map((value) => [value, ASSIGNEE_FILTER_LABELS[value]])}
+                onChange={(value) => updateFilter('assignee', value)}
+              />
+            )}
+            {DEMO_MODE && (
+              <div className="filter">
+                <label className="filter__label" htmlFor="list-origin">Origem</label>
+                <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
+                  <option value="">Todas (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
+                </select>
+              </div>
+            )}
+            {hasFilters && (
+              <button type="button" className="button button--ghost" onClick={clearFilters}>
+                Limpar filtros
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-        {DEMO_MODE && <div className="field">
-          <label className="field__label" htmlFor="list-origin">Origem dos dados</label>
-          <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
-            <option value="">Todos (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
-          </select>
-        </div>}
+      {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
+      {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : filters.attention === 'contested' ? 'Reabertos pelo solicitante: a resolução anterior não resolveu o problema.' : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
+      {filters.sort === 'oldest' && <p className="page__note">Ordenados do mais antigo para o mais recente.</p>}
+      {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       {view === 'board' ? (
         <TicketBoard filters={filters} returnTo={location.pathname + location.search} />

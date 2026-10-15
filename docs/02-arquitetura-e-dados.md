@@ -45,6 +45,9 @@ erDiagram
   TICKETS ||--o| SHARED_INCIDENTS : "chamado principal"
   SHARED_INCIDENTS ||--o{ INCIDENT_PARTICIPATIONS : incident
   USERS ||--o{ INCIDENT_PARTICIPATIONS : user
+  USERS ||--o{ KNOWLEDGE_ARTICLES : "autor / último editor"
+  KNOWLEDGE_ARTICLES ||--o{ ARTICLE_FEEDBACKS : article
+  USERS ||--o{ ARTICLE_FEEDBACKS : user
   USERS {
     ObjectId _id
     String name
@@ -100,6 +103,22 @@ erDiagram
     Date joinedAt
     Date leftAt "nullable"
   }
+  KNOWLEDGE_ARTICLES {
+    ObjectId _id
+    String title
+    String summary
+    String category
+    String body
+    String status "draft, published ou archived"
+    String searchText "sem acentos"
+    Number revision
+  }
+  ARTICLE_FEEDBACKS {
+    ObjectId _id
+    ObjectId article
+    ObjectId user
+    Boolean helpful
+  }
 ```
 
 `HISTORY_EMBEDDED` representa subdocumentos dentro de `tickets`, **não uma terceira coleção**. O diagrama mostra cardinalidades da aplicação, não foreign keys impostas pelo MongoDB. Um usuário pode abrir vários chamados, ser responsável por vários ou ser autor de vários eventos. Cada chamado referencia um solicitante e, opcionalmente, um responsável.
@@ -114,9 +133,9 @@ Os schemas incluem ainda campos internos gerenciados pelo Mongoose, como `__v`; 
 
 Título, descrição, categoria e solicitante são obrigatórios. Prioridade tem default `media`; status, `aberto`; responsável, null; histórico, array vazio. O service de criação acrescenta o primeiro evento. Os enums e limites estão em [ticket.model.ts](../backend/src/models/ticket.model.ts).
 
-Eventos mantêm `type`, `message`, `author` e `at` para compatibilidade. Novos eventos possuem `audit` estruturado, com `eventId`, `operationId`, autor/snapshot, responsável/snapshot, `from`, `to`, revisão, ordem, ciclo e origem. Tipos: `created`, `updated`, `status_changed`, `assigned`, `reopened`, `resolved`.
+Eventos mantêm `type`, `message`, `author` e `at` para compatibilidade. Novos eventos possuem `audit` estruturado, com `eventId`, `operationId`, autor/snapshot, responsável/snapshot, `from`, `to`, revisão, ordem, ciclo e origem. Tipos: `created`, `updated`, `status_changed`, `assigned`, `reopened`, `resolved`, `resolution_confirmed` e `resolution_rated`. Os dois últimos, e a reabertura por contestação (`reopened` com `to.contestedCycle`), são escritos pelo solicitante dono do chamado; ficam no mesmo histórico para herdar a escrita atômica, a revisão e o ciclo.
 
-O chamado possui `revision`, `activeCycleId`, `resolvedAt`, `resolvedBy` e `dataOrigin`. Documentos legados sem revisão são tratados como revisão zero na primeira escrita, sem regravar eventos antigos. Autores e datas legados ausentes retornam null. Não existem `impact`, `startedAt`, SLA ou coleção de equipe.
+O chamado possui `revision`, `activeCycleId`, `resolvedAt`, `resolvedBy`, `dataOrigin` e, quando aberto pelo formulário guiado, `intake`: assunto escolhido, respostas (`key`, texto da pergunta, resposta) e o artigo consultado (`id`, título). É um subdocumento opcional: chamados antigos simplesmente não o têm, e a descrição continua sendo só o texto da pessoa. Documentos legados sem revisão são tratados como revisão zero na primeira escrita, sem regravar eventos antigos. Autores e datas legados ausentes retornam null. Não existem `impact`, `startedAt`, SLA ou coleção de equipe.
 
 Detalhes do contrato e limites: [integridade e auditoria](06-integridade-e-auditoria.md).
 
@@ -139,9 +158,17 @@ O MongoDB do Compose roda sem réplica, portanto sem transações entre coleçõ
 - `tickets`: `{ dataOrigin: 1, assignee: 1, status: 1 }` para carga atual por origem/operador.
 - `sharedincidents`: `{ ticket: 1 }`, único (um incidente por chamado, inclusive com duas publicações simultâneas); `{ status: 1, publishedAt: -1 }` para a lista de ativos.
 - `incidentparticipations`: `{ incident: 1, cycle: 1, user: 1 }`, único (participação idempotente); `{ user: 1, leftAt: 1 }` para "problemas que você acompanhou".
+- `knowledgearticles`: `{ status: 1, category: 1, updatedAt: -1 }` para a lista pública por assunto; `{ demoKey: 1 }`, único e parcial, para o seed idempotente.
+- `articlefeedbacks`: `{ article: 1, user: 1 }`, único (um voto por pessoa e artigo).
 - Cada coleção possui também o índice padrão de `_id`.
 
 Por padrão, a lista ordena por `createdAt` e `_id`, ambos descendentes. O alerta `attention=oldest` usa ordem crescente para trazer as pendências mais antigas primeiro. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.
+
+### Base de conhecimento
+
+`knowledgearticles` guarda os artigos com autor (`createdBy`), último editor (`updatedBy`), `publishedAt` da primeira publicação e revisão própria. `searchText` é título, resumo e corpo em minúsculas e sem acentos, recalculado a cada edição. A busca exige cada palavra digitada nesse campo com uma expressão regular escapada; o filtro inicial usa o índice de status e categoria. É simples e suficiente para dezenas de artigos; não ordena por relevância e, com milhares de artigos, um índice de texto ou mecanismo de busca seria mais adequado.
+
+`articlefeedbacks` tem um documento por pessoa e artigo (`upsert`), o que torna o voto substituível e impede inflar a contagem. Os totais são calculados por agregação. Artigos de demonstração têm `dataOrigin: demo` e `demoKey`.
 
 ## Agregações gerenciais
 

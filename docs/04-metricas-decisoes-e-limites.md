@@ -89,6 +89,18 @@ O bloco **Incidentes compartilhados** da visão gerencial respeita a origem sele
 
 Esses números mostram o alcance de um problema. Não medem chamados evitados: não há como saber se a pessoa abriria um chamado sem o incidente. Também não medem tempo de resolução. Fonte: [incident.service.ts](../backend/src/services/incident.service.ts).
 
+## Qualidade do atendimento
+
+Seção da visão gerencial, com os mesmos filtros e período da página.
+
+- **Base (denominador):** resoluções comprovadas no período, as mesmas de "Resoluções no período" (evento v2 de resolução, uma por chamado e ciclo). Com filtro de analista, são as resoluções feitas por essa pessoa, nunca pelo responsável atual.
+- **Confirmadas / Contestadas:** resoluções da base em que o dono do chamado respondeu "sim" ou "o problema continua". Só contam eventos escritos pelo próprio solicitante do chamado.
+- **Sem resposta:** base − confirmadas − contestadas. Não é insatisfação.
+- **Taxa de resposta:** (confirmadas + contestadas) ÷ base; "—" sem base.
+- **Nota média:** média das avaliações de 1 a 5 dessas resoluções, com o número de avaliações ao lado; "—" sem avaliações. A avaliação é opcional e vem só depois de confirmar.
+
+"Reaberturas no período" continua contando só reaberturas feitas pela equipe; contestações aparecem aqui. Os números não identificam analistas individualmente na tela e não devem servir como avaliação de desempenho isolada: a nota reflete a experiência de quem respondeu, não toda a equipe.
+
 ## Decisões presentes no código
 
 As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, sem afirmar quais alternativas o autor considerou pessoalmente.
@@ -107,6 +119,11 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
 - **Paleta Slate + Teal em tokens CSS:** cores definidas uma vez em `:root`, com variante escura. Os pares de texto e fundo foram calculados acima de 4,5:1 e as bordas de campos acima de 3:1, nos dois temas; o E2E confere o contraste dos botões em cada execução. Situação nunca depende só de cor: selos têm texto e o status do incidente tem ponto e rótulo.
 - **Incidentes em coleções próprias:** a revisão do chamado não é usada para participações, então cliques de muitas pessoas não geram 409 no atendimento. O custo é não ter transação entre chamado e incidente, compensado pela reconciliação na leitura.
+- **Respostas do solicitante no histórico do chamado:** confirmar, avaliar e contestar são eventos do próprio chamado, escritos pelo mesmo `saveChanges` das outras ações. Herdam revisão, ciclo, autor e data do servidor, sem uma coleção paralela com regras próprias. Contestar é uma rota específica, não uma permissão geral de status.
+- **Respostas do formulário guiado em campo próprio:** `intake` guarda as respostas com o texto da pergunta, sem misturar com a descrição. Permite exibir para a TI, evoluir para filtros no futuro e manter chamados antigos válidos sem migração.
+- **Catálogo de perguntas no backend:** uma única definição valida a API e alimenta o formulário (`GET /tickets/intake-questions`), evitando duas versões da mesma regra.
+- **Busca de artigos por campo normalizado:** expressão regular escapada sobre título, resumo e corpo sem acentos, todas as palavras obrigatórias. Atende o volume de demonstração sem serviço externo; não ordena por relevância.
+- **Quadro sem arrastar e soltar:** cada mudança é um botão que chama a rota existente. Assim a justificativa obrigatória, a validação de transição, a revisão (409) e o uso por teclado são os mesmos da página do chamado.
 - **Formato público explícito:** o backend monta o objeto público do incidente e o chamado entregue ao solicitante campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
 
 ## Segurança e limites operacionais
@@ -119,7 +136,7 @@ CORS restringe origens configuradas; autenticação/autorização continuam resp
 
 MongoDB local roda sem autenticação, publicado somente em loopback. Produção exige configuração própria de banco e segredos. `.env` e variantes são ignorados pelo Git; `.env.example` tem apenas configuração e credenciais demonstrativas.
 
-Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
+Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema; o mesmo vale para a pergunta de confirmação da resolução. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
 

@@ -6,26 +6,32 @@
 
 ### Solicitante
 
-1. Entre com seu e-mail. A página **Início** mostra **Problemas conhecidos** (quando houver) e **Meus pedidos**.
-2. Se um problema conhecido também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se o problema passar, clique em **Não estou mais com esse problema**.
-3. Para outro problema, clique em **Solicitar suporte**. Antes do formulário aparecem os problemas conhecidos; eles não impedem o envio. Preencha **Assunto**, **O que aconteceu?**, **Tipo de problema** e **Prioridade sugerida**, e clique em **Enviar solicitação**.
-4. Após o envio, a página do pedido abre com a confirmação. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**. Enquanto ninguém iniciou o atendimento, **Editar chamado** permite corrigir o texto.
-5. Em **Meus pedidos**, acompanhe todos os pedidos. Quando a TI encerra um problema que você acompanhava, ele aparece em **Problemas que você acompanhou**, na página Início, como resolvido.
+1. **Buscar uma solução.** Na página **Início**, digite o problema em "Ex.: impressora, Wi-Fi, acesso" ou escolha um assunto. A **Central de ajuda** mostra as orientações publicadas; abra uma e responda **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**
+2. **Ver se é um problema conhecido.** Em **Problemas conhecidos**, se o problema também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se passar, clique em **Não estou mais com esse problema**.
+3. **Solicitar suporte.** Clique em **Solicitar suporte** (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio.
+4. **Responder às perguntas.** Em **Conte um pouco mais**, responda o que souber; todas são opcionais e podem ser limpas. Se trocar de assunto e voltar, as respostas continuam lá. Preencha **Assunto**, **O que aconteceu?** e **Prioridade sugerida** e clique em **Enviar solicitação**.
+5. **Acompanhar.** A página do pedido abre com a confirmação. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
+6. **Confirmar ou contestar a solução.** Quando a TI resolve, o pedido mostra **Seu problema foi resolvido?** (e a marca **Confirme se resolveu** na lista). **Sim, foi resolvido.** encerra; **Não, o problema continua.** pede o que continua acontecendo e devolve o pedido à TI.
+7. **Avaliar (opcional).** Depois de confirmar, escolha de 1 a 5 estrelas e, se quiser, escreva um comentário. **Agora não** pula a avaliação.
 
 ### Suporte TI
 
-1. A página **Atendimento** mostra os **Incidentes ativos** com o número de pessoas afetadas, as contagens da fila e os chamados recentes. **Ver fila de chamados** abre as pendências.
-2. Na lista **Chamados**, use os atalhos **Sem responsável**, **Atribuídos a mim** e **Em andamento**, a busca e os filtros. Chamados com incidente publicado têm a marca **Incidente · N pessoas afetadas**.
-3. No chamado, o bloco **Atendimento** permite escolher o responsável e **Atribuir**, ajustar categoria/prioridade com **Salvar classificação**, **Iniciar atendimento** e **Marcar como resolvido**. Algumas ações pedem motivo (reatribuição, prioridade durante o atendimento, resolução de chamado de outro responsável, reabertura).
-4. Quando o problema atinge mais pessoas, use **Publicar como incidente** no bloco **Incidente compartilhado** do chamado. Escreva um título e uma mensagem para os usuários, sem dados do chamado original, e clique em **Publicar incidente**. O bloco mostra o texto exatamente como os usuários o veem e quantas pessoas informaram que estão afetadas.
-5. **Editar comunicação** atualiza o texto público. Ao resolver o chamado, o incidente é encerrado automaticamente; **Encerrar incidente** permite encerrar antes, com uma mensagem de encerramento. Se o problema voltar, reabra o chamado e use **Republicar**.
+1. **Acessar a fila.** A página **Atendimento** mostra os **Incidentes ativos**, as contagens da fila e os atalhos **Ver fila de chamados** e **Ver quadro**.
+2. **Lista ou Quadro.** Em **Chamados**, alterne entre **Lista** e **Quadro**. Os atalhos (**Sem responsável**, **Atribuídos a mim**, **Em andamento**), a busca e os filtros valem para os dois. Marcas: **Incidente · N pessoas afetadas** e **Reaberto pelo solicitante**.
+3. **Atribuir e atender.** No quadro, use **Assumir**, **Iniciar atendimento** e **Resolver** nos cartões. No chamado, o bloco **Atendimento** permite escolher o responsável e **Atribuir**, ajustar categoria/prioridade com **Salvar classificação**, iniciar e resolver. Pedem motivo: reatribuição e prioridade durante o atendimento, resolução de chamado de outro responsável e reabertura.
+4. **Ler o pedido e corrigir a categoria.** **Informações do pedido** mostra o assunto escolhido, as respostas e o artigo consultado. Se a categoria estiver errada, corrija em **Salvar classificação**; a correção fica no histórico.
+5. **Publicar incidentes.** Em **Incidente compartilhado**, use **Publicar como incidente**, escreva título e mensagem para os usuários (sem dados do chamado) e clique em **Publicar incidente**. **Editar comunicação** atualiza o texto; resolver o chamado encerra o incidente; **Encerrar incidente** encerra antes; **Republicar** vale depois de reabrir o chamado.
+6. **Gerenciar artigos.** Em **Base de conhecimento**, **Novo artigo** abre o editor com pré-visualização. Escolha **Rascunho**, **Publicado** ou **Arquivado**; só os publicados aparecem para os solicitantes. A lista mostra quantas pessoas disseram que cada artigo ajudou ou não.
+7. **Resolver.** Ao marcar como resolvido, o solicitante recebe a pergunta **Seu problema foi resolvido?**. Uma contestação volta para a fila em atendimento, com o motivo no histórico.
 
 ### Gestor
 
-1. O login abre a **Visão gerencial**. Escolha o **Período** (e a **Origem dos dados**, presente só no modo demonstração); **Filtros de equipe e classificação** refinam por analista, solicitante, categoria, prioridade e status.
-2. **Precisa de atenção** reúne alertas que abrem a fila correspondente. **Equipe de suporte** e **Carga por responsável e prioridade** mostram a distribuição atual; **Ver chamados** abre a fila do analista.
-3. **Incidentes compartilhados** mostra quantos estão ativos, quantas pessoas estão afetadas, novas adesões em 30 dias, encerrados e os incidentes com mais afetados, com link para o chamado principal.
-4. Pelos menus **Atendimento** e **Chamados**, o gestor opera chamados como a TI: assume, atribui, classifica, resolve, reabre e publica incidentes. O texto de chamados de outras pessoas continua restrito ao autor.
+1. **Consultar indicadores.** O login abre a **Visão gerencial**. Escolha o **Período** (e a **Origem dos dados**, presente só no modo demonstração); **Filtros de equipe e classificação** refinam por analista, solicitante, categoria, prioridade e status.
+2. **Identificar alertas.** **Precisa de atenção** reúne alta prioridade sem responsável, pendências antigas e sem movimentação; cada alerta abre a fila correspondente.
+3. **Acompanhar analistas.** **Equipe de suporte** e **Carga por responsável e prioridade** mostram a distribuição atual; **Ver chamados** abre a fila do analista.
+4. **Consultar incidentes.** **Incidentes compartilhados** mostra ativos, pessoas afetadas, novas adesões em 30 dias, encerrados e os incidentes com mais afetados.
+5. **Ver a qualidade do atendimento.** **Qualidade do atendimento** mostra, para as resoluções do período, quantas foram confirmadas, contestadas ou ficaram sem resposta, a taxa de resposta e a nota média. Use como sinal; não é avaliação individual.
+6. **Operar chamados.** Pelos menus **Atendimento** e **Chamados** (Lista ou Quadro), o gestor opera como a TI: assume, atribui, classifica, resolve, reabre, publica incidentes e gerencia artigos. O texto de chamados de outras pessoas continua restrito ao autor.
 
 Filtros na lista ficam na URL e sobrevivem a recarregamentos e ao botão Voltar do navegador. Ao abrir um chamado pela lista, o link explícito do detalhe restaura a URL dessa fila, incluindo filtros e página. Acesso direto ao detalhe usa `/tickets` como fallback.
 
@@ -46,10 +52,11 @@ stateDiagram-v2
   [*] --> aberto: Usuário autenticado cria
   aberto --> em_andamento: TI ou gestor inicia
   em_andamento --> resolvido: TI ou gestor resolve
-  resolvido --> em_andamento: TI ou gestor reabre
+  resolvido --> em_andamento: TI ou gestor reabre, ou o solicitante contesta
+  resolvido --> resolvido: solicitante confirma (e avalia)
 ```
 
-TI e gestor mudam status. Não há transição direta de aberto para resolvido nem retorno ao estado aberto. Transição inválida retorna 409.
+TI e gestor mudam status. O solicitante só responde à resolução do próprio chamado, por rotas próprias: confirmar mantém o status; contestar reabre em novo ciclo, com motivo. Não há transição direta de aberto para resolvido nem retorno ao estado aberto. Transição inválida retorna 409.
 
 Ao passar para `em_andamento`, inclusive ao reabrir, o operador autenticado assume automaticamente se o chamado estiver sem responsável; uma atribuição existente é preservada. Enquanto não resolvido, TI e gestor podem atribuir ou trocar o responsável, reclassificar categoria e prioridade. A API atual não remove o responsável.
 
@@ -84,6 +91,10 @@ Base local: `http://localhost:3000/api`. Rotas autenticadas exigem `Authorizatio
 | GET | `/dashboard/summary` | Escopo autorizado; `dataOrigin?` → `{ summary }` |
 | GET | `/dashboard/manager` | Somente gestor; filtros gerenciais → `{ dashboard }` |
 | GET / POST | `/tickets/:id/incident` | TI/gestor; consulta (`{ incident }` ou `null`) ou publica `{ title, publicMessage }` → 201 |
+| GET | `/tickets/intake-questions` | Qualquer perfil; catálogo de perguntas por categoria → `{ questions }` |
+| POST | `/tickets/:id/resolution/confirm` | Só o dono; `{ cycleId }`; repetir não cria outro evento |
+| POST | `/tickets/:id/resolution/contest` | Só o dono; `{ cycleId, reason }` (5–1000); reabre em novo ciclo |
+| POST | `/tickets/:id/resolution/rating` | Só o dono, depois de confirmar; `{ cycleId, rating (1–5), comment? (até 500) }` |
 
 Lista aceita `dataOrigin` (`operational`/`demo`/`legacy`), `status`, `priority`, `category`, `assignee` (`none`/`me`), `search` por título, `page` (padrão 1) e `limit` (padrão 10, máximo 50). Pesquisa tem limite de 100 caracteres. O frontend oferece filtro de responsável para TI e gestor. IDs inválidos retornam 400. `assigneeId` permite consultar responsável específico para TI/gestor; `requesterId` filtra solicitante sem ampliar o escopo autorizado. Solicitante não pode consultar outros IDs. `pending=true` restringe a abertos/em andamento; combinado com status resolvido retorna fila vazia.
 
@@ -106,6 +117,27 @@ Rotas em `/api/incidents`, todas autenticadas. Regras e motivos em [produto e re
 | POST | `/incidents/:id/republish` | TI/gestor; `{ title, publicMessage, expectedRevision }`, somente encerrado e com chamado não resolvido |
 
 Entrar duas vezes devolve 200 com a mesma contagem. O corpo de participação não aceita `userId`: enviar campos extras retorna 400. A lista de chamados inclui `incident: { id, status, affectedCount }` apenas para TI/gestor. Publicar em chamado resolvido, publicar de novo no mesmo chamado ou usar uma revisão antiga retorna 409.
+
+### Base de conhecimento
+
+Rotas em `/api/articles`, todas autenticadas. Regras em [produto e regras](01-produto-e-regras.md#base-de-conhecimento).
+
+| Método | Rota | Acesso e contrato |
+|---|---|---|
+| GET | `/articles` | Todos; só publicados; `q?` (até 100), `category?`, `page`, `limit` (até 20) → `{ articles, pagination }`, sem o corpo |
+| GET | `/articles/:id` | Publicado para todos; rascunho/arquivado só para TI/gestor, senão 404 → `{ article }` com corpo e `myFeedback` |
+| PUT | `/articles/:id/feedback` | Todos; `{ helpful: boolean }`; uma resposta por pessoa, substituível; só publicados |
+| GET | `/articles/manage` | TI/gestor; mesmos filtros e `status?` → artigos com situação, autoria e totais de "ajudou" |
+| POST | `/articles` | TI/gestor; `{ title, summary, category, body, status? }` (padrão `draft`) → 201 |
+| PATCH | `/articles/:id` | TI/gestor; campos opcionais e `expectedRevision`; revisão antiga → 409 |
+
+### Criação com o formulário guiado
+
+`POST /tickets` aceita `intake?: { answers: [{ key, answer }], articleId? }`. As respostas são validadas contra o catálogo da categoria enviada; `articleId` precisa ser de um artigo publicado. O chamado devolve `intake` (assunto, respostas com o texto da pergunta e artigo) ou `null`. A lista e o detalhe também trazem, para o solicitante, `awaitingConfirmation` e `resolutionFeedback`; para a equipe, `contested` e `resolutionFeedback` com comentário.
+
+### Quadro (Kanban)
+
+O quadro não tem rota própria: cada coluna chama `GET /tickets` com os filtros da URL, o `status` da coluna e `limit=20`, e "Carregar mais" pede a página seguinte. O contador mostra cartões carregados e total filtrado. As ações dos cartões chamam as mesmas rotas de status e atribuição, com a revisão do cartão: conflito retorna 409 e o quadro recarrega. Com filtro de status, só a coluna correspondente aparece, como na lista. Não há arrastar e soltar: um botão por ação mantém justificativa, validação de transição e uso por teclado sem um segundo mecanismo.
 
 ### Filtros dos alertas e do período de criação
 

@@ -8,13 +8,29 @@ Evidências para acompanhar o roteiro: [login e operação por perfil](03-fluxos
 
 - [ ] Docker Desktop iniciado (quando o MongoDB roda pelo Compose); API em `http://localhost:3000`; frontend em `http://localhost:5173`. Habilitar as configurações locais `DEMO_MODE=true` e `VITE_DEMO_MODE=true`, reiniciar os serviços e selecionar origem Demonstração para os exemplos.
 - [ ] `.env` configurado conforme README, com JWT_SECRET preenchido e origens CORS corretas.
-- [ ] `npm run seed` executado em backend; opcionalmente `npm run seed:demo` para exemplos e `npm run seed:incidents` para o incidente de demonstração.
+- [ ] `npm run seed` executado em backend; opcionalmente `npm run seed:demo` para exemplos `npm run seed:incidents` para o incidente de demonstração e `npm run seed:articles` para os artigos de ajuda.
 - [ ] Credenciais dos três perfis disponíveis. Seed não muda senha/papel de um usuário existente.
 - [ ] Executar os comandos de testes, typecheck, lint e builds do README.
 - [ ] Deixar tempo para ensaiar e demonstrar persistência; evitar `docker compose down -v`, que apaga o volume.
 - [ ] Não exibir JWT_SECRET, tokens, hashes ou credenciais reais em capturas ou terminal.
 
 As caixas representam ações para a apresentação, não uma alegação de que todas já foram realizadas manualmente. Dados do seed são exemplos identificados como demonstração.
+
+## Roteiro da história central — cerca de 8 minutos
+
+**O solicitante procura ajuda, escolhe um assunto, encontra uma orientação ou um incidente, abre um pedido quando necessário; a TI atende pela lista ou pelo quadro; o solicitante confirma se funcionou; o gestor acompanha a equipe e a qualidade.**
+
+Pré-requisitos: modo demonstração ligado e, em `backend`, `npm run seed`, `npm run seed:demo`, `npm run seed:incidents` e `npm run seed:articles`.
+
+1. **Encontrar ajuda (Mariana).** Em Início, buscar "impressora" e abrir **O que fazer quando a impressora não responde**. Clicar em **Ainda preciso de ajuda.**: o pedido abre com **Computador ou equipamento** marcado e a orientação como contexto, removível.
+2. **Escolher o assunto.** Trocar para **Internet e conexão**: aparecem o problema conhecido de Wi-Fi e a orientação de rede. Responder **Wi-Fi**, **Está instável ou lenta** e, em "Outras pessoas também estão com esse problema?", **Sim**: o formulário sugere acompanhar o incidente. Clicar em **Também estou com esse problema** mostra o caminho sem pedido.
+3. **Abrir um pedido mesmo assim.** Voltar para **Computador ou equipamento** (as respostas continuam), preencher e enviar. A página do pedido mostra **Informações do pedido** com as respostas.
+4. **Atender pelo quadro (Carlos).** Em Atendimento, **Ver quadro**. Encontrar o pedido em Abertos, **Assumir** e **Iniciar atendimento**; abrir o detalhe e corrigir a categoria se preciso. Voltar ao quadro e **Resolver**. Num chamado de outro responsável, mostrar que **Resolver** pede justificativa.
+5. **Confirmar ou contestar (Mariana).** O pedido tem **Confirme se resolveu**. Responder **Não, o problema continua.** com um motivo: volta para Carlos com **Reaberto pelo solicitante**. Carlos resolve de novo; Mariana responde **Sim, foi resolvido.** e dá 4 estrelas.
+6. **Acompanhar (Ana).** Na Visão gerencial, origem **Demonstração** (as contas do seed geram dados de demonstração, separados dos operacionais): ver **Qualidade do atendimento** e **Incidentes compartilhados**; abrir um alerta para chegar à fila.
+7. **Base de conhecimento (Carlos ou Ana).** Em **Base de conhecimento**, abrir um artigo, editar o resumo e ver a pré-visualização; mudar para **Arquivado** e confirmar, como Mariana, que ele some da busca.
+
+Os pedidos criados nesta demonstração ficam no banco local como dados de demonstração. Nenhum passo apaga dados.
 
 ## Roteiro sugerido — cerca de 6 minutos
 
@@ -65,13 +81,20 @@ Para repetir a demonstração, reabra o chamado (com motivo) e use **Republicar*
 | Dashboard | `dashboard.test.ts`, `permissions.test.ts` e `manager.test.ts`; períodos/fuso, ranking, autor real, ciclos, origens e acesso exclusivo; E2E verifica filtros e três reloads do básico por perfil |
 | Rate limit e hardening | `security.test.ts`, incluindo 429, isolamento de outras rotas, ausência de X-Powered-By e limite JSON |
 | Incidentes compartilhados | `incidents.test.ts` (27 testes): permissões, formato público, participação idempotente e simultânea, concorrência, encerramento, reconciliação (inclusive com falha de gravação simulada e reabertura antes da leitura), corridas entre publicação/republicação e resolução, reabertura e republicação; E2E: TI publica pela UI, marca na fila, solicitante entra/sai/volta com contagem exata, gestor vê o impacto, resolução encerra para todos |
+| Base de conhecimento | `articles.test.ts` (11 testes): permissões, validação e campos aceitos, revisão, rascunhos e arquivados ocultos, busca sem acento por título/conteúdo, categoria, paginação, caracteres literais, texto guardado sem interpretação e votos únicos e substituíveis sem identidade; E2E: TI publica pelo editor, solicitante busca, lê (marcação exibida como texto, nunca executada), vota e não vê rascunho |
+| Classificação orientada | `intake.test.ts` (11 testes): catálogo, nenhuma pergunta de senha, respostas guardadas fora da descrição, descarte de vazias, rejeição de pergunta/opção de outro assunto, prioridade intocada, artigo só se publicado, chamados antigos, correção de categoria auditada e filtro, incidente com assunto; E2E: "Ainda preciso de ajuda" leva assunto e artigo, respostas sobrevivem à troca de assunto, pedido guarda descrição e respostas |
+| Confirmação de resolução | `resolution.test.ts` (10 testes): só o dono responde, validação, confirmação repetida/simultânea, avaliação única, contestação com motivo e novo ciclo, contestação simultânea, ciclo antigo, reabertura pela TI antes da resposta, indicadores de qualidade; E2E: contestação, marca na fila, nova resolução, confirmação e avaliação |
+| Kanban | E2E: colunas e totais iguais aos da lista, filtros preservados entre Lista e Quadro, iniciar atendimento por teclado, resolução de outro responsável com justificativa, conflito 409 com cartão antigo, 390 px |
+| Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
 | Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, capturas claro/escuro e contraste de texto dos botões; não substitui auditoria completa de acessibilidade/responsividade |
 
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
 
-Em **15/10/2026**, na branch de incidentes compartilhados: **156 testes backend** e **115 verificações E2E** aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown, 14 capturas PNG e as 15 variáveis dos exemplos, preservando as seis credenciais públicas. Os quatro diagramas Mermaid foram revisados manualmente contra a implementação; o diagrama de coleções inclui as duas coleções de incidentes.
+Em **15/10/2026**, após base de conhecimento, classificação orientada, confirmação de resolução e quadro: **188 testes backend** e **141 verificações E2E** aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown e 19 capturas PNG.
+
+Na mesma data, antes desses complementos: 156 testes backend e 115 verificações E2E aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown, 14 capturas PNG e as 15 variáveis dos exemplos, preservando as seis credenciais públicas. Os quatro diagramas Mermaid foram revisados manualmente contra a implementação; o diagrama de coleções inclui as duas coleções de incidentes.
 
 Em **10/10/2026**, na etapa anterior: 124 testes backend e 104 verificações E2E aprovados.
 
@@ -128,7 +151,7 @@ Os testes gerenciais validam seed idempotente, preservação de documentos anter
 
 ## Capturas reproduzíveis
 
-As 14 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores. Desktop usa viewport 1440 × 900 e mobile 390 × 844, tema claro. As páginas iniciais dos três perfis, a do solicitante no celular e o gestor mobile usam captura de página inteira; sua altura PNG é maior que a viewport. [capture-info.json](assets/screenshots/capture-info.json) registra rotas, viewports, origem, instante, dimensões da imagem, título, cabeçalho e identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício; não é uma credencial.
+As 19 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores. Desktop usa viewport 1440 × 900 e mobile 390 × 844, tema claro. As páginas iniciais dos três perfis, a do solicitante no celular e o gestor mobile usam captura de página inteira; sua altura PNG é maior que a viewport. [capture-info.json](assets/screenshots/capture-info.json) registra rotas, viewports, origem, instante, dimensões da imagem, título, cabeçalho e identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício; não é uma credencial.
 
 Para conferir somente a documentação, em `backend`:
 
@@ -147,7 +170,23 @@ O script usa Edge/Chrome headless instalado, Node/WebSocket e um perfil temporá
 
 A captura aguarda dados e gráficos renderizados e rejeita estados visíveis de erro, modal ou carregamento. Não execute em produção. Respeite o limite de dez logins por IP em quinze minutos ao repetir. Se necessário, defina E2E_BROWSER_PATH com o executável local. A ferramenta substitui as imagens da documentação; revise-as antes de qualquer commit.
 
-O README apresenta as páginas iniciais dos três perfis e o incidente. As demais imagens ficam nos documentos técnicos.
+O README apresenta as páginas iniciais dos três perfis. As capturas das funcionalidades estão abaixo; as demais, nos documentos técnicos.
+
+### Capturas das funcionalidades
+
+![Central de ajuda com busca, assuntos e orientações publicadas](assets/screenshots/central-ajuda-desktop.png)
+
+![Artigo de ajuda sobre Wi-Fi com a pergunta "A orientação ajudou?"](assets/screenshots/artigo-desktop.png)
+
+![Formulário com o assunto Internet e conexão escolhido e o problema conhecido sobre Wi-Fi](assets/screenshots/abertura-chamado-desktop.png)
+
+![Perguntas contextuais do assunto Internet e conexão, antes dos campos do pedido](assets/screenshots/perguntas-contextuais-desktop.png)
+
+![Pedido resolvido com a pergunta "Seu problema foi resolvido?"](assets/screenshots/confirmacao-resolucao-desktop.png)
+
+![Quadro da TI com as colunas Abertos, Em andamento e Resolvidos](assets/screenshots/quadro-ti-desktop.png)
+
+A confirmação de resolução é apenas exibida na captura, sem resposta; o formulário não é enviado.
 
 Para refazer somente as três páginas iniciais e o gestor mobile, mantendo as outras evidências:
 

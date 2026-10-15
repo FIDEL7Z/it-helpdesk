@@ -35,6 +35,18 @@ Reabertura exige motivo, incrementa `activeCycleId` e limpa essas projeções do
 
 Chamados legados sem esses campos não recebem autor/data de resolução presumidos. A interface direciona ao histórico quando não há projeção estruturada. Eventos sem autor/data retornam null, exibidos como não registrados; IDs existentes continuam disponíveis mesmo se o usuário tiver sido removido.
 
+## Resposta do solicitante à resolução
+
+A confirmação (`resolution_confirmed`), a avaliação (`resolution_rated`, com nota e comentário em `audit.to`) e a contestação (`reopened` com `from.cycleId` e `to.contestedCycle`, e o motivo em `audit.reason`) são eventos v2 do próprio chamado, com o solicitante como `actorId` e `actorSnapshot`. A identidade vem do token; o corpo não aceita usuário.
+
+Cada resposta indica o ciclo da resolução. O servidor só aceita a resolução do ciclo atual, com o chamado ainda resolvido, e grava com a revisão lida, como as demais ações: duas respostas simultâneas não passam juntas, e uma resposta a um ciclo antigo, ou depois de a TI reabrir, recebe 409. A contestação preserva o evento de resolução, seu autor e a justificativa; `resolvedAt`/`resolvedBy` são limpos como em qualquer reabertura.
+
+Os indicadores de atividade operacional e de reaberturas por operador consideram só ações de TI e gestor; as respostas do solicitante entram apenas na seção de qualidade.
+
+## Artigos da base de conhecimento
+
+Artigos guardam autor, último editor, data da primeira publicação e revisão, mas não um histórico de versões: editar substitui o texto anterior. Votos de "ajudou" não geram eventos, como as participações em incidentes.
+
 ## Eventos dos incidentes compartilhados
 
 Cada incidente guarda seu próprio `history[]`, fora do chamado. Os eventos são `published`, `updated`, `closed` e `republished`, com `actorId`, `actorSnapshot` (nome e papel), data, revisão do incidente, ciclo e os valores `from`/`to` alterados. Editar sem mudar o texto não gera evento.
@@ -61,7 +73,7 @@ Histórico embutido continua sujeito ao limite de tamanho do documento MongoDB. 
 
 ## Verificação
 
-`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. `incidents.test.ts` cobre permissões, campos aceitos, publicação simultânea, formato público sem dados privados, participação repetida e simultânea, saída e retorno, edição concorrente, encerramento pela resolução (com autor), reconciliação de um encerramento perdido, reabertura, republicação e chamados legados. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil, viewport de 390 px e o fluxo de incidente entre TI, solicitante e gestor.
+`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. `incidents.test.ts` cobre permissões, campos aceitos, publicação simultânea, formato público sem dados privados, participação repetida e simultânea, saída e retorno, edição concorrente, encerramento pela resolução (com autor), reconciliação de um encerramento perdido, reabertura, republicação e chamados legados. `resolution.test.ts` cobre quem pode responder, validação, confirmação repetida e simultânea, avaliação única, contestação com motivo e novo ciclo, contestação simultânea, ciclo antigo, reabertura pela TI antes da resposta e os indicadores de qualidade. `articles.test.ts` e `intake.test.ts` cobrem permissões, rascunhos, busca, votos, perguntas e artigo consultado. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil, viewport de 390 px, o fluxo de incidente entre TI, solicitante e gestor, a contestação e confirmação da resolução e as ações do quadro com justificativa e conflito 409.
 
 ## Evidência visual da autoria
 

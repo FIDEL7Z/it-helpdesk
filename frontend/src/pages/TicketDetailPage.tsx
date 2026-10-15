@@ -97,12 +97,14 @@ export function TicketDetailPage() {
   }
 
   const { ticket } = state
+  // Requesters read "pedidos"; the team keeps "chamados".
+  const queueName = can(user?.role, 'tickets:view-all') ? 'chamados' : 'meus pedidos'
 
   if (!ticket) {
     return (
       <section className="page">
         <Link to={returnTo} className="back-link">
-          ← Voltar para chamados
+          ← Voltar para {queueName}
         </Link>
         {loading ? (
           <div className="card card--empty" role="status">
@@ -113,7 +115,7 @@ export function TicketDetailPage() {
           <div className="card card--empty">
             <p>{state.error}</p>
             <Link to={returnTo} className="button button--secondary">
-              Ver meus chamados
+              Ver {queueName}
             </Link>
           </div>
         )}
@@ -133,7 +135,7 @@ export function TicketDetailPage() {
     <section className="page">
       <header className="page__header">
         <Link to={returnTo} className="back-link">
-          ← Voltar para chamados
+          ← Voltar para {queueName}
         </Link>
         <div className="ticket-heading">
           <h1 className="page__title">{ticket.title}</h1>

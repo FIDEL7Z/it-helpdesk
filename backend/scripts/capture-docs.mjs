@@ -168,8 +168,24 @@ async function run() {
   await go('/dashboard', requesterHome);
   await delay(150); await capture('dashboard-solicitante-desktop.png', null, true);
   if (!profilesOnly) {
-  await go('/tickets/new', '!!document.getElementById("title") && !!document.querySelector(".incident-card")');
+  // Help center and an article, read only.
+  await go('/help', '!!document.querySelector(".article-card") && !document.querySelector(".spinner")');
+  await capture('central-ajuda-desktop.png');
+  const apiGet = (path) => evaluate(`(async () => { const response = await fetch('http://localhost:3000/api' + ${JSON.stringify(path)}, { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); return response.json(); })()`);
+  const wifiArticle = (await apiGet('/articles?q=wi-fi')).articles[0];
+  if (!wifiArticle) throw new Error('No Wi-Fi help article: run npm run seed:articles first');
+  await go(`/help/${wifiArticle.id}`, '!!document.querySelector(".article-feedback")');
+  await capture('artigo-desktop.png');
+  // Guided form for "Internet e conexão": subject, known problem, articles and questions. Nothing is sent.
+  await go('/tickets/new?category=rede', '!!document.querySelector(".guided-questions") && !!document.querySelector(".incident-card")');
   await capture('abertura-chamado-desktop.png');
+  await capture('perguntas-contextuais-desktop.png', '.guided-questions');
+  // "Seu problema foi resolvido?" on a fictitious resolved request; the question is only shown, not answered.
+  const awaiting = (await apiGet('/tickets?status=resolvido&dataOrigin=demo&limit=50')).tickets
+    .find((ticket) => ticket.awaitingConfirmation && ticket.title.startsWith('[DEMO GERENCIAL v1]'));
+  if (!awaiting) throw new Error('No demo resolution waiting for confirmation');
+  await go(`/tickets/${awaiting.id}`, '!!document.querySelector(".resolution-answer")');
+  await capture('confirmacao-resolucao-desktop.png');
   // The only write in this script: follow the demo incident for one capture, then leave it,
   // so the requester's public state ends as it started. Tickets and users are not touched.
   await go('/dashboard', requesterHome);
@@ -198,6 +214,8 @@ async function run() {
   if (!profilesOnly) {
   await go('/tickets?dataOrigin=demo&search=%5BDEMO%20GERENCIAL%20v1%5D', '!!document.querySelector(".ticket-table tbody tr") && !document.querySelector("[aria-busy=true]")');
   await capture('lista-chamados-desktop.png');
+  await go('/tickets?view=board&dataOrigin=demo&search=%5BDEMO%20GERENCIAL%20v1%5D', 'document.querySelectorAll(".board-column").length === 3 && !!document.querySelector(".board-card") && !document.querySelector("[aria-busy=true]")');
+  await capture('quadro-ti-desktop.png');
   const selected = await evaluate(`(async () => { const response = await fetch('http://localhost:3000/api/tickets?dataOrigin=demo&search=' + encodeURIComponent('[DEMO GERENCIAL v1]') + '&limit=50', { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); const data = await response.json(); return data.tickets.find(ticket => ticket.status === 'resolvido' && ticket.resolvedById !== ticket.assigneeId)?.id; })()`);
   if (!selected) throw new Error('No explicit structured cross-assignee demo resolution exists');
   await go(`/tickets/${selected}`, '!!document.querySelector(".timeline")');

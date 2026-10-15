@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-15T10:29:43.906Z",
+  "capturedAt": "2026-10-15T16:15:43.508Z",
   "timezone": "America/Fortaleza",
   "origin": "demo",
   "mode": "read-only",
@@ -15,7 +15,7 @@
       "path": "/login",
       "title": "Entrar · IT Helpdesk",
       "heading": "Entrar",
-      "capturedAt": "2026-10-15T10:29:38.412Z",
+      "capturedAt": "2026-10-15T16:15:35.363Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -36,11 +36,53 @@
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-15T10:29:39.478Z",
+      "capturedAt": "2026-10-15T16:15:36.312Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
-        "height": 1262
+        "height": 1426
+      }
+    },
+    {
+      "file": "central-ajuda-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/help",
+      "title": "Central de ajuda · IT Helpdesk",
+      "heading": "Encontre uma solução",
+      "user": {
+        "id": "6ac9664c2dd387cb5e9d57ab",
+        "name": "Mariana Souza",
+        "role": "solicitante"
+      },
+      "capturedAt": "2026-10-15T16:15:36.548Z",
+      "fullPage": false,
+      "imageDimensions": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "artigo-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/help/6ad0f3d21a737ba8b6593766",
+      "title": "Como verificar problemas de Wi-Fi · IT Helpdesk",
+      "heading": "Como verificar problemas de Wi-Fi",
+      "user": {
+        "id": "6ac9664c2dd387cb5e9d57ab",
+        "name": "Mariana Souza",
+        "role": "solicitante"
+      },
+      "capturedAt": "2026-10-15T16:15:36.974Z",
+      "fullPage": false,
+      "imageDimensions": {
+        "width": 1440,
+        "height": 900
       }
     },
     {
@@ -49,7 +91,7 @@
         "width": 1440,
         "height": 900
       },
-      "path": "/tickets/new",
+      "path": "/tickets/new?category=rede",
       "title": "Solicitar suporte · IT Helpdesk",
       "heading": "Solicitar suporte",
       "user": {
@@ -57,7 +99,49 @@
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-15T10:29:39.697Z",
+      "capturedAt": "2026-10-15T16:15:37.480Z",
+      "fullPage": false,
+      "imageDimensions": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "perguntas-contextuais-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets/new?category=rede",
+      "title": "Solicitar suporte · IT Helpdesk",
+      "heading": "Solicitar suporte",
+      "user": {
+        "id": "6ac9664c2dd387cb5e9d57ab",
+        "name": "Mariana Souza",
+        "role": "solicitante"
+      },
+      "capturedAt": "2026-10-15T16:15:37.610Z",
+      "fullPage": false,
+      "imageDimensions": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "confirmacao-resolucao-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets/7b24c4208d0eff75e8940a12",
+      "title": "[DEMO GERENCIAL v1] 2026-10 · Caso 23 · IT Helpdesk",
+      "heading": "[DEMO GERENCIAL v1] 2026-10 · Caso 23",
+      "user": {
+        "id": "6ac9664c2dd387cb5e9d57ab",
+        "name": "Mariana Souza",
+        "role": "solicitante"
+      },
+      "capturedAt": "2026-10-15T16:15:37.895Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -78,7 +162,7 @@
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-15T10:29:40.059Z",
+      "capturedAt": "2026-10-15T16:15:38.381Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -99,11 +183,11 @@
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-15T10:29:40.585Z",
+      "capturedAt": "2026-10-15T16:15:39.058Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
-        "height": 1731
+        "height": 2064
       }
     },
     {
@@ -120,7 +204,7 @@
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-15T10:29:41.420Z",
+      "capturedAt": "2026-10-15T16:15:39.817Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
@@ -141,7 +225,28 @@
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-15T10:29:41.641Z",
+      "capturedAt": "2026-10-15T16:15:40.117Z",
+      "fullPage": false,
+      "imageDimensions": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "file": "quadro-ti-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "path": "/tickets?view=board&dataOrigin=demo&search=%5BDEMO%20GERENCIAL%20v1%5D",
+      "title": "Chamados · IT Helpdesk",
+      "heading": "Chamados",
+      "user": {
+        "id": "6ac9664c2dd387cb5e9d57aa",
+        "name": "Carlos Andrade",
+        "role": "ti"
+      },
+      "capturedAt": "2026-10-15T16:15:40.506Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -162,7 +267,7 @@
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-15T10:29:41.904Z",
+      "capturedAt": "2026-10-15T16:15:40.804Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -183,7 +288,7 @@
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-15T10:29:42.154Z",
+      "capturedAt": "2026-10-15T16:15:41.202Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -204,11 +309,11 @@
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-15T10:29:43.439Z",
+      "capturedAt": "2026-10-15T16:15:42.875Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
-        "height": 3849
+        "height": 4110
       }
     },
     {
@@ -225,7 +330,7 @@
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-15T10:29:43.532Z",
+      "capturedAt": "2026-10-15T16:15:42.975Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -246,7 +351,7 @@
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-15T10:29:43.615Z",
+      "capturedAt": "2026-10-15T16:15:43.076Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -267,7 +372,7 @@
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-15T10:29:43.697Z",
+      "capturedAt": "2026-10-15T16:15:43.188Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -288,11 +393,11 @@
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-15T10:29:43.906Z",
+      "capturedAt": "2026-10-15T16:15:43.508Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
-        "height": 6036
+        "height": 6836
       }
     }
   ]

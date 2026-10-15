@@ -64,8 +64,8 @@ for (const file of ['backend/.env.example', 'frontend/.env.example']) {
 const manifest = JSON.parse(readFileSync('docs/assets/screenshots/capture-info.json', 'utf8'));
 assert.equal(manifest.origin, 'demo');
 assert.equal(manifest.mode, 'read-only');
-assert.equal(manifest.captures.length, 14);
-assert.equal(new Set(manifest.captures.map(capture => capture.file)).size, 14);
+assert.equal(manifest.captures.length, 19);
+assert.equal(new Set(manifest.captures.map(capture => capture.file)).size, 19);
 for (const capture of manifest.captures) {
   assert.equal(capture.file, capture.file.split('/').pop());
   const png = readFileSync(`docs/assets/screenshots/${capture.file}`);

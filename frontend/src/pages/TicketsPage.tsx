@@ -5,6 +5,7 @@ import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
+import { TicketBoard } from '../components/TicketBoard'
 import {
   ASSIGNEE_FILTERS,
   ASSIGNEE_FILTER_LABELS,
@@ -93,11 +94,15 @@ export function TicketsPage() {
   const seesAllTickets = can(user?.role, 'tickets:view-all')
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
+  // Lista | Quadro: the team chooses; the choice lives in the URL with the filters.
+  const view = seesAllTickets && searchParams.get('view') === 'board' ? 'board' : 'list'
   const hasFilters = Boolean(
     filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && filters.dataOrigin) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
 
   useEffect(() => {
+    // The board loads its own columns.
+    if (new URLSearchParams(queryKey).get('view') === 'board') return
     const controller = new AbortController()
 
     listTickets(readFilters(new URLSearchParams(queryKey)), controller.signal)
@@ -129,7 +134,15 @@ export function TicketsPage() {
   }
 
   function clearFilters() {
-    setSearchParams(new URLSearchParams())
+    setSearchParams(view === 'board' ? new URLSearchParams({ view: 'board' }) : new URLSearchParams())
+  }
+
+  function setView(next: 'list' | 'board') {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'board') params.set('view', 'board')
+    else params.delete('view')
+    params.delete('page')
+    setSearchParams(params)
   }
 
   const firstItem = pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
@@ -165,6 +178,13 @@ export function TicketsPage() {
       {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
       {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
       {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
+
+      {seesAllTickets && (
+        <div className="view-toggle" role="group" aria-label="Forma de exibição">
+          <button type="button" className="view-toggle__option" aria-pressed={view === 'list'} onClick={() => setView('list')}>Lista</button>
+          <button type="button" className="view-toggle__option" aria-pressed={view === 'board'} onClick={() => setView('board')}>Quadro</button>
+        </div>
+      )}
 
       <div className="toolbar">
         {/* Remounted when the URL search changes (e.g. back button, clear filters). */}
@@ -220,6 +240,9 @@ export function TicketsPage() {
           </select>
         </div>}
 
+      {view === 'board' ? (
+        <TicketBoard filters={filters} returnTo={location.pathname + location.search} />
+      ) : (<>
       {error ? (
         <div className="alert alert--error" role="alert">
           <p>{error}</p>
@@ -366,6 +389,7 @@ export function TicketsPage() {
           </div>
         </nav>
       )}
+      </>)}
     </section>
   )
 }

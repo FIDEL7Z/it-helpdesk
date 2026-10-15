@@ -465,6 +465,8 @@ async function run() {
   const { SharedIncidentModel, IncidentParticipationModel } = await import('../src/models/incident.model.ts');
   await Promise.all([SharedIncidentModel.syncIndexes(), IncidentParticipationModel.syncIndexes()]);
   const outage = await ticket('Rede do terceiro andar fora do ar', other, 'em_andamento', users.ti);
+  const boardOpen = await ticket('Quadro: monitor piscando', other);
+  const boardOther = await ticket('Quadro: atribuído ao Carlos', other, 'em_andamento', secondAnalyst);
   const login = async (role) => {
     await go(`/login?incidents=${role}`);
     await waitDom(`${role} incident login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
@@ -515,6 +517,43 @@ async function run() {
   check(true, 'TI writes and publishes a help article through the editor');
   const draft = await browserApi('POST', '/articles', { title: 'Rascunho interno de VPN', summary: 'Texto ainda em revisão pela equipe.', category: 'rede', body: 'Rascunho que os solicitantes não podem ler nem encontrar.', status: 'draft' });
   check(draft.status === 201, 'TI saves a draft article');
+  // Kanban (Quadro), same TI session: same data and rules as the list, explicit actions only.
+  const cardOf = (title) => `Array.from(document.querySelectorAll('.board-card')).find(card => card.querySelector('.board-card__title').textContent === ${JSON.stringify(title)})`;
+  const columnOf = (title) => `(${cardOf(title)}?.closest('.board-column')?.className ?? '')`;
+  const cardButton = (title, text) => `Array.from(${cardOf(title)}?.querySelectorAll('button') ?? []).find(el => el.textContent.trim() === ${JSON.stringify(text)})`;
+  await go('/tickets?view=board&search=Quadro');
+  await waitDom('board loaded', `${columnOf('Quadro: monitor piscando')}.includes('board-column--aberto') && ${columnOf('Quadro: atribuído ao Carlos')}.includes('board-column--em_andamento')`);
+  const openTotal = (await browserApi('GET', '/tickets?search=Quadro&status=aberto')).body.pagination.total;
+  check(await evaluate(`document.querySelector('.board-column--aberto .board-column__count').textContent === '${openTotal}' && document.querySelectorAll('.board-column').length === 3`), 'Board columns show the same tickets and totals as the list API');
+  await clickButton('Lista');
+  await waitDom('list keeps filters', 'location.search.includes("search=Quadro") && !location.search.includes("view=") && document.querySelectorAll(".ticket-table tbody tr").length === 2');
+  await clickButton('Quadro');
+  await waitDom('board keeps filters', `location.search.includes("view=board") && location.search.includes("search=Quadro") && !!${cardOf('Quadro: monitor piscando')}`);
+  check(true, 'Switching between list and board keeps the filters in the URL');
+  // Keyboard only: focus the card action and press Enter.
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Iniciar atendimento')}.focus()`);
+  for (const type of ['keyDown', 'keyUp']) await command('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, ...(type === 'keyDown' && { text: '\r' }) });
+  await waitDom('card moved to in progress', `${columnOf('Quadro: monitor piscando')}.includes('board-column--em_andamento')`);
+  const started = (await browserApi('GET', `/tickets/${boardOpen.id}`)).body.ticket;
+  check(started.status === 'em_andamento' && started.assignee.id === users.ti.id && started.history.at(-1).audit.actorId === users.ti.id, 'Starting work from a card, by keyboard, is audited and assigns the operator');
+  await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Resolver')}.click()`);
+  await waitDom('justification on card', `!!${cardOf('Quadro: atribuído ao Carlos')}.querySelector('textarea')`);
+  check(await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Confirmar resolução')}.disabled`), 'Resolving someone else\'s ticket from the board requires a justification');
+  await fill(`resolve-${boardOther.id}`, 'Cabo de vídeo trocado durante a visita ao setor.');
+  await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Confirmar resolução')}.click()`);
+  await waitDom('card moved to resolved', `${columnOf('Quadro: atribuído ao Carlos')}.includes('board-column--resolvido')`);
+  const resolvedOnBoard = (await browserApi('GET', `/tickets/${boardOther.id}`)).body.ticket;
+  check(resolvedOnBoard.resolvedBy.id === users.ti.id && resolvedOnBoard.assignee.id === secondAnalyst.id && resolvedOnBoard.history.at(-1).audit.reason.startsWith('Cabo'), 'Board resolution keeps the assignee, records the resolver and the justification');
+  // A change made elsewhere after the board loaded: the card action gets 409 and the board reloads.
+  check((await browserApi('PATCH', `/tickets/${boardOpen.id}`, { category: 'rede' })).status === 200, 'Concurrent change after the board loaded');
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Resolver')}.click()`);
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Confirmar resolução')}.click()`);
+  await waitDom('stale card rejected', 'document.querySelector(".board-wrapper [role=alert]")?.textContent.includes("alterado por outra pessoa")');
+  check((await browserApi('GET', `/tickets/${boardOpen.id}`)).body.ticket.status === 'em_andamento', 'A stale card cannot resolve: 409 and nothing is written');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await waitDom('board on mobile', `!!${cardOf('Quadro: monitor piscando')}`);
+  check(await evaluate('document.documentElement.scrollWidth <= 390 && !!document.querySelector(".board-jump")'), 'Board fits 390px with links to each column');
+  await command('Emulation.clearDeviceMetricsOverride');
   await logout('ti');
 
   await login('solicitante');

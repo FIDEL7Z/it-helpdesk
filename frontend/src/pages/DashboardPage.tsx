@@ -70,6 +70,7 @@ function TeamDashboard() {
         </div>
         <div className="page__actions">
           <Link to="/tickets?pending=true" className="button button--primary">Ver fila de chamados</Link>
+          <Link to="/tickets?view=board" className="button button--secondary">Ver quadro</Link>
           <Link to="/tickets/new" className="button button--secondary">Abrir chamado</Link>
         </div>
       </header>

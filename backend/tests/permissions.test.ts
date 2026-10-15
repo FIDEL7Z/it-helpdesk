@@ -104,6 +104,8 @@ describe('permission map (can)', () => {
       'users:list-it-staff': false,
       'incidents:manage': false,
       'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': false,
     },
     ti: {
       'tickets:view-all': true,
@@ -113,6 +115,8 @@ describe('permission map (can)', () => {
       'users:list-it-staff': true,
       'incidents:manage': true,
       'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': true,
     },
     gestor: {
       'tickets:view-all': true,
@@ -122,6 +126,8 @@ describe('permission map (can)', () => {
       'users:list-it-staff': true,
       'incidents:manage': true,
       'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': true,
     },
   };
 

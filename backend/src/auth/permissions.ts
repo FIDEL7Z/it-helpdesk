@@ -21,6 +21,10 @@ export const PERMISSIONS = {
   'incidents:manage': ['ti', 'gestor'],
   /** See active shared incidents (public data only) and say "I am affected too". */
   'incidents:follow': ['solicitante', 'ti', 'gestor'],
+  /** Read published help articles and say whether one helped. */
+  'kb:read': ['solicitante', 'ti', 'gestor'],
+  /** Write, publish and archive help articles; see drafts and feedback totals. */
+  'kb:manage': ['ti', 'gestor'],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

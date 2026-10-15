@@ -5,6 +5,7 @@ import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import incidentRoutes from './routes/incident.routes';
+import articleRoutes from './routes/article.routes';
 import ticketRoutes from './routes/ticket.routes';
 import userRoutes from './routes/user.routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
@@ -22,6 +23,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/incidents', incidentRoutes);
+app.use('/api/articles', articleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 

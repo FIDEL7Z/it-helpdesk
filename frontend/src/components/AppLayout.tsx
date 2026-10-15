@@ -13,6 +13,9 @@ export function AppLayout() {
     navigate('/login', { replace: true })
   }
 
+  const isRequester = user?.role === 'solicitante'
+  const isManager = user?.role === 'gestor'
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -22,13 +25,26 @@ export function AppLayout() {
             <span className="brand__name">IT Helpdesk</span>
           </div>
 
+          {/* One shared bar, a different set of destinations per profile. */}
           <nav className="app-nav" aria-label="Navegação principal">
-            {/* Each profile has its own entry point; the links keep the same routes. */}
-            {user?.role === 'gestor' && <NavLink to="/manager" className="app-nav__link">Visão gerencial</NavLink>}
-            <NavLink to="/dashboard" className="app-nav__link">{user?.role === 'solicitante' ? 'Início' : 'Atendimento'}</NavLink>
-            {user?.role === 'solicitante' && <NavLink to="/help" className="app-nav__link">Central de ajuda</NavLink>}
-            <NavLink to="/tickets" className="app-nav__link">{user?.role === 'solicitante' ? 'Meus pedidos' : 'Chamados'}</NavLink>
-            {can(user?.role, 'kb:manage') && <NavLink to="/help/manage" className="app-nav__link">Base de conhecimento</NavLink>}
+            {isRequester ? (
+              <>
+                <NavLink to="/dashboard" className="app-nav__link">Início</NavLink>
+                <NavLink to="/help" className="app-nav__link">Central de ajuda</NavLink>
+                <NavLink to="/tickets" className="app-nav__link">Meus pedidos</NavLink>
+              </>
+            ) : (
+              <>
+                {/* Managers start in the management view; operating tickets is a secondary group. */}
+                {isManager && <NavLink to="/manager" className="app-nav__link">Visão gerencial</NavLink>}
+                {isManager && <span className="app-nav__group-label" aria-hidden="true">Operação</span>}
+                <NavLink to="/dashboard" className={`app-nav__link${isManager ? ' app-nav__link--secondary' : ''}`}>Atendimento</NavLink>
+                <NavLink to="/tickets" className={`app-nav__link${isManager ? ' app-nav__link--secondary' : ''}`}>Chamados</NavLink>
+                {can(user?.role, 'kb:manage') && (
+                  <NavLink to="/help/manage" className={`app-nav__link${isManager ? ' app-nav__link--secondary' : ''}`}>Artigos</NavLink>
+                )}
+              </>
+            )}
           </nav>
 
           {user && (
@@ -37,7 +53,7 @@ export function AppLayout() {
                 <span className="user-menu__name">{user.name}</span>
                 <span className="user-menu__role">{ROLE_LABELS[user.role]}</span>
               </div>
-              <button type="button" className="button button--secondary" onClick={handleLogout}>
+              <button type="button" className="button button--nav" onClick={handleLogout}>
                 Sair
               </button>
             </div>

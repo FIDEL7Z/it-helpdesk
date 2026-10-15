@@ -1,41 +1,60 @@
 /*
- * Slate + Teal. Contrast checked (WCAG): body text >= 7:1, muted text >= 7:1, primary on
- * white 5.5:1, white on primary 5.5:1, form-control borders >= 3:1 against their background.
+ * Corporate light theme (default) and an equivalent dark theme. Contrast checked (WCAG AA):
+ * text 14.5:1 and muted text 6.1:1 on white; primary as text 5.0:1 on the page background and
+ * white on primary buttons 5.4:1; form-control borders 3.2:1 on the background; navigation text
+ * 13:1 on navy. The suggested primary #087F8C was darkened to #067682: as text on #F5F7FA it
+ * measured 4.4:1, below AA.
  */
 :root {
-  --color-bg: #f8fafc;
+  --color-bg: #f5f7fa;
   --color-surface: #ffffff;
-  --color-surface-muted: #f1f5f9;
-  --color-surface-accent: #f0fdfa;
-  /* Decorative dividers; form controls use --color-border-strong (3.4:1). */
-  --color-border: #e2e8f0;
-  --color-border-strong: #7f8da0;
-  --color-text: #0f172a;
-  --color-text-muted: #475569;
-  --color-primary: #0f766e;
-  --color-primary-hover: #115e59;
+  --color-surface-muted: #eef2f6;
+  --color-surface-accent: #ecf8f6;
+  /* Decorative dividers; form controls use --color-border-strong (3.2:1). */
+  --color-border: #dce4ea;
+  --color-border-strong: #7a8da0;
+  --color-text: #172b3a;
+  --color-text-muted: #526477;
+  --color-primary: #067682;
+  --color-primary-hover: #055e68;
   --color-primary-contrast: #ffffff;
-  --color-primary-soft: #ccfbf1;
-  --color-focus: rgba(15, 118, 110, 0.3);
-  --color-danger: #b91c1c;
-  --color-danger-bg: #fef2f2;
-  --color-danger-border: #fecaca;
-  --color-success: #15803d;
-  --color-success-bg: #f0fdf4;
-  --color-success-border: #bbf7d0;
-  --color-warning: #b45309;
-  --color-warning-bg: #fffbeb;
-  --color-info: #1d4ed8;
-  --color-info-bg: #eff6ff;
-  --color-badge-ti-bg: #ccfbf1;
-  --color-badge-ti-text: #115e59;
-  --color-badge-solicitante-bg: #f1f5f9;
-  --color-badge-solicitante-text: #334155;
+  --color-primary-soft: #d9f1ee;
+  --color-focus: rgba(6, 118, 130, 0.35);
+  --color-danger: #b42318;
+  --color-danger-bg: #fef3f2;
+  --color-danger-border: #fecdca;
+  --color-success: #157f3d;
+  --color-success-bg: #effaf3;
+  --color-success-border: #b7e4c7;
+  --color-warning: #a15c07;
+  --color-warning-bg: #fff6e5;
+  --color-info: #1d5fbf;
+  --color-info-bg: #eef4fd;
+  --color-badge-ti-bg: #d9f1ee;
+  --color-badge-ti-text: #0a5a63;
+  --color-badge-solicitante-bg: #eef2f6;
+  --color-badge-solicitante-text: #34495c;
+
+  /* Navigation bar: the one dark surface of the light theme, shared by the three profiles. */
+  --color-nav: #17324d;
+  --color-nav-text: #ffffff;
+  --color-nav-muted: #c3d2e0;
+  --color-nav-hover: #22425f;
+  --color-nav-active-bg: #d9f1ee;
+  --color-nav-active-text: #17324d;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
 
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-card: 0 1px 2px rgba(23, 43, 58, 0.05);
+  --shadow-raised: 0 2px 8px rgba(23, 43, 58, 0.08);
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
@@ -49,35 +68,43 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0b1220;
-    --color-surface: #141f2e;
-    --color-surface-muted: #1d2b3b;
-    --color-surface-accent: #102a2c;
-    --color-border: #334155;
-    --color-border-strong: #64748b;
-    --color-text: #f1f5f9;
-    --color-text-muted: #a8b5c5;
-    --color-primary: #14b8a6;
-    /* Lighter on hover: dark text on #0d9488 would fall below 4.5:1. */
-    --color-primary-hover: #2dd4bf;
-    --color-primary-contrast: #042f2e;
-    --color-primary-soft: #134e4a;
-    --color-focus: rgba(45, 212, 191, 0.35);
-    --color-danger: #f87171;
-    --color-danger-bg: #2a1215;
-    --color-danger-border: #7f1d1d;
-    --color-success: #4ade80;
-    --color-success-bg: #0f2a1c;
-    --color-success-border: #166534;
-    --color-warning: #fbbf24;
-    --color-warning-bg: #2b1f07;
-    --color-info: #93c5fd;
-    --color-info-bg: #172554;
-    --color-badge-ti-bg: #134e4a;
-    --color-badge-ti-text: #99f6e4;
-    --color-badge-solicitante-bg: #1e293b;
-    --color-badge-solicitante-text: #cbd5e1;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+    --color-bg: #0f1b27;
+    --color-surface: #172636;
+    --color-surface-muted: #1e3043;
+    --color-surface-accent: #12333a;
+    --color-border: #2a3d52;
+    --color-border-strong: #5f7488;
+    --color-text: #e6edf3;
+    --color-text-muted: #a3b3c3;
+    --color-primary: #3cc1cc;
+    --color-primary-hover: #6ad3db;
+    --color-primary-contrast: #04262b;
+    --color-primary-soft: #123a40;
+    --color-focus: rgba(60, 193, 204, 0.4);
+    --color-danger: #f28b82;
+    --color-danger-bg: #2c1517;
+    --color-danger-border: #7a2b26;
+    --color-success: #5bd08a;
+    --color-success-bg: #10291c;
+    --color-success-border: #1f6b3e;
+    --color-warning: #f2b544;
+    --color-warning-bg: #2d2109;
+    --color-info: #8ab8f5;
+    --color-info-bg: #142640;
+    --color-badge-ti-bg: #123a40;
+    --color-badge-ti-text: #9de5ea;
+    --color-badge-solicitante-bg: #1e3043;
+    --color-badge-solicitante-text: #c8d4df;
+
+    --color-nav: #0a1520;
+    --color-nav-text: #ffffff;
+    --color-nav-muted: #a9bccd;
+    --color-nav-hover: #15273a;
+    --color-nav-active-bg: #123a40;
+    --color-nav-active-text: #9de5ea;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.35);
 
     color-scheme: dark;
   }
@@ -2715,3 +2742,86 @@ html {
     display: flex;
   }
 }
+
+/* ---------- Corporate refresh: shared shell ---------- */
+
+/* Links without a component class follow the palette (no browser blue/purple). */
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+.app-header {
+  border-bottom: 0;
+  background: var(--color-nav);
+  box-shadow: var(--shadow-raised);
+}
+
+.app-header .brand__name,
+.app-header .user-menu__name {
+  color: var(--color-nav-text);
+}
+
+.app-header .user-menu__role {
+  color: var(--color-nav-muted);
+}
+
+.app-nav {
+  align-items: center;
+}
+
+.app-nav__link {
+  color: var(--color-nav-muted);
+}
+
+.app-nav__link:hover {
+  background: var(--color-nav-hover);
+  color: var(--color-nav-text);
+}
+
+.app-nav__link.active {
+  background: var(--color-nav-active-bg);
+  color: var(--color-nav-active-text);
+  font-weight: 650;
+}
+
+.app-nav__link:focus-visible,
+.button--nav:focus-visible {
+  outline: 3px solid var(--color-nav-active-bg);
+  outline-offset: 2px;
+}
+
+/* Manager: "Operação" is a secondary group after the management view. */
+.app-nav__group-label {
+  margin: 0 var(--space-1) 0 var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 1px solid rgba(195, 210, 224, 0.35);
+  color: var(--color-nav-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-nav__link--secondary {
+  font-size: 0.875rem;
+}
+
+.button--nav {
+  border: 1px solid rgba(195, 210, 224, 0.55);
+  background: transparent;
+  color: var(--color-nav-text);
+}
+
+.button--nav:hover {
+  background: var(--color-nav-hover);
+  color: var(--color-nav-text);
+}
+
+.page__title {
+  letter-spacing: -0.01em;
+}
+

@@ -15,6 +15,8 @@ import {
   type TicketStatus,
 } from '../models/ticket.model';
 import { UserModel, toPublicUser, type PublicUser } from '../models/user.model';
+import { KnowledgeArticleModel } from '../models/article.model';
+import { buildIntakeAnswers, type IntakeAnswerInput } from './intake';
 
 // Labels used in history messages, which are shown to users in Portuguese.
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -64,8 +66,16 @@ export interface TicketSummary {
   dataOrigin: Ticket['dataOrigin'];
 }
 
+/** Guided-form answers as the team and the requester read them. */
+export interface IntakeView {
+  category: TicketCategory;
+  answers: { key: string; question: string; answer: string }[];
+  article: { id: string; title: string } | null;
+}
+
 export interface TicketDetail extends TicketSummary {
   description: string;
+  intake: IntakeView | null;
   history: TicketEventView[];
 }
 
@@ -103,6 +113,8 @@ export interface RequesterTicketSummary {
 
 export interface RequesterTicketDetail extends RequesterTicketSummary {
   description: string;
+  /** Their own answers, as they gave them. */
+  intake: IntakeView | null;
   history: RequesterEventView[];
 }
 
@@ -123,6 +135,7 @@ export interface CreateTicketInput {
   description: string;
   category: TicketCategory;
   priority: TicketPriority;
+  intake?: { answers: IntakeAnswerInput[]; articleId?: string };
 }
 
 export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
@@ -187,6 +200,15 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
   };
 }
 
+function toIntakeView(ticket: TicketDocument): IntakeView | null {
+  if (!ticket.intake) return null;
+  return {
+    category: ticket.intake.category,
+    answers: ticket.intake.answers.map(({ key, question, answer }) => ({ key, question, answer })),
+    article: ticket.intake.article ? { id: ticket.intake.article.id.toString(), title: ticket.intake.article.title } : null,
+  };
+}
+
 function nameOf(user: PublicUser | null): PersonName | null {
   return user ? { name: user.name } : null;
 }
@@ -225,6 +247,7 @@ export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser):
     return {
       ...toRequesterSummary(ticket, users),
       description: ticket.description,
+      intake: toIntakeView(ticket),
       history: ticket.history.map((event) => ({
         type: event.type,
         message: event.message,
@@ -238,6 +261,7 @@ export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser):
   return {
     ...toSummary(ticket, users),
     description: ticket.description,
+    intake: toIntakeView(ticket),
     history: ticket.history.map((event) => ({
       authorId: event.author?.toString() ?? null,
       audit: event.audit,
@@ -343,18 +367,34 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
 
 // ---------- Use cases ----------
 
+/** Validated guided answers and the article read before asking. Nothing is stored when both are empty. */
+async function buildIntake(input: CreateTicketInput): Promise<Ticket['intake']> {
+  if (!input.intake) return undefined;
+  const answers = buildIntakeAnswers(input.category, input.intake.answers);
+  let article = null;
+  if (input.intake.articleId) {
+    const found = await KnowledgeArticleModel.findOne({ _id: input.intake.articleId, status: 'published' }).select('title');
+    if (!found) throw new HttpError(400, 'The referenced help article is not available');
+    article = { id: found._id, title: found.title };
+  }
+  return answers.length === 0 && !article ? undefined : { category: input.category, answers, article };
+}
+
 export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetailView> {
   // The requester always comes from the authenticated user, never from the request body.
   const at = new Date();
+  const { intake: _guided, ...fields } = input;
+  const intake = await buildIntake(input);
   const origin = DEMO_EMAILS.has(actor.email) ? 'demo' : 'operational';
   const ticket = await TicketModel.create({
-    ...input,
+    ...fields,
+    ...(intake && { intake }),
     dataOrigin: origin,
     createdAt: at,
     updatedAt: at,
     requester: actor.id,
     history: [{ type: 'created', author: actor.id, message: 'Chamado aberto', at,
-      audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...input }, null, origin, randomUUID(), 0) }],
+      audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...fields }, null, origin, randomUUID(), 0) }],
   });
 
   return toTicketDetail(ticket, actor);

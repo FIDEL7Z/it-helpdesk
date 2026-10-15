@@ -9,7 +9,7 @@ import {
   type IncidentStatus,
   type SharedIncidentDocument,
 } from '../models/incident.model';
-import { TicketModel, type TicketDocument, type TicketPriority, type TicketStatus } from '../models/ticket.model';
+import { TicketModel, type TicketCategory, type TicketDocument, type TicketPriority, type TicketStatus } from '../models/ticket.model';
 import { UserModel, toPublicUser, type PublicUser } from '../models/user.model';
 import { findAccessibleTicket } from './ticket.service';
 
@@ -33,6 +33,11 @@ export interface PublicIncident {
   affectedCount: number;
   /** The authenticated user follows the current publication cycle. */
   following: boolean;
+  /**
+   * Subject of the problem (category of the main ticket, read now, so a correction by the team
+   * shows up). Only the area, never the ticket itself. Used to suggest it in the request form.
+   */
+  category: TicketCategory | null;
 }
 
 export interface IncidentEventView {
@@ -100,7 +105,8 @@ async function followedBy(actor: PublicUser, incidents: SharedIncidentDocument[]
   return new Set(rows.map((row) => row.incident.toString()));
 }
 
-function toPublic(incident: SharedIncidentDocument, affected: Map<string, number>, following: Set<string>): PublicIncident {
+function toPublic(incident: SharedIncidentDocument, affected: Map<string, number>, following: Set<string>,
+  categories: Map<string, TicketCategory>): PublicIncident {
   return {
     id: incident.id,
     title: incident.title,
@@ -111,6 +117,7 @@ function toPublic(incident: SharedIncidentDocument, affected: Map<string, number
     resolutionMessage: incident.resolutionMessage,
     affectedCount: affected.get(incident.id) ?? 0,
     following: following.has(incident.id),
+    category: categories.get(incident.ticket.toString()) ?? null,
   };
 }
 
@@ -226,7 +233,7 @@ async function loadPeople(ids: (Types.ObjectId | null | undefined)[]): Promise<M
 async function toManaged(incidents: SharedIncidentDocument[]): Promise<ManagedIncident[]> {
   const affected = await countAffected(incidents);
   const tickets = new Map((await TicketModel.find({ _id: { $in: incidents.map((incident) => incident.ticket) } })
-    .select('title status priority assignee')).map((ticket) => [ticket.id, ticket]));
+    .select('title status priority assignee category')).map((ticket) => [ticket.id, ticket]));
   const people = await loadPeople([
     ...incidents.flatMap((incident) => [incident.publishedBy, incident.closedBy]),
     ...[...tickets.values()].map((ticket) => ticket.assignee),
@@ -246,6 +253,7 @@ async function toManaged(incidents: SharedIncidentDocument[]): Promise<ManagedIn
       ticketTitle: ticket?.title ?? 'Chamado removido',
       ticketStatus: ticket?.status ?? null,
       ticketPriority: ticket?.priority ?? null,
+      category: ticket?.category ?? null,
       assignee: ticket?.assignee ? people.get(ticket.assignee.toString()) ?? null : null,
       cycle: incident.cycle,
       revision: incident.revision,
@@ -267,8 +275,13 @@ async function toManaged(incidents: SharedIncidentDocument[]): Promise<ManagedIn
 }
 
 async function publicView(incidents: SharedIncidentDocument[], actor: PublicUser): Promise<PublicIncident[]> {
-  const [affected, following] = await Promise.all([countAffected(incidents), followedBy(actor, incidents)]);
-  return incidents.map((incident) => toPublic(incident, affected, following));
+  const [affected, following, tickets] = await Promise.all([
+    countAffected(incidents),
+    followedBy(actor, incidents),
+    TicketModel.find({ _id: { $in: incidents.map((incident) => incident.ticket) } }).select('category'),
+  ]);
+  const categories = new Map(tickets.map((ticket) => [ticket.id, ticket.category]));
+  return incidents.map((incident) => toPublic(incident, affected, following, categories));
 }
 
 // ---------- Public use cases (any authenticated user) ----------

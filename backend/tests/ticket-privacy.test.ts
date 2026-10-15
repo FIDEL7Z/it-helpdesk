@@ -16,7 +16,8 @@ const RESOLUTION_REASON = 'Justificativa interna: resolvido por outro analista a
 const REOPEN_REASON = 'Reabertura interna: falha voltou no teste de carga';
 
 const REQUESTER_SUMMARY_KEYS = ['assignee', 'category', 'createdAt', 'id', 'priority', 'requesterId', 'resolvedAt', 'revision', 'status', 'title', 'updatedAt'];
-const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'description', 'history'].sort();
+// intake: the requester's own guided-form answers (null when there are none).
+const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'description', 'history', 'intake'].sort();
 const REQUESTER_EVENT_KEYS = ['at', 'author', 'message', 'type'];
 
 let server: Server;

@@ -3,6 +3,7 @@ import {
   assignTicket,
   changeStatus,
   createTicket,
+  getIntakeQuestions,
   getTicket,
   listTickets,
   updateTicket,
@@ -17,6 +18,7 @@ router.use(requireAuth);
 // Ownership checks (requester vs IT) happen in the service, per ticket.
 router.post('/', createTicket);
 router.get('/', listTickets);
+router.get('/intake-questions', getIntakeQuestions);
 router.get('/:id', getTicket);
 router.patch('/:id', updateTicket);
 

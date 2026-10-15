@@ -162,7 +162,7 @@ describe('public data and privacy', () => {
     assert.equal(status, 200);
     const item = body.incidents.find((candidate: Json) => candidate.id === incident.id);
     assert.deepEqual(Object.keys(item).sort(),
-      ['affectedCount', 'closedAt', 'following', 'id', 'publicMessage', 'publishedAt', 'resolutionMessage', 'status', 'title']);
+      ['affectedCount', 'category', 'closedAt', 'following', 'id', 'publicMessage', 'publishedAt', 'resolutionMessage', 'status', 'title']);
     for (const secret of [PRIVATE_TEXT, incident.ticketId, requester.email, requester.name, requester.id, tech.id, 'history', 'publishedBy']) {
       assert.equal(raw.includes(secret), false, `leaked: ${secret}`);
     }

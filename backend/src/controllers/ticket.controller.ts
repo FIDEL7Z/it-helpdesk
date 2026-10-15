@@ -9,6 +9,7 @@ import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
 } from '../models/ticket.model';
+import { INTAKE_QUESTIONS } from '../services/intake';
 import * as ticketService from '../services/ticket.service';
 
 export const MAX_PAGE_SIZE = 50;
@@ -30,6 +31,11 @@ const createTicketSchema = z.strictObject({
   description: descriptionSchema,
   category: z.enum(TICKET_CATEGORIES),
   priority: z.enum(TICKET_PRIORITIES).default('media'),
+  // Guided-form answers; checked against the question catalog in the service.
+  intake: z.strictObject({
+    answers: z.array(z.strictObject({ key: z.string().max(40), answer: z.string().max(400) })).max(10).default([]),
+    articleId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid article id').optional(),
+  }).optional(),
 });
 
 const listTicketsQuerySchema = z.object({
@@ -61,6 +67,11 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
   const ticket = await ticketService.createTicket(input, getAuthenticatedUser(req));
 
   res.status(201).json({ ticket });
+}
+
+/** Questions of the guided request form, by category (same catalog the API validates against). */
+export function getIntakeQuestions(_req: Request, res: Response): void {
+  res.json({ questions: INTAKE_QUESTIONS });
 }
 
 export async function listTickets(req: Request, res: Response): Promise<void> {

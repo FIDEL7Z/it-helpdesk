@@ -6,42 +6,42 @@
 
 ### Solicitante
 
-1. **Buscar uma solução.** Na página **Início**, digite o problema em "Ex.: impressora, Wi-Fi, acesso" ou escolha um assunto. A **Central de ajuda** mostra as orientações publicadas; abra uma e responda **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**
+1. **Buscar uma solução.** A página **Início** pergunta **Como podemos ajudar?**: digite o problema na busca e clique em **Buscar orientações**, ou escolha um dos cinco cartões de assunto, que levam direto ao pedido guiado. A **Central de ajuda** mostra as orientações publicadas; abra uma e responda **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**
 2. **Ver se é um problema conhecido.** Em **Problemas conhecidos**, se o problema também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se passar, clique em **Não estou mais com esse problema**.
-3. **Solicitar suporte.** Clique em **Solicitar suporte** (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio.
+3. **Solicitar suporte.** Clique em **Solicitar suporte**, o único botão principal da página, (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio.
 4. **Responder às perguntas.** Em **Conte um pouco mais**, responda o que souber; todas são opcionais e podem ser limpas. Se trocar de assunto e voltar, as respostas continuam lá. Preencha **Assunto**, **O que aconteceu?** e **Prioridade sugerida** e clique em **Enviar solicitação**.
-5. **Acompanhar.** A página do pedido abre com a confirmação. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
+5. **Acompanhar.** A página do pedido abre com a confirmação. Em Início, **Meus pedidos** resume quantos estão aguardando, em atendimento e resolvidos e lista os mais recentes. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
 6. **Confirmar ou contestar a solução.** Quando a TI resolve, o pedido mostra **Seu problema foi resolvido?** (e a marca **Confirme se resolveu** na lista). **Sim, foi resolvido.** encerra; **Não, o problema continua.** pede o que continua acontecendo e devolve o pedido à TI.
 7. **Avaliar (opcional).** Depois de confirmar, escolha de 1 a 5 estrelas e, se quiser, escreva um comentário. **Agora não** pula a avaliação.
 
 ### Suporte TI
 
-1. **Acessar a fila.** A página **Atendimento** mostra os **Incidentes ativos**, as contagens da fila e os atalhos **Ver fila de chamados** e **Ver quadro**.
-2. **Lista ou Quadro.** Em **Chamados**, alterne entre **Lista** e **Quadro**. Os atalhos (**Sem responsável**, **Atribuídos a mim**, **Em andamento**), a busca e os filtros valem para os dois. Marcas: **Incidente · N pessoas afetadas** e **Reaberto pelo solicitante**.
+1. **Começar pelo que precisa de ação.** A página **Atendimento** abre com quatro cartões (alta prioridade sem responsável, reabertos pelo solicitante, sem movimentação há 3 dias, sem responsável), que levam à fila filtrada. Abaixo: **Meus atendimentos**, **Sem responsável — mais antigos primeiro**, **Incidentes ativos** e, por último, a situação da fila. **Ver fila de chamados** e **Ver quadro** ficam no topo.
+2. **Lista ou Quadro.** Em **Chamados**, alterne entre **Lista** e **Quadro**. Um painel reúne a forma de exibição, as **Filas rápidas** (**Sem responsável**, mais antigos primeiro; **Atribuídos a mim**; **Em andamento**; **Reabertos pelo solicitante**), a busca e os filtros, que valem para os dois. No celular, os filtros ficam atrás do botão **Filtros**, que mostra quantos estão ativos. Marcas: **Incidente · N pessoas afetadas** e **Reaberto pelo solicitante**.
 3. **Atribuir e atender.** No quadro, use **Assumir**, **Iniciar atendimento** e **Resolver** nos cartões. No chamado, o bloco **Atendimento** permite escolher o responsável e **Atribuir**, ajustar categoria/prioridade com **Salvar classificação**, iniciar e resolver. Pedem motivo: reatribuição e prioridade durante o atendimento, resolução de chamado de outro responsável e reabertura.
 4. **Ler o pedido e corrigir a categoria.** **Informações do pedido** mostra o assunto escolhido, as respostas e o artigo consultado. Se a categoria estiver errada, corrija em **Salvar classificação**; a correção fica no histórico.
 5. **Publicar incidentes.** Em **Incidente compartilhado**, use **Publicar como incidente**, escreva título e mensagem para os usuários (sem dados do chamado) e clique em **Publicar incidente**. **Editar comunicação** atualiza o texto; resolver o chamado encerra o incidente; **Encerrar incidente** encerra antes; **Republicar** vale depois de reabrir o chamado.
-6. **Gerenciar artigos.** Em **Base de conhecimento**, **Novo artigo** abre o editor com pré-visualização. Escolha **Rascunho**, **Publicado** ou **Arquivado**; só os publicados aparecem para os solicitantes. A lista mostra quantas pessoas disseram que cada artigo ajudou ou não.
+6. **Gerenciar artigos.** Em **Artigos** (`/help/manage`), as abas **Publicados**, **Rascunhos**, **Arquivados** e **Todos** mostram quantos há em cada situação; cada linha tem **Editar** e, se publicado, **Ver**. **Novo artigo** abre o editor com pré-visualização. Escolha **Rascunho**, **Publicado** ou **Arquivado**; só os publicados aparecem para os solicitantes. A lista mostra quantas pessoas disseram que cada artigo ajudou ou não.
 7. **Resolver.** Ao marcar como resolvido, o solicitante recebe a pergunta **Seu problema foi resolvido?**. Uma contestação volta para a fila em atendimento, com o motivo no histórico.
 
 ### Gestor
 
-1. **Consultar indicadores.** O login abre a **Visão gerencial**. Escolha o **Período** (e a **Origem dos dados**, presente só no modo demonstração); **Filtros de equipe e classificação** refinam por analista, solicitante, categoria, prioridade e status.
-2. **Identificar alertas.** **Precisa de atenção** reúne alta prioridade sem responsável, pendências antigas e sem movimentação; cada alerta abre a fila correspondente.
+1. **Consultar indicadores.** O login abre a **Visão gerencial**, com seções na ordem: Situação atual, Precisa de atenção, Equipe, Incidentes, Qualidade e Demanda e tendências. Na barra do topo, escolha o **Período** e a **Origem dos dados** (só no modo demonstração); ao lado aparece de onde vêm os números. **Mais filtros: equipe, solicitante e classificação** refina por analista, solicitante, categoria, prioridade e status.
+2. **Identificar alertas.** **Precisa de atenção** reúne alta prioridade sem responsável, pendências antigas e sem movimentação; cada alerta abre a fila correspondente. Se alguém tem mais pendências do que a média da equipe, aparece **Carga desigual**, um aviso operacional de redistribuição, não de desempenho.
 3. **Acompanhar analistas.** **Equipe de suporte** e **Carga por responsável e prioridade** mostram a distribuição atual; **Ver chamados** abre a fila do analista.
 4. **Consultar incidentes.** **Incidentes compartilhados** mostra ativos, pessoas afetadas, novas adesões em 30 dias, encerrados e os incidentes com mais afetados.
 5. **Ver a qualidade do atendimento.** **Qualidade do atendimento** mostra, para as resoluções do período, quantas foram confirmadas, contestadas ou ficaram sem resposta, a taxa de resposta e a nota média. Use como sinal; não é avaliação individual.
-6. **Operar chamados.** Pelos menus **Atendimento** e **Chamados** (Lista ou Quadro), o gestor opera como a TI: assume, atribui, classifica, resolve, reabre, publica incidentes e gerencia artigos. O texto de chamados de outras pessoas continua restrito ao autor.
+6. **Operar chamados.** Pelo grupo **Operação** do menu (**Atendimento**, **Chamados** em Lista ou Quadro, e **Artigos**), o gestor opera como a TI: assume, atribui, classifica, resolve, reabre, publica incidentes e gerencia artigos. O texto de chamados de outras pessoas continua restrito ao autor.
 
 Filtros na lista ficam na URL e sobrevivem a recarregamentos e ao botão Voltar do navegador. Ao abrir um chamado pela lista, o link explícito do detalhe restaura a URL dessa fila, incluindo filtros e página. Acesso direto ao detalhe usa `/tickets` como fallback.
 
 ## Visão gerencial
 
-Menu **Visão gerencial** (`/manager`) separado de **Operação de chamados** (`/tickets`). Login normal do gestor abre a visão gerencial; uma rota protegida anteriormente consultada pode ser restaurada. TI e solicitante recebem 403 no endpoint gerencial, mesmo em requisições diretas, e são redirecionados ao próprio dashboard ao tentar a página.
+Menu **Visão gerencial** (`/manager`) separado do grupo **Operação** (Atendimento, Chamados e Artigos). Login normal do gestor abre a visão gerencial; uma rota protegida anteriormente consultada pode ser restaurada. TI e solicitante recebem 403 no endpoint gerencial, mesmo em requisições diretas, e são redirecionados ao próprio dashboard ao tentar a página.
 
 `GET /dashboard/manager` aceita `period=today|week|month|year` (padrão `month`), `dataOrigin=operational|demo|legacy` (padrão `operational`), `analystId`, `requesterId`, `category`, `priority` e `status`. IDs devem ser ObjectId; campos desconhecidos/valores inválidos retornam 400. Limites, timezone e instante da consulta retornam em `range` e `asOf`.
 
-Resposta contém `current`, `period`, `alerts`, `workload`, `distributions`, `team`, `requesters`, `trends`, `demand`, `coverage` e opções públicas de filtro. A interface mantém filtros gerenciais na URL. Links de equipe e alertas abrem pendências atuais de qualquer data de criação. Links de solicitantes e criações incluem os limites exatos do período consultado. Cartões de backlog usam `pending=true`; nenhuma resolução é inferida do responsável atual.
+Resposta contém `current`, `period`, `alerts`, `workload`, `distributions`, `team`, `requesters`, `trends`, `demand` (horas, dias da semana e `categories`, as criações do período por assunto), `coverage` e opções públicas de filtro. A interface mantém filtros gerenciais na URL. Links de equipe e alertas abrem pendências atuais de qualquer data de criação. Links de solicitantes e criações incluem os limites exatos do período consultado. Cartões de backlog usam `pending=true`; nenhuma resolução é inferida do responsável atual.
 
 Consulte [definições dos indicadores](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
 
@@ -141,7 +141,7 @@ O quadro não tem rota própria: cada coluna chama `GET /tickets` com os filtros
 
 ### Filtros dos alertas e do período de criação
 
-`GET /api/tickets` aceita `attention=high_unassigned|oldest|inactive`, `ageDays` (1–365, padrão 7) e `inactivityDays` (1–90, padrão 3). Os predicados são os mesmos da visão gerencial; `oldest` ordena a fila por abertura crescente. Combinam-se com origem, classificação, solicitante, responsável e paginação, sem ampliar a autorização do usuário.
+`GET /api/tickets` aceita `attention=high_unassigned|oldest|inactive|contested`, `ageDays` (1–365, padrão 7) e `inactivityDays` (1–90, padrão 3). Os predicados são os mesmos da visão gerencial; `oldest` ordena a fila por abertura crescente. `contested` traz os chamados em andamento cujo ciclo atual começou com a contestação do solicitante (Reabertos pelo solicitante). `sort=newest|oldest` (padrão `newest`) ordena qualquer fila pela abertura; outro valor retorna 400. Combinam-se com origem, classificação, solicitante, responsável e paginação, sem ampliar a autorização do usuário.
 
 `createdFrom` e `createdTo` aceitam datas ISO com horário UTC; início inclusivo e fim exclusivo. Os links de volume por solicitante incluem o intervalo exato retornado pela API. Carga atual e alertas não recebem esse intervalo, pois consideram pendências de qualquer data de abertura. Links de detalhe preservam a URL da fila ao retornar.
 
@@ -149,7 +149,7 @@ O quadro não tem rota própria: cada coluna chama `GET /tickets` com os filtros
 
 ## Capturas por perfil
 
-Imagens reais do ambiente demonstrativo, em 15/10/2026, com viewport desktop de 1440 × 900 e celular de 390 × 844. As páginas iniciais são capturas da página inteira; as demais mostram o trecho indicado. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores, como títulos digitados ao acaso, permanecem preservados; os números refletem aquele momento, não uma instalação nova.
+Imagens reais da aplicação, em 15/10/2026, obtidas num [ambiente isolado](05-demonstracao.md#capturas-reproduzíveis) com banco temporário e apenas os [cenários de demonstração](05-demonstracao.md#cenários-de-demonstração). Viewport desktop de 1440 × 900 e celular de 390 × 844. As páginas iniciais são capturas da página inteira; as demais mostram o trecho indicado.
 
 <details>
 <summary>Solicitante: login, Início, pedido e problema conhecido</summary>
@@ -158,9 +158,9 @@ Imagens reais do ambiente demonstrativo, em 15/10/2026, com viewport desktop de 
 
 O login autentica os três perfis; não há cadastro público.
 
-![Página Início da solicitante com Solicitar suporte, problema conhecido e Meus pedidos](assets/screenshots/dashboard-solicitante-desktop.png)
+![Página Início da solicitante com busca, assuntos, problema conhecido e Meus pedidos](assets/screenshots/dashboard-solicitante-desktop.png)
 
-A solicitante vê seus pedidos e os problemas que a TI já publicou.
+A solicitante busca uma orientação, escolhe um assunto ou pede suporte; vê os problemas que a TI já publicou e os próprios pedidos, sem indicadores da equipe.
 
 ![Problema conhecido acompanhado pela solicitante, com a opção de sair](assets/screenshots/incidente-solicitante-desktop.png)
 
@@ -177,9 +177,9 @@ O formulário mostra os problemas conhecidos antes dos campos, sem bloquear o en
 <details>
 <summary>Atendimento da TI, listagem e incidente</summary>
 
-![Página Atendimento da TI com incidentes ativos, contagens e chamados recentes](assets/screenshots/dashboard-ti-desktop.png)
+![Página Atendimento da TI com cartões de ação, filas pessoal e sem responsável, incidente ativo e situação da fila](assets/screenshots/dashboard-ti-desktop.png)
 
-O incidente de demonstração aparece identificado como tal; as contagens abaixo seguem a origem escolhida.
+Sem chamados operacionais, a página passou para a origem Demonstração e avisa isso na barra de origem. O incidente aparece identificado como demonstração; todas as contagens seguem a origem escolhida.
 
 ![Bloco Incidente compartilhado no chamado principal, com afetados e texto público](assets/screenshots/incidente-ti-desktop.png)
 
@@ -187,7 +187,7 @@ No chamado principal, a equipe vê quantas pessoas estão afetadas e o texto exa
 
 ![Lista de chamados demonstrativos com solicitante, responsável atribuído e autor da resolução](assets/screenshots/lista-chamados-desktop.png)
 
-A lista foi filtrada pelo título do conjunto gerencial fictício. As três identidades têm colunas próprias. Registros legados sem evidência estruturada, consultados em outras filas, continuam identificados como tal.
+A lista mostra os cenários fictícios da origem Demonstração. Solicitante, responsável atribuído e autor da resolução têm colunas próprias. Registros legados sem evidência estruturada, consultados em outras filas, continuam identificados como tal.
 
 </details>
 

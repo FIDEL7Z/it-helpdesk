@@ -24,7 +24,7 @@ flowchart LR
 - `backend/src/server.ts` conecta ao MongoDB antes de aceitar requisições.
 - `routes/` associa endpoints a autenticação e permissões. Login e health são públicos.
 - `controllers/` valida entradas com Zod e monta as respostas HTTP.
-- `services/` aplica as regras e consulta os models. `buildTicketFilter` compartilha escopo entre lista e dashboard.
+- `services/` aplica as regras e consulta os models. `buildTicketFilter` compartilha escopo entre lista e dashboard. `demo-scenarios.ts` e `demo-articles.ts` guardam os dados fictícios usados pelos seeds e pela captura isolada da documentação.
 - `middlewares/` trata JWT/usuário atual, permissões, rate limit e erros.
 - `frontend/src/auth/` restaura a sessão usando `/auth/me`; `components/ProtectedRoute.tsx` protege a navegação. A proteção definitiva continua no backend.
 
@@ -184,4 +184,4 @@ As consultas compartilham um instante de corte para períodos, mas não uma tran
 
 O Compose publica MongoDB 7 em `127.0.0.1:27017` e usa o volume nomeado `mongo-data`. `docker compose down` preserva esse volume. O ambiente local não utiliza autenticação no banco; produção precisa de configuração própria, credenciais e gestão de segredos.
 
-Os testes usam bancos separados `it-helpdesk-test*`, apagados ao final. O E2E cria um banco exclusivo por execução e processos locais em portas livres. Os seeds de demonstração usam datas e histórico de exemplo: esses dados não representam uma operação real.
+Os testes usam bancos separados `it-helpdesk-test*`, apagados ao final. O E2E e a captura da documentação criam cada um um banco exclusivo por execução (`it-helpdesk-test-e2e-*`, `it-helpdesk-docs-*`) e processos locais em portas livres. Os seeds de demonstração usam datas e histórico de exemplo, exceto `seed:scenarios`, que percorre o fluxo real no momento da execução: nenhum desses dados representa uma operação real.

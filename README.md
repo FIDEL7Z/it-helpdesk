@@ -17,17 +17,17 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Confirmação de resolução:** "Seu problema foi resolvido?", com contestação que reabre o pedido e avaliação opcional.
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
-- **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, tema claro/escuro e layout para celular.
+- **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados (claro e escuro, contraste AA) e layout para celular.
 
 Regras detalhadas em [produto e regras](docs/01-produto-e-regras.md); passo a passo de cada perfil em [como usar, por perfil](docs/03-fluxos-e-api.md#como-usar-por-perfil).
 
 ## Portal do Solicitante
 
-A página Início segue a ordem de quem precisa de ajuda: **encontrar uma solução → problemas conhecidos → solicitar suporte → acompanhar**. Pesquisar não é obrigatório: **Solicitar suporte** está sempre à mão.
+A página Início é um portal de ajuda: **Como podemos ajudar?**, uma busca larga por orientações e um único botão **Solicitar suporte**. Abaixo, os cinco assuntos em cartões (ícone, título, descrição e seta) levam direto ao pedido guiado; os **Problemas conhecidos** ficam numa faixa própria, só quando existem; por fim, **Meus pedidos** mostra os pedidos mais recentes. Pesquisar não é obrigatório.
 
 ![Página Início da solicitante com busca de soluções, assuntos, problema conhecido e Meus pedidos](docs/assets/screenshots/dashboard-solicitante-desktop.png)
 
-Os pedidos aparecem como Aguardando atendimento, Em atendimento ou Resolvido; o que espera a resposta do solicitante tem a marca **Confirme se resolveu**. A tela não mostra indicadores da equipe nem termos técnicos.
+Os pedidos aparecem como Aguardando atendimento, Em atendimento ou Resolvido; o que espera a resposta do solicitante tem a marca **Confirme se resolveu**. A tela não mostra indicadores da equipe, tabelas administrativas nem termos técnicos. A **Central de ajuda** separa buscar e ler orientações; abrir um pedido continua a um clique, mas não compete com a busca.
 
 ## Incidentes Compartilhados
 
@@ -40,7 +40,7 @@ Quando um problema atinge várias pessoas, a TI publica um aviso a partir do cha
 
 ## Base de Conhecimento
 
-TI e gestor escrevem artigos (rascunho, publicado, arquivado). O solicitante pesquisa por palavras do título ou do conteúdo, sem precisar acertar acentos, ou filtra por assunto. Em cada artigo responde **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**; a segunda opção abre o pedido com o assunto e o artigo já indicados, que podem ser removidos. Nada é criado automaticamente.
+TI e gestor escrevem artigos em **Artigos** (`/help/manage`), uma página de gestão separada da Central de ajuda, com abas Publicados, Rascunhos, Arquivados e Todos, e ações Editar e Ver. O solicitante pesquisa por palavras do título ou do conteúdo, sem precisar acertar acentos, ou filtra por assunto. Em cada artigo responde **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**; a segunda opção abre o pedido com o assunto e o artigo já indicados, que podem ser removidos. Nada é criado automaticamente.
 
 O texto dos artigos é exibido somente como texto: HTML ou scripts digitados não são executados. Cada pessoa tem um único voto por artigo, que pode trocar; os totais aparecem só para a equipe.
 
@@ -58,19 +58,21 @@ Só o dono do pedido responde, uma vez por resolução; a equipe não responde p
 
 ## Kanban
 
-TI e gestor alternam a fila entre **Lista** e **Quadro** (Abertos, Em andamento, Resolvidos). O quadro usa os mesmos filtros (guardados na URL) e a mesma API da lista, carrega 20 cartões por coluna e mostra "carregados de total". As ações são botões nos cartões (Assumir, Iniciar atendimento, Resolver), acessíveis por teclado e sujeitos às mesmas regras: justificativa para resolver chamado de outro responsável, conflito 409 com dados antigos e auditoria. Não há arrastar e soltar.
+TI e gestor alternam a fila entre **Lista** e **Quadro** (Abertos, Em andamento, Resolvidos). Um painel único reúne a forma de exibição, as **filas rápidas** (Sem responsável, Atribuídos a mim, Em andamento, Reabertos pelo solicitante) e a busca com filtros; no celular os filtros começam recolhidos atrás de **Filtros**, com a contagem dos ativos. O quadro ocupa toda a largura, inclusive quando um filtro de status deixa uma só coluna. Ele usa os mesmos filtros (guardados na URL) e a mesma API da lista, carrega 20 cartões por coluna e mostra "carregados de total". As ações são botões nos cartões (Assumir, Iniciar atendimento, Resolver), acessíveis por teclado e sujeitos às mesmas regras: justificativa para resolver chamado de outro responsável, conflito 409 com dados antigos e auditoria. Não há arrastar e soltar.
 
 ## Os três perfis
 
 Telas reais, com dados fictícios de demonstração. A página do solicitante está em [Portal do Solicitante](#portal-do-solicitante).
 
-**Suporte TI (Carlos Andrade) — Atendimento.** Incidentes ativos com afetados, fila sem responsável, atendimentos próprios e atalhos para a fila e o quadro.
+**Suporte TI (Carlos Andrade) — Atendimento.** Uma mesa de trabalho, não um painel: **Precisa de ação** (alta prioridade sem responsável, reabertos pelo solicitante, sem movimentação, sem responsável), **Meus atendimentos**, **Sem responsável — mais antigos primeiro**, incidentes ativos e, por último, a situação da fila. Atalhos para a fila e o quadro.
 
-![Página Atendimento da TI com incidentes ativos, contagens da fila e chamados recentes](docs/assets/screenshots/dashboard-ti-desktop.png)
+![Página Atendimento da TI com cartões de ação, filas pessoal e sem responsável, incidente ativo e situação da fila](docs/assets/screenshots/dashboard-ti-desktop.png)
 
-**Gestor (Ana Ribeiro) — Visão gerencial.** Alertas que abrem a fila, incidentes, qualidade do atendimento, carga por analista e gráficos de demanda.
+**Gestor (Ana Ribeiro) — Visão gerencial.** Seções na ordem das decisões: Situação atual, Precisa de atenção (com aviso de carga desigual), Equipe, Incidentes, Qualidade e Demanda e tendências. Período e origem dos dados ficam numa barra compacta; os demais filtros, em "Mais filtros". A operação (Atendimento, Chamados, Artigos) fica num grupo secundário do menu.
 
-![Visão gerencial com alertas, incidentes, qualidade do atendimento, equipe e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
+![Visão gerencial com situação atual, alertas, equipe, incidentes, qualidade e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
+
+Com o modo demonstração ligado e nenhum chamado operacional, Atendimento e Visão gerencial passam uma vez para a origem **Demonstração** e avisam isso; uma origem vazia é explicada ("os zeros indicam ausência de registros, não desempenho da equipe"), e dados demonstrativos nunca se misturam aos operacionais.
 
 As demais telas estão no [guia de demonstração](docs/05-demonstracao.md#capturas-reproduzíveis) e nos documentos técnicos.
 
@@ -155,9 +157,12 @@ npm run seed            # cria os usuários TI, solicitante e (com SEED_GESTOR) 
 npm run seed:demo       # até 10 chamados de exemplo
 npm run seed:incidents  # publica o incidente "Instabilidade na rede Wi-Fi"
 npm run seed:articles   # cinco artigos de ajuda fictícios
+npm run seed:scenarios  # cenários fictícios claros, percorridos pelo fluxo real
 ```
 
 Todos podem ser executados de novo sem duplicar dados: usuários existentes não têm senha nem papel alterados, chamados com o mesmo título são pulados, e o incidente e os artigos existentes (inclusive se editados) são mantidos. Em caso de erro, encerram com código 1.
+
+`seed:scenarios` cria pedidos com títulos específicos (por exemplo "Impressora do setor administrativo sem conexão" e "Notebook desligando sozinho durante reuniões") e executa cada etapa pelos mesmos serviços da aplicação: atendimento, resolução, confirmação com nota e contestação. Os quatro cenários de equipe (segundo solicitante e segundo analista, resolução por outro responsável e um incidente da rede cabeada) só rodam se as contas adicionais existirem. Não altera registros existentes nem cria histórico com datas passadas. Detalhes em [cenários de demonstração](docs/05-demonstracao.md#cenários-de-demonstração).
 
 O seed gerencial opcional (`npm run seed:manager`) cria 24 chamados fictícios por mês para os gráficos da gestão. Exige as contas adicionais `demo.ti2@helpdesk.local` e `demo.solicitante2@helpdesk.local` e a variável `LOCAL_DEMO_SEED=1`, e recusa bancos remotos ou de produção. Em PowerShell, a partir da raiz:
 
@@ -240,8 +245,8 @@ npm run build
 ```
 
 - **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit, incidentes compartilhados, privacidade das respostas, base de conhecimento, classificação orientada e confirmação de resolução. Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
-- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390 px e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução e quadro (incluindo teclado, justificativa e conflito 409). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
-- **Documentação (`npm run docs:check`):** links, âncoras, imagens, scripts npm citados, variáveis dos exemplos e credenciais demonstrativas.
+- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390 px e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução e quadro (incluindo teclado, justificativa, conflito 409 e filtros recolhidos no celular). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
+- **Documentação (`npm run docs:check`):** links, âncoras, imagens, viewport e tema de cada captura, scripts npm citados, variáveis dos exemplos e credenciais demonstrativas.
 
 O que cada teste cobre: [o que os testes verificam](docs/05-demonstracao.md#o-que-os-testes-verificam).
 

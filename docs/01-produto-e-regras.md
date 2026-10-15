@@ -27,7 +27,7 @@ Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de c
 | Ser responsável | Não | Sim | Sim |
 | Consultar equipe TI | Não | Sim | Sim |
 | Receber auditoria do chamado (justificativas, ciclos, origem, contatos) | Não | Sim | Sim |
-| Página inicial | Início: pedidos próprios e problemas conhecidos | Atendimento: fila global, pessoal e incidentes ativos | Visão gerencial (Atendimento também disponível) |
+| Página inicial | Início: portal de ajuda com busca, assuntos, problemas conhecidos e pedidos próprios | Atendimento: o que precisa de ação, fila pessoal, sem responsável e incidentes ativos | Visão gerencial (Atendimento, Chamados e Artigos no grupo Operação) |
 | Visão gerencial e dados de equipe | Não | Não | Exclusiva |
 | Publicar, editar, encerrar e republicar incidente | Não | Sim | Sim |
 | Ver incidentes ativos e indicar que foi afetado | Sim | Sim | Sim |

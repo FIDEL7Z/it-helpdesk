@@ -19,6 +19,7 @@ let baseUrl: string;
 interface TestUser {
   id: string;
   token: string;
+  name: string;
 }
 
 let requester: TestUser;
@@ -53,7 +54,7 @@ async function createUser(name: string, role: UserRole): Promise<TestUser> {
     passwordHash: 'not-used-tokens-are-signed-directly',
     role,
   });
-  return { id: user.id, token: signAccessToken(user.id) };
+  return { id: user.id, token: signAccessToken(user.id), name };
 }
 
 const validTicket = {
@@ -100,14 +101,14 @@ describe('POST /api/tickets', () => {
     const { status, body } = await api('POST', '/tickets', requester, validTicket);
 
     assert.equal(status, 201);
-    assert.equal(body.ticket.requester.id, requester.id);
+    assert.equal(body.ticket.requesterId, requester.id);
     assert.equal(body.ticket.status, 'aberto');
     assert.equal(body.ticket.assignee, null);
     assert.equal(body.ticket.title, validTicket.title);
     assert.equal(body.ticket.history.length, 1);
     assert.equal(body.ticket.history[0].type, 'created');
-    assert.equal(body.ticket.history[0].author.id, requester.id);
-    assert.equal('passwordHash' in body.ticket.requester, false);
+    assert.equal(body.ticket.history[0].author.name, requester.name);
+    assert.equal(JSON.stringify(body).includes('passwordHash'), false);
   });
 
   it('defaults priority to media', async () => {
@@ -173,7 +174,7 @@ describe('GET /api/tickets (listing, filters and pagination)', () => {
     const { status, body } = await api('GET', '/tickets', requester);
     assert.equal(status, 200);
     assert.equal(body.pagination.total, 3);
-    assert.ok(body.tickets.every((t: Body & any) => t.requester.id === requester.id));
+    assert.ok(body.tickets.every((t: Body & any) => t.requesterId === requester.id));
   });
 
   it('IT sees every ticket, newest first', async () => {

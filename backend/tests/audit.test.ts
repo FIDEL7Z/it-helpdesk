@@ -211,7 +211,8 @@ describe('structured ticket audit', () => {
   it('separates demonstration and unclassified legacy data from operational indicators', async () => {
     await create();
     const demo = await user('demo', 'solicitante', 'demo.solicitante2@helpdesk.local');
-    assert.equal((await create(demo)).dataOrigin, 'demo');
+    // The requester response does not carry dataOrigin; the classification is checked where it is stored.
+    assert.equal((await TicketModel.findById((await create(demo)).id))?.dataOrigin, 'demo');
     await TicketModel.create({ title: 'Legado desconhecido', description: 'Origem sem comprovação.', category: 'rede', requester: requester.id });
     for (const dataOrigin of ['operational', 'demo', 'legacy']) {
       const summary = await request(manager, 'GET', `/dashboard/summary?dataOrigin=${dataOrigin}`);

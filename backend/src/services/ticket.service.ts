@@ -69,6 +69,46 @@ export interface TicketDetail extends TicketSummary {
   history: TicketEventView[];
 }
 
+/**
+ * What a requester receives about their own request: an explicit allowlist, not the team
+ * shape with fields removed. No audit metadata, justifications, cycles, data origin or other
+ * people's ids and contact data; people appear by name only.
+ */
+export interface PersonName {
+  name: string;
+}
+
+export interface RequesterEventView {
+  type: TicketEventType;
+  message: string;
+  at: Date | null;
+  author: PersonName | null;
+}
+
+export interface RequesterTicketSummary {
+  id: string;
+  title: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  /** The requester's own id, so the client can tell it is their request. */
+  requesterId: string | null;
+  assignee: PersonName | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  /** Needed to edit the text while the request is open. */
+  revision: number;
+  resolvedAt: Date | null;
+}
+
+export interface RequesterTicketDetail extends RequesterTicketSummary {
+  description: string;
+  history: RequesterEventView[];
+}
+
+export type TicketSummaryView = TicketSummary | RequesterTicketSummary;
+export type TicketDetailView = TicketDetail | RequesterTicketDetail;
+
 export interface Pagination {
   page: number;
   limit: number;
@@ -147,7 +187,32 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
   };
 }
 
-export async function toTicketDetail(ticket: TicketDocument): Promise<TicketDetail> {
+function nameOf(user: PublicUser | null): PersonName | null {
+  return user ? { name: user.name } : null;
+}
+
+function toRequesterSummary(ticket: TicketDocument, users: UserMap): RequesterTicketSummary {
+  return {
+    id: ticket.id,
+    title: ticket.title,
+    category: ticket.category,
+    priority: ticket.priority,
+    status: ticket.status,
+    requesterId: ticket.requester?.toString() ?? null,
+    assignee: nameOf(userFrom(users, ticket.assignee)),
+    createdAt: ticket.createdAt ?? null,
+    updatedAt: ticket.updatedAt ?? null,
+    revision: ticket.revision ?? 0,
+    resolvedAt: ticket.resolvedAt ?? null,
+  };
+}
+
+/** Team shape for operators with tickets:view-audit; the requester allowlist for everyone else. */
+function toSummaryFor(ticket: TicketDocument, users: UserMap, actor: PublicUser): TicketSummaryView {
+  return can(actor.role, 'tickets:view-audit') ? toSummary(ticket, users) : toRequesterSummary(ticket, users);
+}
+
+export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser): Promise<TicketDetailView> {
   const users = await loadUsers([
     ticket.requester,
     ticket.assignee,
@@ -155,6 +220,20 @@ export async function toTicketDetail(ticket: TicketDocument): Promise<TicketDeta
     ...ticket.history.flatMap(event => [event.audit?.assigneeAtEvent ?? null]),
     ...ticket.history.map((event) => event.author),
   ]);
+
+  if (!can(actor.role, 'tickets:view-audit')) {
+    return {
+      ...toRequesterSummary(ticket, users),
+      description: ticket.description,
+      history: ticket.history.map((event) => ({
+        type: event.type,
+        message: event.message,
+        at: event.at ?? null,
+        // The name recorded at the time of the action, when available.
+        author: event.audit?.actorSnapshot ? { name: event.audit.actorSnapshot.name } : nameOf(userFrom(users, event.author)),
+      })),
+    };
+  }
 
   return {
     ...toSummary(ticket, users),
@@ -264,7 +343,7 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
 
 // ---------- Use cases ----------
 
-export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetail> {
+export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetailView> {
   // The requester always comes from the authenticated user, never from the request body.
   const at = new Date();
   const origin = DEMO_EMAILS.has(actor.email) ? 'demo' : 'operational';
@@ -278,13 +357,13 @@ export async function createTicket(input: CreateTicketInput, actor: PublicUser):
       audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...input }, null, origin, randomUUID(), 0) }],
   });
 
-  return toTicketDetail(ticket);
+  return toTicketDetail(ticket, actor);
 }
 
 export async function listTickets(
   query: ListTicketsQuery,
   actor: PublicUser,
-): Promise<{ tickets: TicketSummary[]; pagination: Pagination }> {
+): Promise<{ tickets: TicketSummaryView[]; pagination: Pagination }> {
   const filter = buildTicketFilter(query, actor);
   const { page, limit } = query;
 
@@ -300,13 +379,13 @@ export async function listTickets(
   const users = await loadUsers(tickets.flatMap((ticket) => [ticket.requester, ticket.assignee, ticket.resolvedBy]));
 
   return {
-    tickets: tickets.map((ticket) => toSummary(ticket, users)),
+    tickets: tickets.map((ticket) => toSummaryFor(ticket, users, actor)),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
 
-export async function getTicket(id: string, actor: PublicUser): Promise<TicketDetail> {
-  return toTicketDetail(await findAccessibleTicket(id, actor));
+export async function getTicket(id: string, actor: PublicUser): Promise<TicketDetailView> {
+  return toTicketDetail(await findAccessibleTicket(id, actor), actor);
 }
 
 // ---------- Updates ----------
@@ -340,7 +419,7 @@ async function saveChanges(
   events: NewEvent[],
   actor: PublicUser,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const at = new Date();
   if ((ticket.updatedAt && at < ticket.updatedAt) || ticket.history.some(event => event.at && event.at > at)) {
     throw new HttpError(409, 'Ticket contains future dates. Review data integrity before updating');
@@ -370,7 +449,7 @@ async function saveChanges(
     throw new HttpError(409, 'Ticket was changed by someone else. Reload and try again');
   }
 
-  return toTicketDetail(updated);
+  return toTicketDetail(updated, actor);
 }
 
 /**
@@ -384,7 +463,7 @@ export async function updateTicket(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
 
@@ -432,7 +511,7 @@ export async function updateTicket(
   }
 
   // Same values as before: nothing to save, no history event.
-  if (messages.length === 0) return toTicketDetail(ticket);
+  if (messages.length === 0) return toTicketDetail(ticket, actor);
 
   return saveChanges(ticket, changes, [{ type: 'updated', message: messages.join('; '),
     from: Object.fromEntries(Object.keys(changes).map(key => [key, ticket.get(key)])), to: { ...changes } }], actor, reason);
@@ -445,7 +524,7 @@ export async function changeStatus(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
   const from = ticket.status;
@@ -494,7 +573,7 @@ export async function assignTicket(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
 
@@ -507,7 +586,7 @@ export async function assignTicket(
     throw new HttpError(400, 'Assignee must be an IT team member');
   }
 
-  if (ticket.assignee?.equals(assignee._id)) return toTicketDetail(ticket);
+  if (ticket.assignee?.equals(assignee._id)) return toTicketDetail(ticket, actor);
 
   if (ticket.status === 'em_andamento' && ticket.assignee && !reason) throw new HttpError(400, 'A reason is required to reassign during work');
   const previous = ticket.assignee ? await UserModel.findById(ticket.assignee) : null;

@@ -9,6 +9,8 @@ import type { UserRole } from '../models/user.model';
 export const PERMISSIONS = {
   /** See every ticket. Without it, a user only sees the tickets they opened. */
   'tickets:view-all': ['ti', 'gestor'],
+  /** Receive operational ticket data: audit metadata, people's contact data, cycles and data origin. */
+  'tickets:view-audit': ['ti', 'gestor'],
   /** Workflow actions: change status, assign and triage (category and priority). */
   'tickets:operate': ['ti', 'gestor'],
   /** Can be set as a ticket's assignee. */

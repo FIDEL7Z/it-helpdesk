@@ -107,7 +107,7 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
 - **Paleta Slate + Teal em tokens CSS:** cores definidas uma vez em `:root`, com variante escura. Os pares de texto e fundo foram calculados acima de 4,5:1 e as bordas de campos acima de 3:1, nos dois temas; o E2E confere o contraste dos botões em cada execução. Situação nunca depende só de cor: selos têm texto e o status do incidente tem ponto e rótulo.
 - **Incidentes em coleções próprias:** a revisão do chamado não é usada para participações, então cliques de muitas pessoas não geram 409 no atendimento. O custo é não ter transação entre chamado e incidente, compensado pela reconciliação na leitura.
-- **Formato público explícito:** o backend monta o objeto público campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
+- **Formato público explícito:** o backend monta o objeto público do incidente e o chamado entregue ao solicitante campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
 
 ## Segurança e limites operacionais
 

@@ -60,18 +60,18 @@ Para repetir a demonstração, reabra o chamado (com motivo) e use **Republicar*
 |---|---|
 | Login, token e sessão | `auth.test.ts`; E2E testa senha incorreta, login/logout e restauração após reload |
 | Criação e persistência | `tickets.test.ts` cria e consulta no MongoDB real; E2E edita um chamado pela UI e confirma na API |
-| Isolamento e RBAC | `tickets.test.ts` e `permissions.test.ts`; E2E compara acesso/listas dos três perfis e operações do gestor |
+| Isolamento e RBAC | `tickets.test.ts`, `permissions.test.ts` e `ticket-privacy.test.ts` (campos exatos e ausência de dados restritos nas respostas do solicitante); E2E compara acesso/listas dos três perfis e operações do gestor |
 | Triagem, atribuição, resolução e reabertura | `tickets.test.ts`, incluindo eventos e transições |
 | Dashboard | `dashboard.test.ts`, `permissions.test.ts` e `manager.test.ts`; períodos/fuso, ranking, autor real, ciclos, origens e acesso exclusivo; E2E verifica filtros e três reloads do básico por perfil |
 | Rate limit e hardening | `security.test.ts`, incluindo 429, isolamento de outras rotas, ausência de X-Powered-By e limite JSON |
-| Incidentes compartilhados | `incidents.test.ts` (23 testes): permissões, formato público, participação idempotente e simultânea, concorrência, encerramento, reconciliação, reabertura e republicação; E2E: TI publica pela UI, marca na fila, solicitante entra/sai/volta com contagem exata, gestor vê o impacto, resolução encerra para todos |
+| Incidentes compartilhados | `incidents.test.ts` (27 testes): permissões, formato público, participação idempotente e simultânea, concorrência, encerramento, reconciliação (inclusive com falha de gravação simulada e reabertura antes da leitura), corridas entre publicação/republicação e resolução, reabertura e republicação; E2E: TI publica pela UI, marca na fila, solicitante entra/sai/volta com contagem exata, gestor vê o impacto, resolução encerra para todos |
 | Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, capturas claro/escuro e contraste de texto dos botões; não substitui auditoria completa de acessibilidade/responsividade |
 
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
 
-Em **15/10/2026**, na branch de incidentes compartilhados: **147 testes backend** e **115 verificações E2E** aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown, 14 capturas PNG e as 15 variáveis dos exemplos, preservando as seis credenciais públicas. Os quatro diagramas Mermaid foram revisados manualmente contra a implementação; o diagrama de coleções inclui as duas coleções de incidentes.
+Em **15/10/2026**, na branch de incidentes compartilhados: **156 testes backend** e **115 verificações E2E** aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown, 14 capturas PNG e as 15 variáveis dos exemplos, preservando as seis credenciais públicas. Os quatro diagramas Mermaid foram revisados manualmente contra a implementação; o diagrama de coleções inclui as duas coleções de incidentes.
 
 Em **10/10/2026**, na etapa anterior: 124 testes backend e 104 verificações E2E aprovados.
 

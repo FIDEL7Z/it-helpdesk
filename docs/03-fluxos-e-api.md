@@ -76,7 +76,7 @@ Base local: `http://localhost:3000/api`. Rotas autenticadas exigem `Authorizatio
 | GET | `/auth/me` | Usuário autenticado → `{ user }` |
 | POST | `/tickets` | `{ title, description, category, priority? }`; qualquer perfil autenticado |
 | GET | `/tickets` | Escopo autorizado; filtros e paginação → `{ tickets, pagination }` |
-| GET | `/tickets/:id` | Dono, TI ou gestor → `{ ticket }` com histórico |
+| GET | `/tickets/:id` | Dono, TI ou gestor → `{ ticket }` com histórico; o dono solicitante recebe o [formato reduzido](01-produto-e-regras.md#permissões-implementadas) |
 | PATCH | `/tickets/:id` | Texto próprio aberto; categoria/prioridade TI/gestor; `expectedRevision` obrigatório e não resolvido |
 | PATCH | `/tickets/:id/status` | TI/gestor; `{ status, expectedRevision, reason? }`, conforme transições |
 | PATCH | `/tickets/:id/assignee` | TI/gestor; `{ assigneeId, expectedRevision, reason? }`, destino operador ativo e chamado não resolvido |

@@ -26,12 +26,15 @@ Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de c
 | Atribuir responsável | Não | Se não resolvido; destino TI/gestor ativo | Mesma regra |
 | Ser responsável | Não | Sim | Sim |
 | Consultar equipe TI | Não | Sim | Sim |
+| Receber auditoria do chamado (justificativas, ciclos, origem, contatos) | Não | Sim | Sim |
 | Página inicial | Início: pedidos próprios e problemas conhecidos | Atendimento: fila global, pessoal e incidentes ativos | Visão gerencial (Atendimento também disponível) |
 | Visão gerencial e dados de equipe | Não | Não | Exclusiva |
 | Publicar, editar, encerrar e republicar incidente | Não | Sim | Sim |
 | Ver incidentes ativos e indicar que foi afetado | Sim | Sim | Sim |
 
 O endpoint gerencial exige o papel gestor, validado na rota após autenticação. As permissões operacionais estão em [backend/src/auth/permissions.ts](../backend/src/auth/permissions.ts). O frontend mantém uma cópia apenas para controlar a interface. A API aplica a autorização mesmo em chamadas diretas. Status e atribuição exigem permissão na rota; consulta e edição aplicam escopo e propriedade no service.
+
+O solicitante recebe um formato próprio, montado campo a campo no backend: dados do pedido, situação, datas, revisão para editar, nome de quem atende e o histórico com tipo, mensagem, data e nome do autor. Não recebe justificativas internas, metadados de auditoria, ciclos, origem dos dados, IDs ou e-mails de outras pessoas. TI e gestor recebem o formato operacional completo (permissão `tickets:view-audit`).
 
 O papel vem do usuário no banco a cada requisição, não do JWT. Usuário removido ou desativado é rejeitado. Para solicitante, consultar o chamado de outra pessoa retorna 404, evitando confirmar sua existência.
 
@@ -66,7 +69,7 @@ Quando várias pessoas sofrem o mesmo problema (Wi-Fi fora, sistema lento), cada
 
 **Edição e concorrência.** O incidente tem revisão própria, separada da revisão do chamado. Editar, encerrar e republicar exigem `expectedRevision`; uma tela desatualizada recebe 409 e recarrega. Participar não altera a revisão do incidente nem a do chamado, então muitas pessoas clicando ao mesmo tempo não bloqueiam o atendimento.
 
-**Encerramento.** Resolver o chamado principal encerra o incidente, com o autor da resolução registrado como quem encerrou. Se a gravação do encerramento falhar logo após a resolução, a próxima leitura detecta o chamado resolvido e conclui o encerramento. TI e gestor também podem encerrar manualmente, com mensagem de encerramento. Depois de encerrado, ninguém entra como afetado; quem acompanhava vê o problema como resolvido. Reabrir o chamado não reativa o incidente: se o problema voltar, a equipe reabre o chamado e republica o incidente, o que inicia um novo ciclo e pede nova confirmação de quem está afetado.
+**Encerramento.** Resolver o chamado principal encerra o incidente, com o autor da resolução registrado como quem encerrou. Se a gravação do encerramento falhar logo após a resolução, a próxima leitura detecta a resolução e conclui o encerramento, inclusive se o chamado já tiver sido reaberto. Enquanto esse reparo não for gravado, todas as respostas já mostram o incidente como encerrado e ninguém consegue entrar nele. Publicar, republicar ou participar no mesmo instante de uma resolução também termina com o incidente encerrado. TI e gestor também podem encerrar manualmente, com mensagem de encerramento. Depois de encerrado, ninguém entra como afetado; quem acompanhava vê o problema como resolvido. Reabrir o chamado não reativa o incidente: se o problema voltar, a equipe reabre o chamado e republica o incidente, o que inicia um novo ciclo e pede nova confirmação de quem está afetado.
 
 **Auditoria.** Publicação, edição do texto, encerramento e republicação geram eventos com autor, papel, data, revisão, ciclo e valores anteriores/novos. Participações não geram eventos, para não transformar o histórico em um registro de cliques.
 

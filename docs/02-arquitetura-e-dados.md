@@ -128,7 +128,7 @@ Os incidentes compartilhados ficam fora do documento do chamado. Assim, a revis�
 
 `incidentparticipations` tem um documento por incidente, ciclo e usuário. Sair preenche `leftAt`; voltar limpa o campo no mesmo documento. Afetados = participações do ciclo atual com `leftAt` nulo, contadas por agregação. Um contador salvo no incidente poderia divergir após cliques simultâneos.
 
-O MongoDB do Compose roda sem réplica, portanto sem transações entre coleções. Resolver o chamado e encerrar o incidente são duas escritas. Se a segunda falhar, a leitura seguinte de qualquer tela de incidentes encontra o chamado resolvido e conclui o encerramento. Regras completas em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
+O MongoDB do Compose roda sem réplica, portanto sem transações entre coleções. Resolver o chamado e encerrar o incidente são duas escritas. Se a segunda falhar, a leitura seguinte de qualquer tela de incidentes encontra a resolução (pelo status atual ou por um evento de resolução posterior à publicação, caso o chamado já tenha sido reaberto) e conclui o encerramento. Se esse reparo também falhar, a resposta mostra o incidente como encerrado sem gravar nada, e a leitura seguinte tenta de novo. Publicação, republicação e participação reconciliam o resultado logo após gravar, o que cobre uma resolução que chegue entre a verificação e a escrita. Regras completas em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
 
 ### Índices explícitos
 

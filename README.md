@@ -41,8 +41,9 @@ Quando a TI identifica um problema que atinge várias pessoas, publica um aviso 
 
 ![Problema conhecido acompanhado pela solicitante, com a opção de sair](docs/assets/screenshots/incidente-solicitante-desktop.png)
 
-- O solicitante recebe só o texto público escrito pela TI; a descrição do chamado e a lista de afetados não saem do backend.
+- O solicitante recebe só o texto público escrito pela TI; a descrição do chamado e a lista de afetados não saem do backend. O mesmo vale para os próprios chamados: o solicitante não recebe justificativas internas, metadados de auditoria nem e-mails da equipe.
 - Clicar duas vezes, ou várias pessoas ao mesmo tempo, não duplica a contagem.
+- Um incidente nunca aparece como ativo depois que o chamado principal foi resolvido, mesmo se a gravação do encerramento falhar.
 - Participar não interfere no atendimento do chamado.
 - Publicação, edição, encerramento e republicação ficam no histórico do incidente, com autor.
 - O número de afetados mostra alcance. O sistema não afirma quantos chamados foram evitados.
@@ -249,7 +250,6 @@ docker-compose.yml  MongoDB local
 - Incidentes não avisam ativamente; o usuário vê o problema ao abrir o sistema. Não há vínculo de outros chamados ao incidente nem sugestão automática de problemas parecidos.
 - Sem SLA, tempo médio de atendimento ou evolução histórica do backlog. Indicadores mostram estado atual e ações comprovadas, não qualidade da equipe.
 - O MongoDB local roda sem réplica, portanto sem transações entre coleções. Encerrar o incidente após resolver o chamado são duas escritas, e uma falha entre elas é corrigida na leitura seguinte.
-- A API do detalhe do chamado ainda envia ao solicitante os metadados de auditoria dos eventos (autor, ciclo, justificativa). A interface do solicitante não os exibe.
 - Dashboards não atualizam em tempo real. O tema segue o sistema operacional; não há seletor manual.
 
 Mais detalhes em [métricas, decisões e limites](docs/04-metricas-decisoes-e-limites.md).

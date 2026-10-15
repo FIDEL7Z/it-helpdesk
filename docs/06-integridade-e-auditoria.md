@@ -6,6 +6,8 @@
 
 Solicitante abre o chamado; responsável é quem está atribuído; autor executa uma ação. Uma identidade não substitui a outra. TI e gestor podem operar e ser responsáveis. Resolver um chamado atribuído a outro responsável exige justificativa de 5–1000 caracteres. Reabertura, alteração de prioridade e reatribuição durante atendimento também exigem motivo.
 
+A auditoria é da equipe: o solicitante recebe o histórico do próprio chamado sem o bloco `audit`, sem justificativas e sem IDs ou e-mails de outras pessoas (detalhes em [regras](01-produto-e-regras.md#permissões-implementadas)).
+
 O backend valida o JWT e consulta o usuário ativo a cada requisição. Autor, snapshots e datas são gerados pelo servidor. O cliente não pode fornecer esses campos, editar o histórico nem modificar projeções de resolução.
 
 ## Eventos v2 e escrita atômica

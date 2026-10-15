@@ -157,7 +157,8 @@ export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
 
 export interface TicketFilters {
   createdFrom?: string; createdTo?: string;
-  attention?: 'high_unassigned' | 'oldest' | 'inactive';
+  /** contested: the requester said the last resolution did not work and the ticket is back in progress. */
+  attention?: 'high_unassigned' | 'oldest' | 'inactive' | 'contested';
   inactivityDays?: number;
   ageDays?: number;
   pending?: boolean;
@@ -170,6 +171,8 @@ export interface TicketFilters {
   search?: string;
   /** "none": no assignee yet; "me": assigned to the authenticated user. */
   assignee?: AssigneeFilter;
+  /** Creation order; oldest first helps pick the next ticket from a queue. */
+  sort?: 'newest' | 'oldest';
 }
 
 export interface ListTicketsQuery extends TicketFilters {
@@ -393,6 +396,15 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
       { $ne: [lastOperationalActivity(now), null] },
       { $lte: [lastOperationalActivity(now), daysAgo(filters.inactivityDays ?? 3, now)] },
     ] } });
+    // Same definition as the "Reaberto pelo solicitante" marker: a contest reopened the current cycle.
+    if (filters.attention === 'contested') filter.$and.push({ status: 'em_andamento', $expr: { $gt: [{ $size: { $filter: {
+      input: { $ifNull: ['$history', []] }, as: 'event',
+      cond: { $and: [
+        { $eq: ['$$event.type', 'reopened'] },
+        { $eq: ['$$event.audit.cycleId', { $ifNull: ['$activeCycleId', 1] }] },
+        { $isNumber: '$$event.audit.to.contestedCycle' },
+      ] },
+    } } }, 0] } });
   }
   // User input is escaped so it is matched literally, not as a regular expression.
   if (filters.search) filter.title = { $regex: escapeRegex(filters.search), $options: 'i' };
@@ -445,7 +457,7 @@ export async function listTickets(
   const [total, tickets] = await Promise.all([
     TicketModel.countDocuments(filter),
     TicketModel.find(filter)
-      .sort(query.attention === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
+      .sort(query.attention === 'oldest' || query.sort === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       // History stays (without messages) to tell whether the requester contested the resolution.

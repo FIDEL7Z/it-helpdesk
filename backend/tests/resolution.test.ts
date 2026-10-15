@@ -237,3 +237,28 @@ describe('quality indicators for the manager', () => {
     assert.equal((await api('GET', '/dashboard/manager', tech)).status, 403);
   });
 });
+
+describe('queue filters for the team', () => {
+  it('attention=contested lists tickets reopened by the requester in the current cycle only', async () => {
+    const contested = await resolvedTicket();
+    await contest(contested.id, 1, 'Continua reiniciando sozinho.');
+    const reopenedByTeam = await resolvedTicket();
+    await status(reopenedByTeam.id, tech, 'em_andamento', 'Nova falha detectada pela equipe.');
+    const ids = async () => (await api('GET', '/tickets?attention=contested&limit=50', tech)).body.tickets.map((item: Json) => item.id);
+
+    const listed = await ids();
+    assert.ok(listed.includes(contested.id));
+    assert.equal(listed.includes(reopenedByTeam.id), false, 'a reopening by the team is not a contest');
+    await status(contested.id, tech, 'resolvido');
+    assert.equal((await ids()).includes(contested.id), false, 'resolved again: no longer waiting as contested');
+    assert.equal((await api('GET', '/tickets?attention=contested', requester)).status, 200, 'requesters can use it on their own tickets');
+  });
+
+  it('sort=oldest returns the queue from the oldest creation; other values are rejected', async () => {
+    const oldest = await api('GET', '/tickets?sort=oldest&limit=50', tech);
+    const dates = oldest.body.tickets.map((item: Json) => new Date(item.createdAt).getTime());
+    assert.ok(dates.length > 1);
+    assert.deepEqual(dates, [...dates].sort((a, b) => a - b));
+    assert.equal((await api('GET', '/tickets?sort=priority', tech)).status, 400);
+  });
+});

@@ -6,6 +6,7 @@ import type { UserRole } from '../services/auth'
  */
 const PERMISSIONS = {
   'tickets:view-all': ['ti', 'gestor'],
+  'tickets:view-audit': ['ti', 'gestor'],
   'tickets:operate': ['ti', 'gestor'],
   'tickets:be-assigned': ['ti', 'gestor'],
   'users:list-it-staff': ['ti', 'gestor'],

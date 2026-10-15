@@ -121,7 +121,7 @@ export function TicketDetailPage() {
 
   const canOperate = can(user?.role, 'tickets:operate')
   // The team sees audit details (cycles, origin, assignee at each event); requesters see a plain timeline.
-  const teamView = can(user?.role, 'tickets:view-all')
+  const teamView = can(user?.role, 'tickets:view-audit')
   const isSupervisor = teamView && !canOperate
   const isOwner = ticket.requesterId === user?.id
   const canEditText = isOwner && ticket.status === 'aberto'

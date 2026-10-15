@@ -47,13 +47,19 @@ export const TICKET_LIMITS = {
 
 export const PAGE_SIZE = 10
 
+/**
+ * Requesters receive people by name only; the team (tickets:view-audit) receives the public user.
+ * Fields marked optional below are sent only to the team.
+ */
+export type Person = Pick<User, 'name'> & Partial<Omit<User, 'name'>>
+
 export type TicketEvent = {
   type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved'
   message: string
   at: string | null
-  author: User | null
-  authorId: string | null
-  assigneeAtEvent: User | null
+  author: Person | null
+  authorId?: string | null
+  assigneeAtEvent?: Person | null
   audit?: {
     eventId: string
     actorId: string
@@ -78,18 +84,18 @@ export type TicketSummary = {
   category: TicketCategory
   priority: TicketPriority
   status: TicketStatus
-  requester: User | null
-  assignee: User | null
-  assigneeId: string | null
+  requester?: Person | null
+  assignee: Person | null
+  assigneeId?: string | null
   requesterId: string | null
   createdAt: string | null
   updatedAt: string | null
   revision: number
-  activeCycleId: number
+  activeCycleId?: number
   resolvedAt: string | null
-  resolvedBy: User | null
-  resolvedById: string | null
-  dataOrigin: 'operational' | 'demo' | 'legacy'
+  resolvedBy?: Person | null
+  resolvedById?: string | null
+  dataOrigin?: 'operational' | 'demo' | 'legacy'
   /** Only in the team's list: this ticket is the main ticket of a shared incident. */
   incident?: IncidentBadge | null
 }

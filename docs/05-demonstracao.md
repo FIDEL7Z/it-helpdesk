@@ -133,6 +133,7 @@ O convite pendente não equivale a acesso ativo. O avaliador precisa aceitá-lo.
 - **Invalid environment variables:** conferir MONGODB_URI e JWT_SECRET com ao menos 32 caracteres.
 - **Failed to start server:** verificar conexão com o banco; a API só aceita requisições depois de conectar.
 - **EBADENGINE:** usar Node 22.22 ou superior, conforme engines dos projetos.
+- **E2E lento ou com timeout de captura no Windows com a tela bloqueada:** o Windows marca a janela do Edge headless como oculta, o que pausa a renderização. O E2E desativa essa detecção, traz a página de volta quando necessário e informa no final quantas vezes isso ocorreu; as verificações não mudam. Se ainda falhar, rode com a sessão desbloqueada.
 - **429 no login:** aguardar a janela do limite; reiniciar a API apenas no ambiente de demonstração se necessário.
 - **CORS:** conferir origem exata, inclusive porta; preview usa 4173, desenvolvimento usa 5173 por padrão.
 - **Seed demo sem usuários:** executar `npm run seed` no mesmo ambiente antes de `npm run seed:demo`.

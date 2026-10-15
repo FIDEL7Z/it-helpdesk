@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { can } from '../auth/permissions';
 import { getAuthenticatedUser } from '../middlewares/auth.middleware';
+import * as incidentService from '../services/incident.service';
 import {
   TICKET_CATEGORIES,
   TICKET_LIMITS,
@@ -63,8 +65,15 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
 
 export async function listTickets(req: Request, res: Response): Promise<void> {
   const query = listTicketsQuerySchema.parse(req.query);
-  const result = await ticketService.listTickets(query, getAuthenticatedUser(req));
+  const actor = getAuthenticatedUser(req);
+  const result = await ticketService.listTickets(query, actor);
 
+  // The team sees which tickets are the main ticket of a shared incident (and how many people joined).
+  if (can(actor.role, 'incidents:manage')) {
+    const badges = await incidentService.badgesForTickets(result.tickets.map((ticket) => ticket.id));
+    res.json({ ...result, tickets: result.tickets.map((ticket) => ({ ...ticket, incident: badges.get(ticket.id) ?? null })) });
+    return;
+  }
   res.json(result);
 }
 
@@ -110,7 +119,16 @@ export async function updateTicket(req: Request, res: Response): Promise<void> {
 export async function changeStatus(req: Request, res: Response): Promise<void> {
   const { id } = idParamsSchema.parse(req.params);
   const { status, expectedRevision, reason } = changeStatusSchema.parse(req.body);
-  const ticket = await ticketService.changeStatus(id, status, getAuthenticatedUser(req), expectedRevision, reason);
+  const actor = getAuthenticatedUser(req);
+  const ticket = await ticketService.changeStatus(id, status, actor, expectedRevision, reason);
+
+  // Resolving the main ticket closes its shared incident. The ticket is already saved, so a failure
+  // here must not turn the response into an error; reads reconcile a missed close (see incident.service).
+  if (ticket.status === 'resolvido') {
+    await incidentService.closeForResolvedTicket(ticket.id, actor).catch((error: unknown) => {
+      console.error('Could not close the shared incident after resolving the ticket:', error);
+    });
+  }
 
   res.json({ ticket });
 }

@@ -7,6 +7,7 @@ import { PieChart, TrendLineChart, HorizontalChart, HoursChart } from '../compon
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getManagerDashboard, type ManagerDashboard, type Count } from '../services/manager'
 import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tickets'
+import { IncidentsOverview } from '../components/IncidentsOverview'
 import { getErrorMessage } from '../utils/errors'
 
 const PERIODS = { today: 'Hoje', week: 'Últimos sete dias', month: 'Mês atual', year: 'Ano atual' }
@@ -85,6 +86,7 @@ function ManagerContent() {
         </div><details className="manager-help"><summary>Como interpretar os alertas</summary><p>Idade: tempo desde a abertura. Inatividade: desde a última ação comprovada de suporte ou gestor. {data.alerts.unknownActivity} pendências sem movimentação comprovada não entram no alerta de inatividade. Não representam SLA. Ajuste os dias nos filtros avançados.</p></details>
         {data.alerts.oldest.length > 0 && <details><summary>Pendências mais antigas</summary><ul>{data.alerts.oldest.map(row => <li key={row.id}><Link to={`/tickets/${row.id}`} state={{ returnTo: tickets({ pending: 'true' }) }}>{row.title}</Link> · {row.ageDays} dias desde a abertura</li>)}</ul></details>}
         </section>
+        <IncidentsOverview dataOrigin={origin} />
         <section aria-labelledby="manager-overview"><h2 id="manager-overview" className="section-title">Visão geral</h2>
           <div className="manager-stats">
             <Metric label="Criados no período" to={tickets({ createdFrom: data.range.start, createdTo: data.range.end })} value={data.period.created} hint="Aberturas, independentemente do status atual" />

@@ -1,5 +1,6 @@
 import { apiRequest } from './api'
 import type { User } from './auth'
+import type { IncidentBadge } from './incidents'
 
 export const TICKET_CATEGORIES = ['hardware', 'software', 'rede', 'acesso', 'outros'] as const
 export const TICKET_PRIORITIES = ['baixa', 'media', 'alta'] as const
@@ -26,6 +27,13 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   aberto: 'Aberto',
   em_andamento: 'Em andamento',
+  resolvido: 'Resolvido',
+}
+
+/** How the person who asked for help reads the same status. */
+export const REQUESTER_STATUS_LABELS: Record<TicketStatus, string> = {
+  aberto: 'Aguardando atendimento',
+  em_andamento: 'Em atendimento',
   resolvido: 'Resolvido',
 }
 
@@ -82,6 +90,8 @@ export type TicketSummary = {
   resolvedBy: User | null
   resolvedById: string | null
   dataOrigin: 'operational' | 'demo' | 'legacy'
+  /** Only in the team's list: this ticket is the main ticket of a shared incident. */
+  incident?: IncidentBadge | null
 }
 
 export type TicketDetail = TicketSummary & {
@@ -120,6 +130,8 @@ export type TicketFilters = {
   assignee?: AssigneeFilter
   search?: string
   page?: number
+  /** Defaults to PAGE_SIZE. */
+  limit?: number
 }
 
 export type CreateTicketInput = {

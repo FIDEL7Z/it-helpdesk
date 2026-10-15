@@ -3421,3 +3421,74 @@ a:hover {
     min-width: 0;
   }
 }
+
+/* ---------- Management view: compact filters and decision-ordered sections ---------- */
+
+.manager-filterbar {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.manager-filterbar__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+}
+
+.manager-filterbar__main .field {
+  min-width: 200px;
+}
+
+.manager-filterbar .manager-source {
+  flex: 1 1 260px;
+  align-self: center;
+  margin: 0;
+}
+
+.manager-source--legacy {
+  border-color: var(--color-text-muted);
+}
+
+.manager-sections {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.manager-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.manager-section > .section-title {
+  margin-bottom: 0;
+}
+
+.manager-section h3.card__title {
+  font-size: 1rem;
+}
+
+.manager-load-note {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 0.9375rem;
+}
+
+.manager-page .stat-card__value {
+  font-size: 1.75rem;
+}
+
+/* Grid items must be allowed to shrink, or responsive charts measure a collapsed width. */
+.manager-section,
+.manager-sections {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.manager-section .bar-list__item {
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr) 32px;
+}

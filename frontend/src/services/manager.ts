@@ -14,7 +14,8 @@ export type ManagerDashboard = {
   requesters: { id: string; name: string; created: number; pending: number; categories: { category: string; count: number }[] }[]
   options: { analysts: Option[]; requesters: Option[] }
   trends: { period: string; created: number; resolved: number }[]
-  demand: { hours: Count[]; weekdays: Count[] }
+  /** categories: creations in the period by subject. */
+  demand: { hours: Count[]; weekdays: Count[]; categories: Count[] }
   coverage: { resolvedWithoutStructuredHistory: number; conflictingResolutionCycles: number }
   /** Requester answers to the resolutions proved in the period. */
   quality: { resolutions: number; confirmed: number; contested: number; awaiting: number; responseRate: number | null; ratings: number; averageRating: number | null }

@@ -389,10 +389,10 @@ async function run() {
         check(filtered.filters.period === period && filtered.period.created === 4, `Manager ${period} filter reaches backend`);
       }
       await select('manager-dataOrigin', 'demo');
-      await waitDom('demonstration indicators', 'document.querySelector(".manager-source--demo") && document.querySelector(".manager-page .stat-card__value")?.textContent === "1"');
+      await waitDom('demonstration indicators', 'document.querySelector(".manager-source--demo") && Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent === "1"');
       check((await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard.current.total === 1, 'Demonstration indicators remain separate and visibly identified');
       await select('manager-dataOrigin', 'operational');
-      await waitDom('operational indicators restored', 'document.querySelector(".manager-page .stat-card__value")?.textContent === "4"');
+      await waitDom('operational indicators restored', 'Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent === "4"');
       await evaluate('document.querySelector(".manager-filters__advanced").open = true');
       await select('manager-analystId', secondAnalyst.id);
       await waitDom('analyst filter', `location.search.includes('analystId=${secondAnalyst.id}') && document.querySelectorAll('.manager-page .stat-card__value').length === 6`);
@@ -415,7 +415,7 @@ async function run() {
       const oldDate = new Date(Date.now() - 10 * 86400000);
       await TicketModel.create({ dataOrigin: 'demo', title: '[DEMO] Aging and inactivity fixture', description: 'Explicitly fictitious isolated E2E fixture for alerts.', category: 'hardware', priority: 'alta', status: 'em_andamento', requester: other._id, assignee: secondAnalyst._id, createdAt: oldDate, updatedAt: new Date(), revision: 1, activeCycleId: 1, history: [{ type: 'assigned', author: users.gestor._id, at: oldDate, message: 'Fictitious assignment', audit: { schemaVersion: 2, eventId: randomUUID(), operationId: randomUUID(), actorId: users.gestor._id, actorSnapshot: { name: users.gestor.name, role: 'gestor' }, eventType: 'assigned', occurredAt: oldDate, revision: 1, eventIndex: 0, cycleId: 1, from: { assignee: null }, to: { assignee: secondAnalyst._id }, assigneeAtEvent: secondAnalyst._id, dataOrigin: 'demo' } }] });
       await select('manager-dataOrigin', 'demo');
-      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && document.querySelector(".manager-page .stat-card__value")?.textContent !== "4"');
+      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent !== "4"');
       const demoReport = (await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard;
       check(demoReport.current.total === 26 && demoReport.period.resolutions === 14 && demoReport.period.reopenings === 4, 'Demo aggregates reflect actual structured cycles and remain separate from four operational tickets');
       for (const attention of ['high_unassigned', 'oldest', 'inactive']) {

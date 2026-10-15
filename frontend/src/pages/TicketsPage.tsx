@@ -276,7 +276,7 @@ export function TicketsPage() {
                       <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
                     </td>
                     <td data-label="Tipo">{CATEGORY_LABELS[ticket.category]}</td>
-                    <td data-label="Situação"><StatusBadge status={ticket.status} audience="requester" /></td>
+                    <td data-label="Situação"><StatusBadge status={ticket.status} audience="requester" />{ticket.awaitingConfirmation && <Link to={`/tickets/${ticket.id}`} className="attention-tag">Confirme se resolveu</Link>}</td>
                     <td data-label="Atendido por" className={ticket.assignee ? undefined : 'text-muted'}>{ticket.assignee?.name ?? 'Aguardando a equipe'}</td>
                     <td data-label="Aberto em" className="ticket-table__date">
                       {ticket.createdAt ? <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time> : 'Data não registrada'}
@@ -320,6 +320,7 @@ export function TicketsPage() {
                   </td>
                   <td data-label="Status">
                     <StatusBadge status={ticket.status} />
+                    {ticket.contested && <span className="attention-tag">Reaberto pelo solicitante</span>}
                   </td>
                   <td data-label="Solicitante">{ticket.requester?.name ?? 'Usuário removido'}</td>
                   <td data-label="Responsável" className={ticket.assignee ? undefined : 'text-muted'}>

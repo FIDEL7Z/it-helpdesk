@@ -16,6 +16,8 @@ export type ManagerDashboard = {
   trends: { period: string; created: number; resolved: number }[]
   demand: { hours: Count[]; weekdays: Count[] }
   coverage: { resolvedWithoutStructuredHistory: number; conflictingResolutionCycles: number }
+  /** Requester answers to the resolutions proved in the period. */
+  quality: { resolutions: number; confirmed: number; contested: number; awaiting: number; responseRate: number | null; ratings: number; averageRating: number | null }
 }
 export type Count = { _id: string | number | null; count: number }
 type Option = { id: string; name: string }

@@ -134,6 +134,7 @@ export function RequesterHomePage() {
                     </div>
                     <div className="request-card__side">
                       <StatusBadge status={request.status} audience="requester" />
+                      {request.awaitingConfirmation && <span className="attention-tag">Confirme se resolveu</span>}
                       <Link to={`/tickets/${request.id}`} className="button button--ghost button--small">Ver detalhes</Link>
                     </div>
                   </li>

@@ -66,7 +66,7 @@ export const PAGE_SIZE = 10
 export type Person = Pick<User, 'name'> & Partial<Omit<User, 'name'>>
 
 export type TicketEvent = {
-  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved'
+  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved' | 'resolution_confirmed' | 'resolution_rated'
   message: string
   at: string | null
   author: Person | null
@@ -108,13 +108,26 @@ export type TicketSummary = {
   resolvedBy?: Person | null
   resolvedById?: string | null
   dataOrigin?: 'operational' | 'demo' | 'legacy'
+  /** Team: the requester said the last resolution did not solve the problem. */
+  contested?: boolean
+  /** Requester: resolved and waiting for their "was it solved?" answer. */
+  awaitingConfirmation?: boolean
   /** Only in the team's list: this ticket is the main ticket of a shared incident. */
   incident?: IncidentBadge | null
+}
+
+/** The requester's answer to the resolution of the current cycle (or the one they contested). */
+export type ResolutionFeedback = {
+  cycleId: number
+  status: 'pending' | 'confirmed' | 'contested'
+  rating: number | null
+  comment: string | null
 }
 
 export type TicketDetail = TicketSummary & {
   description: string
   intake: TicketIntake | null
+  resolutionFeedback: ResolutionFeedback | null
   history: TicketEvent[]
 }
 
@@ -236,4 +249,16 @@ export function isTicketCategory(value: string | null): value is TicketCategory 
 
 export function isAssigneeFilter(value: string | null): value is AssigneeFilter {
   return ASSIGNEE_FILTERS.some((filter) => filter === value)
+}
+
+export function confirmResolution(id: string, cycleId: number): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/confirm`, { method: 'POST', body: { cycleId } })
+}
+
+export function contestResolution(id: string, cycleId: number, reason: string): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/contest`, { method: 'POST', body: { cycleId, reason } })
+}
+
+export function rateResolution(id: string, cycleId: number, rating: number, comment?: string): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/rating`, { method: 'POST', body: { cycleId, rating, ...(comment ? { comment } : {}) } })
 }

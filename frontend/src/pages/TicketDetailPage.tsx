@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import { IncidentPanel } from '../components/IncidentPanel'
+import { ResolutionAnswer } from '../components/ResolutionAnswer'
 import { ApiError } from '../services/api'
 import type { User } from '../services/auth'
 import {
@@ -152,6 +153,8 @@ export function TicketDetailPage() {
         </div>
       )}
 
+      {isOwner && <ResolutionAnswer ticket={ticket} busy={busy} run={runAction} />}
+
       <div className={`ticket-layout${loading ? ' is-loading' : ''}`} aria-busy={loading}>
         <div className="ticket-layout__main">
           <div className="card">
@@ -263,6 +266,14 @@ export function TicketDetailPage() {
                     <dt>Resolvido em</dt>
                     <dd>{ticket.resolvedAt ? formatDateTime(ticket.resolvedAt) : 'Não registrado no ciclo atual'}</dd>
                   </div>
+                  {ticket.resolutionFeedback && (
+                    <div className="details__row">
+                      <dt>Resposta do solicitante</dt>
+                      <dd>{ticket.resolutionFeedback.status === 'pending' ? 'Aguardando confirmação'
+                        : ticket.resolutionFeedback.status === 'contested' ? `Problema continua (resolução do ciclo ${ticket.resolutionFeedback.cycleId} contestada)`
+                          : `Resolução confirmada${ticket.resolutionFeedback.rating ? ` · nota ${ticket.resolutionFeedback.rating} de 5` : ''}${ticket.resolutionFeedback.comment ? ` · “${ticket.resolutionFeedback.comment}”` : ''}`}</dd>
+                    </div>
+                  )}
                   <div className="details__row"><dt>Ciclo atual</dt><dd>{ticket.activeCycleId}</dd></div>
                   <div className="details__row"><dt>Origem</dt><dd>{ticket.dataOrigin === 'demo' ? 'Demonstração — não usar como produtividade real' : ticket.dataOrigin === 'legacy' ? 'Legado — origem não comprovada' : 'Operacional'}</dd></div>
                 </>
@@ -321,11 +332,12 @@ export function TicketDetailPage() {
             </p>
           )}
 
-          {!canOperate && isOwner && !canEditText && (
+          {/* While the "was it solved?" question is open, it is the only instruction shown. */}
+          {!canOperate && isOwner && !canEditText && ticket.resolutionFeedback?.status !== 'pending' && (
             <p className="side-note">
               {isResolved
-                ? 'Este chamado foi resolvido. Se o problema voltar, fale com a equipe de TI para reabri-lo.'
-                : 'O chamado está em atendimento pela equipe de TI e não pode mais ser editado.'}
+                ? 'Se o problema voltar mais tarde, abra um novo pedido e mencione este.'
+                : 'O pedido está em atendimento pela equipe de TI e não pode mais ser editado.'}
             </p>
           )}
         </aside>

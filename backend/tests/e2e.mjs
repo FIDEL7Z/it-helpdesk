@@ -477,7 +477,12 @@ async function run() {
     await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent === "Sair").click()');
     await waitDom(`${role} incident logout`, 'location.pathname === "/login"');
   };
-  const clickButton = (text) => evaluate(`Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === ${JSON.stringify(text)}).click()`);
+  // Waits for the button: panels and forms render after their data loads.
+  const clickButton = async (text) => {
+    const find = `Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === ${JSON.stringify(text)} && !el.disabled)`;
+    await waitDom(`button ${text}`, `!!${find}`);
+    await evaluate(`${find}.click()`);
+  };
   const cardCount = '(document.querySelector(".incident-card .incident-card__count")?.textContent ?? "")';
 
   await login('ti');
@@ -570,6 +575,19 @@ async function run() {
     && JSON.stringify(guided.intake.answers.map((item) => item.answer)) === JSON.stringify(['Notebook', 'Sim']) && guided.intake.article.id === keyboardArticle.id,
   'Guided request keeps the description, the answers of the final subject and the article read');
   check(await evaluate('document.querySelector(".intake-card").textContent.includes("Qual equipamento está com problema?")'), 'The request page shows the guided answers');
+
+  // "Seu problema foi resolvido?" on the ticket TI resolved earlier: the requester says it continues.
+  await go(`/tickets/${own.id}`);
+  await waitDom('resolution question', 'document.querySelector(".resolution-answer")?.textContent.includes("Seu problema foi resolvido?")');
+  await clickButton('Não, o problema continua.');
+  await waitDom('contest form', '!!document.getElementById("contest-reason")');
+  check(await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Reabrir pedido").disabled'), 'Contesting requires a reason');
+  await fill('contest-reason', 'O programa voltou a fechar sozinho hoje.');
+  await evaluate('document.getElementById("contest-reason").closest("form").requestSubmit()');
+  await waitDom('contested', '!!document.querySelector(".resolution-answer--contested")');
+  const contested = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+  check(contested.status === 'em_andamento' && contested.resolutionFeedback.status === 'contested' && contested.history.at(-1).type === 'reopened', 'Requester contests the resolution and the request goes back to the team');
+  check((await browserApi('POST', `/tickets/${own.id}/resolution/contest`, { cycleId: contested.resolutionFeedback.cycleId, reason: 'Repetindo a contestação.' })).status === 409, 'A repeated contest does not reopen again');
   await logout('solicitante');
 
   await login('gestor');
@@ -585,12 +603,30 @@ async function run() {
   await waitDom('manager sees closed incident', `${overview}.includes("Ativos0") && ${overview}.includes("Encerrados1")`);
   const managed = (await browserApi('GET', '/incidents/manage')).body.incidents[0];
   check(managed.status === 'closed' && managed.closeReason === 'ticket_resolved' && managed.closedBy.id === users.gestor.id, 'Resolving the ticket closes the incident, attributed to the resolver');
+  await waitDom('manager quality section', 'document.querySelector(".quality-overview")?.textContent.includes("Qualidade do atendimento")');
+  check(true, 'Manager sees the service quality section');
+  await go('/tickets?status=em_andamento&search=Requester%20open');
+  await waitDom('contested tag in queue', 'document.querySelector(".ticket-table .attention-tag")?.textContent === "Reaberto pelo solicitante"');
+  check(true, 'The queue shows the reopening by the requester');
+  const reResolved = await browserApi('PATCH', `/tickets/${own.id}/status`, { status: 'resolvido', reason: 'Atualização do programa reaplicada e validada.' });
+  check(reResolved.status === 200 && reResolved.body.ticket.activeCycleId === 2, 'The team resolves the contested request in a new cycle');
   await logout('gestor');
 
   await login('solicitante');
   await go('/dashboard');
   await waitDom('requester sees result', '!!document.getElementById("followed-incidents")');
   check(await evaluate('!document.getElementById("known-incidents") && document.querySelector(".incident-card--closed .incident-status")?.textContent === "Resolvido"'), 'Requester sees the closed problem as resolved and no longer as active');
+  check(await evaluate('Array.from(document.querySelectorAll(".attention-tag")).some(el => el.textContent === "Confirme se resolveu")'), 'The requester home points to the resolution waiting for an answer');
+  await go(`/tickets/${own.id}`);
+  await waitDom('resolution question again', 'document.querySelector(".resolution-answer")?.textContent.includes("Seu problema foi resolvido?")');
+  await clickButton('Sim, foi resolvido.');
+  await waitDom('rating form', '!!document.querySelector(".resolution-rating")');
+  await pick('rating', '4');
+  await fill('rating-comment', 'Resolveram rápido na segunda vez.');
+  await evaluate('document.querySelector(".resolution-rating").requestSubmit()');
+  await waitDom('rated', 'document.querySelector(".resolution-answer")?.textContent.includes("4 de 5")');
+  const answered = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+  check(answered.resolutionFeedback.status === 'confirmed' && answered.resolutionFeedback.rating === 4 && answered.history.filter((event) => event.type === 'resolution_confirmed').length === 1, 'Requester confirms the resolution and rates it once');
   await logout('solicitante');
 
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');

@@ -8,6 +8,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getManagerDashboard, type ManagerDashboard, type Count } from '../services/manager'
 import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tickets'
 import { IncidentsOverview } from '../components/IncidentsOverview'
+import { QualityOverview } from '../components/QualityOverview'
 import { getErrorMessage } from '../utils/errors'
 
 const PERIODS = { today: 'Hoje', week: 'Últimos sete dias', month: 'Mês atual', year: 'Ano atual' }
@@ -94,9 +95,10 @@ function ManagerContent() {
             <Metric label="Em andamento agora" value={data.current.inProgress} to={tickets({ status: 'em_andamento' })} hint="Situação atual, sem filtro de criação" />
             <Metric label="Backlog atual" value={data.current.backlog} to={tickets({ pending: 'true' })} hint="Abertos + em andamento; qualquer data de criação" />
             <Metric label="Pendentes sem responsável" value={data.current.unassigned} to={tickets({ assignee: 'none', pending: 'true' })} hint="Chamados abertos ou em andamento" />
-            <Metric label="Reaberturas no período" value={data.period.reopenings} hint="Eventos estruturados por chamado e novo ciclo" />
+            <Metric label="Reaberturas no período" value={data.period.reopenings} hint="Pela equipe; contestações do solicitante ficam em Qualidade" />
           </div>
         </section>
+        <QualityOverview quality={data.quality} />
         <div className="dashboard__grid">
           <PieChart title="Backlog por prioridade" rows={data.distributions.priority} label={id => PRIORITY_LABELS[id as keyof typeof PRIORITY_LABELS] ?? id} />
           <HorizontalChart title="Backlog por categoria" rows={data.distributions.category} label={id => CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ?? id} />

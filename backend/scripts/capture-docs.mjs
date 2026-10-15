@@ -92,7 +92,7 @@ async function run() {
   const port = listener.address().port; await new Promise(resolve => listener.close(resolve));
   profile = await mkdtemp(join(tmpdir(), 'it-helpdesk-docs-'));
   const executable = await findBrowser();
-  child = spawn(executable, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+  child = spawn(executable, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
   const debugUrl = `http://127.0.0.1:${port}`;
   await waitFor('browser startup', async () => { try { return (await fetch(`${debugUrl}/json/list`)).ok; } catch { return false; } });
   const pages = await (await fetch(`${debugUrl}/json/list`)).json();
@@ -106,6 +106,8 @@ async function run() {
   async function capture(name, section, fullPage = false) {
     if (section) await evaluate(`document.querySelector(${JSON.stringify(section)}).scrollIntoView({ block: 'start' })`);
     else await evaluate('window.scrollTo(0,0)');
+    // Headless Edge on Windows may mark the page hidden (locked or sleeping screen) and stop rendering.
+    if (await evaluate('document.visibilityState') !== 'visible') { await command('Page.bringToFront'); await command('Emulation.setFocusEmulationEnabled', { enabled: true }); }
     await evaluate('(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
     if (await evaluate(`!!document.querySelector('[role=alert], [role=dialog], .is-loading, [aria-busy=true], .spinner')`)) throw new Error('Capture blocked by error or loading state');
     let identity = null;

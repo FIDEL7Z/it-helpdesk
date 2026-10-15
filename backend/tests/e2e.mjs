@@ -20,6 +20,8 @@ let checks = 0;
 let apiServer, vite, browserProcess, profile, socket, evaluate, command;
 let databaseConnected = false;
 let browserFailure;
+let keepVisible;
+let visibilityRecoveries = 0;
 
 function check(condition, label) {
   assert.ok(condition, label);
@@ -150,6 +152,9 @@ async function run() {
   profile = await mkdtemp(join(tmpdir(), 'it-helpdesk-e2e-'));
   browserProcess = spawn(executable, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    // Keep rendering when Windows reports the window as occluded (locked or sleeping screen);
+    // otherwise frames, requestAnimationFrame and captures can stop mid-run.
+    '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
     `--user-data-dir=${profile}`, 'about:blank',
   ], { windowsHide: true, stdio: 'ignore' });
@@ -167,6 +172,19 @@ async function run() {
   await command('Page.enable');
   await command('Runtime.enable');
   await command('Network.enable');
+  // Windows can mark the headless page hidden (seen with a locked or sleeping screen); a hidden page
+  // stops rendering and throttles timers, which looks like a slow or frozen app. That is the
+  // environment, not the product: keep the page in front and report every recovery.
+  keepVisible = setInterval(() => {
+    command('Runtime.evaluate', { expression: 'document.visibilityState', returnByValue: true })
+      .then((result) => {
+        if (result.result.value === 'visible') return;
+        visibilityRecoveries += 1;
+        console.log(`RECOVER page was ${result.result.value}; bringing it to the front`);
+        return command('Page.bringToFront');
+      })
+      .catch(() => {});
+  }, 500);
   evaluate = async (expression) => {
     const result = await command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
@@ -200,6 +218,34 @@ async function run() {
     });
     return { status: response.status, body: await response.json() };
   })()`);
+  };
+  // Evidence images only (assertions come before them). On Windows, headless Edge sometimes marks the
+  // page as hidden after a viewport change (seen with a locked or sleeping screen) and stops rendering, so
+  // a capture never answers. The page is brought back to the front first; every recovery is printed and
+  // three failed attempts still fail the run.
+  const ensureVisible = async (file) => {
+    const state = await evaluate('document.visibilityState');
+    if (state === 'visible') return;
+    console.log(`RECOVER page was ${state} before ${basename(file)}; bringing it to the front`);
+    diagnostics.push({ event: 'page-hidden-before-screenshot', file: basename(file) });
+    await command('Page.bringToFront');
+    await command('Emulation.setFocusEmulationEnabled', { enabled: true });
+  };
+  const snap = async (file) => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await ensureVisible(file);
+        await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))');
+        const { data } = await command('Page.captureScreenshot', { format: 'png' });
+        await writeFile(file, Buffer.from(data, 'base64'));
+        return;
+      } catch (error) {
+        if (attempt >= 3 || !String(error.message).includes('timed out')) throw error;
+        console.log(`RETRY screenshot ${basename(file)} after: ${error.message}`);
+        diagnostics.push({ event: 'screenshot-retry', file: basename(file), attempt });
+        await command('Page.bringToFront').catch(() => {});
+      }
+    }
   };
   const dashboard = async (expected, role) => {
     await waitDom(`${role} dashboard data`, 'document.querySelectorAll(".stat-card__value").length >= 4');
@@ -409,7 +455,7 @@ async function run() {
       await waitDom('demo queue for mobile', '!!document.querySelector(".ticket-table tbody tr")');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       check(await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth && Array.from(document.querySelectorAll('select')).every(el => !!document.querySelector('label[for="' + el.id + '"]'))`), 'Real queue fits mobile and associates every selector with its label');
-      await writeFile(resolve(root, 'backend/e2e-results/tickets-mobile.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(resolve(root, 'backend/e2e-results/tickets-mobile.png'));
       await command('Emulation.clearDeviceMetricsOverride');
       await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/dashboard/manager?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E manager failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
       await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
@@ -433,25 +479,25 @@ async function run() {
         return Array.from(document.querySelectorAll('.button--primary, .button--secondary')).every(el => { const s = getComputedStyle(el); const a = luminance(s.color), b = luminance(s.backgroundColor); return (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 4.5; });
       })()`);
       check(await contrast(), 'Light theme action buttons meet 4.5:1 text contrast');
-      await writeFile(join(output, 'manager-desktop-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-desktop-light.png'));
       await evaluate('document.getElementById("manager-team").scrollIntoView({ block: "start" })');
-      await writeFile(join(output, 'manager-team-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-team-desktop.png'));
       await evaluate('document.getElementById("manager-trends").scrollIntoView({ block: "start" })');
       await waitDom('populated area chart for visual review', 'document.querySelectorAll(".line-chart .recharts-area-curve").length === 2');
       check(await evaluate('Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100 && el.getBoundingClientRect().height > 100) && Array.from(document.querySelectorAll(".line-chart .recharts-area-curve")).every(el => el.getAttribute("d")?.length > 20)'), 'Rich area chart renders actual paths after navigation and resizing');
       await evaluate('(async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
       await writeFile(join(output, 'manager-chart-diagnostics.json'), JSON.stringify(await evaluate('Array.from(document.querySelectorAll(".chart-container")).map(el => ({ label: el.getAttribute("aria-label"), width: el.clientWidth, height: el.clientHeight, svgs: el.querySelectorAll("svg").length, paths: el.querySelectorAll("path").length }))'), null, 2));
-      await writeFile(join(output, 'manager-lines-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-lines-desktop.png'));
       await evaluate('window.scrollTo(0,0)');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits desktop without page overflow');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
-      await writeFile(join(output, 'manager-mobile-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-mobile-light.png'));
       await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
-      await writeFile(join(output, 'manager-mobile-dark.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-mobile-dark.png'));
       check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark"'), 'Manager dark theme uses the shared system palette');
       await command('Emulation.clearDeviceMetricsOverride');
       await command('Emulation.setEmulatedMedia', { features: [] });
@@ -670,6 +716,7 @@ async function run() {
 
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);
+  if (visibilityRecoveries) console.log(`The browser page was brought back to the front ${visibilityRecoveries} time(s) (hidden by the OS).`);
   console.log(`Longest observed wait: ${Math.max(...timings.map((item) => item.ms))} ms.`);
 }
 
@@ -689,6 +736,7 @@ try {
   }
   console.error('Diagnostics: backend/e2e-results/diagnostics.json (and failure.png when available).');
 } finally {
+  clearInterval(keepVisible);
   socket?.close();
   if (browserProcess && browserProcess.exitCode === null && !browserProcess.killed) {
     const exited = once(browserProcess, 'exit').catch(() => {});

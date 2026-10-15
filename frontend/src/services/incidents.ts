@@ -37,6 +37,8 @@ export type ManagedIncident = Omit<PublicIncident, 'following'> & {
   publishedBy: User | null
   closedBy: User | null
   closeReason: 'ticket_resolved' | 'manual' | null
+  /** Inherited from the ticket: incidents on demo tickets are labelled, never mixed silently. */
+  dataOrigin: 'operational' | 'demo' | 'legacy'
   history: IncidentEvent[]
 }
 

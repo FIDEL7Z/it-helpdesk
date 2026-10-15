@@ -74,6 +74,9 @@ function TeamDashboard() {
         </div>
       </header>
 
+      {/* A work list, like the ticket queue: not filtered by the indicator origin below. */}
+      {can(user.role, 'incidents:manage') && <ActiveIncidentsCard />}
+
       {DEMO_MODE && <div className="field">
         <label className="field__label" htmlFor="dashboard-origin">Origem dos indicadores</label>
         <select id="dashboard-origin" className="field__input field__select" value={dataOrigin} onChange={event => { setDataOrigin(event.target.value as typeof dataOrigin); setReloadCount(n => n + 1) }}>
@@ -133,8 +136,6 @@ function TeamDashboard() {
               />
             </div>
           )}
-
-          {can(user.role, 'incidents:manage') && <ActiveIncidentsCard />}
 
           {summary.byStatus.total === 0 ? (
             <div className="card card--empty">
@@ -244,6 +245,7 @@ function ActiveIncidentsCard() {
                 <Link to={`/tickets/${incident.ticketId}`} className="incident-row__title">{incident.title}</Link>
                 <span className="incident-row__meta">
                   {incident.ticketStatus ? STATUS_LABELS[incident.ticketStatus] : 'Chamado indisponível'} · {incident.assignee ? incident.assignee.name : 'Sem responsável'}
+                  {incident.dataOrigin === 'demo' && <> · <span className="origin-tag">Demonstração</span></>}
                 </span>
               </div>
               <span className="affected-pill">{affectedLabel(incident.affectedCount)}</span>

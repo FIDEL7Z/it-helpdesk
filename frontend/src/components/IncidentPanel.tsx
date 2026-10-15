@@ -93,7 +93,7 @@ export function IncidentPanel({ ticket }: { ticket: TicketDetail }) {
         <>
           <div className="incident-panel__summary">
             <strong className="incident-panel__count">{incident.affectedCount}</strong>
-            <span>{incident.affectedCount === 1 ? 'pessoa afetada' : 'pessoas afetadas'}{incident.status === 'active' ? ' acompanhando' : ''}</span>
+            <span>{incident.affectedCount === 1 ? 'pessoa informou que está afetada' : 'pessoas informaram que estão afetadas'}</span>
           </div>
 
           {mode === 'edit' ? (

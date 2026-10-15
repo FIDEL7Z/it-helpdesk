@@ -30,6 +30,18 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   resolvido: 'Resolvido',
 }
 
+/** How the person who asked for help names each category ("Com o que você precisa de ajuda?"). */
+export const SUBJECT_LABELS: Record<TicketCategory, string> = {
+  hardware: 'Computador ou equipamento',
+  rede: 'Internet e conexão',
+  software: 'Programas e aplicativos',
+  acesso: 'Contas e permissões',
+  outros: 'Outro problema',
+}
+
+/** Order shown to requesters. */
+export const SUBJECT_ORDER: TicketCategory[] = ['hardware', 'rede', 'software', 'acesso', 'outros']
+
 /** How the person who asked for help reads the same status. */
 export const REQUESTER_STATUS_LABELS: Record<TicketStatus, string> = {
   aberto: 'Aguardando atendimento',

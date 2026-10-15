@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
+import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { ROLE_LABELS } from '../services/auth'
 import { BrandMark } from './BrandMark'
@@ -25,7 +26,9 @@ export function AppLayout() {
             {/* Each profile has its own entry point; the links keep the same routes. */}
             {user?.role === 'gestor' && <NavLink to="/manager" className="app-nav__link">Visão gerencial</NavLink>}
             <NavLink to="/dashboard" className="app-nav__link">{user?.role === 'solicitante' ? 'Início' : 'Atendimento'}</NavLink>
+            {user?.role === 'solicitante' && <NavLink to="/help" className="app-nav__link">Central de ajuda</NavLink>}
             <NavLink to="/tickets" className="app-nav__link">{user?.role === 'solicitante' ? 'Meus pedidos' : 'Chamados'}</NavLink>
+            {can(user?.role, 'kb:manage') && <NavLink to="/help/manage" className="app-nav__link">Base de conhecimento</NavLink>}
           </nav>
 
           {user && (

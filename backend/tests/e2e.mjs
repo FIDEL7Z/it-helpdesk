@@ -493,6 +493,23 @@ async function run() {
   await go('/tickets?search=terceiro');
   await waitDom('incident tag in queue', '!!document.querySelector(".ticket-table .incident-tag")');
   check(await evaluate('document.querySelector(".ticket-table .incident-tag").textContent.includes("0 pessoas afetadas")'), 'TI queue marks the ticket as a shared incident');
+
+  // Knowledge base, in the same TI session: an article whose text contains markup, and a draft.
+  const { KnowledgeArticleModel, ArticleFeedbackModel } = await import('../src/models/article.model.ts');
+  await Promise.all([KnowledgeArticleModel.syncIndexes(), ArticleFeedbackModel.syncIndexes()]);
+  const choose = (id, value) => evaluate(`(() => { const el = document.getElementById(${JSON.stringify(id)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await go('/help/manage/new');
+  await waitDom('article editor', '!!document.getElementById("article-title")');
+  await fill('article-title', 'Teclado sem resposta no notebook');
+  await fill('article-summary', 'O que verificar quando o teclado para de responder.');
+  await choose('article-category', 'hardware');
+  await choose('article-status', 'published');
+  await fill('article-body', 'Verifique se o teclado está conectado.\n\n- Reinicie o computador.\n- <script>window.__kbInjected = true</script><img src=x onerror="window.__kbInjected = true"> continua como texto.');
+  await evaluate('document.getElementById("article-title").closest("form").requestSubmit()');
+  await waitDom('article saved and published', 'location.pathname.startsWith("/help/manage/") && !location.pathname.endsWith("/new") && document.querySelector(".page__subtitle")?.textContent.startsWith("Publicado")');
+  check(true, 'TI writes and publishes a help article through the editor');
+  const draft = await browserApi('POST', '/articles', { title: 'Rascunho interno de VPN', summary: 'Texto ainda em revisão pela equipe.', category: 'rede', body: 'Rascunho que os solicitantes não podem ler nem encontrar.', status: 'draft' });
+  check(draft.status === 201, 'TI saves a draft article');
   await logout('ti');
 
   await login('solicitante');
@@ -514,6 +531,19 @@ async function run() {
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Requester home with known problems fits 390px');
   await command('Emulation.clearDeviceMetricsOverride');
+
+  await go('/help?q=teclado');
+  await waitDom('help search results', 'document.querySelectorAll(".article-card").length === 1');
+  check(await evaluate('!document.body.textContent.includes("Rascunho interno")'), 'Drafts are not listed for requesters');
+  await evaluate('document.querySelector(".article-card__title").click()');
+  await waitDom('article page', '!!document.querySelector(".article-body")');
+  check(await evaluate('!window.__kbInjected && !document.querySelector(".article-body script, .article-body img") && document.querySelector(".article-body").textContent.includes("<script>")'), 'Article markup is shown as text and never executed');
+  await clickButton('Isso resolveu meu problema.');
+  await waitDom('article feedback saved', '!!document.querySelector(".article-feedback__thanks")');
+  check(true, 'Requester tells that the article helped');
+  await go(`/help/${draft.body.article.id}`);
+  await waitDom('draft hidden', 'document.querySelector("[role=alert]")?.textContent.includes("não está disponível")');
+  check(true, 'A draft article answers as unavailable to requesters');
   await logout('solicitante');
 
   await login('gestor');

@@ -15,6 +15,10 @@ export const PERMISSIONS = {
   'tickets:be-assigned': ['ti', 'gestor'],
   /** List the IT team members (assignee picker, team supervision). */
   'users:list-it-staff': ['ti', 'gestor'],
+  /** Publish, edit, close and republish shared incidents; see their operational data. */
+  'incidents:manage': ['ti', 'gestor'],
+  /** See active shared incidents (public data only) and say "I am affected too". */
+  'incidents:follow': ['solicitante', 'ti', 'gestor'],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

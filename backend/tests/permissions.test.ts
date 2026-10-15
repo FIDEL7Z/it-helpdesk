@@ -101,18 +101,24 @@ describe('permission map (can)', () => {
       'tickets:operate': false,
       'tickets:be-assigned': false,
       'users:list-it-staff': false,
+      'incidents:manage': false,
+      'incidents:follow': true,
     },
     ti: {
       'tickets:view-all': true,
       'tickets:operate': true,
       'tickets:be-assigned': true,
       'users:list-it-staff': true,
+      'incidents:manage': true,
+      'incidents:follow': true,
     },
     gestor: {
       'tickets:view-all': true,
       'tickets:operate': true,
       'tickets:be-assigned': true,
       'users:list-it-staff': true,
+      'incidents:manage': true,
+      'incidents:follow': true,
     },
   };
 

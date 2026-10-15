@@ -22,12 +22,10 @@ export function AppLayout() {
           </div>
 
           <nav className="app-nav" aria-label="Navegação principal">
-            <NavLink to={user?.role === 'gestor' ? '/manager' : '/dashboard'} className="app-nav__link">
-              {user?.role === 'gestor' ? 'Visão gerencial' : 'Dashboard'}
-            </NavLink>
-            <NavLink to="/tickets" className="app-nav__link">
-              {user?.role === 'solicitante' ? 'Meus chamados' : 'Operação de chamados'}
-            </NavLink>
+            {/* Each profile has its own entry point; the links keep the same routes. */}
+            {user?.role === 'gestor' && <NavLink to="/manager" className="app-nav__link">Visão gerencial</NavLink>}
+            <NavLink to="/dashboard" className="app-nav__link">{user?.role === 'solicitante' ? 'Início' : 'Atendimento'}</NavLink>
+            <NavLink to="/tickets" className="app-nav__link">{user?.role === 'solicitante' ? 'Meus pedidos' : 'Chamados'}</NavLink>
           </nav>
 
           {user && (

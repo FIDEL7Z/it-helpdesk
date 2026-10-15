@@ -23,6 +23,7 @@ import {
   type TicketFilters,
   type TicketSummary,
 } from '../services/tickets'
+import { affectedLabel } from '../services/incidents'
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
@@ -138,15 +139,15 @@ export function TicketsPage() {
     <section className="page">
       <header className="page__header page__header--with-action">
         <div>
-          <h1 className="page__title">Chamados</h1>
+          <h1 className="page__title">{seesAllTickets ? 'Chamados' : 'Meus pedidos'}</h1>
           <p className="page__subtitle">
             {seesAllTickets
-              ? 'Acompanhe e atenda as solicitações de TI de toda a empresa.'
-              : 'Abra e acompanhe as suas solicitações para a equipe de TI.'}
+              ? 'Fila de atendimento da empresa, com filtros e busca.'
+              : 'Acompanhe o andamento dos seus pedidos de suporte.'}
           </p>
         </div>
         <Link to="/tickets/new" className="button button--primary">
-          Abrir chamado
+          {seesAllTickets ? 'Abrir chamado' : 'Solicitar suporte'}
         </Link>
       </header>
 
@@ -244,15 +245,50 @@ export function TicketsPage() {
             <p>Nenhum chamado registrado até o momento.</p>
           ) : (
             <>
-              <p>Você ainda não abriu nenhum chamado.</p>
+              <p><strong>Você ainda não pediu ajuda por aqui.</strong></p>
+              <p className="text-muted">Quando algo não funcionar, conte o que aconteceu e acompanhe o atendimento nesta página.</p>
               <Link to="/tickets/new" className="button button--primary">
-                Abrir meu primeiro chamado
+                Fazer meu primeiro pedido
               </Link>
             </>
           )}
         </div>
       ) : (
         <div className={`card card--table${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+          {!seesAllTickets ? (
+            // Requesters: their own requests, in plain language, without the team's operational columns.
+            <table className="ticket-table">
+              <caption className="sr-only">Meus pedidos de suporte</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Assunto</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col">Atendido por</th>
+                  <th scope="col">Aberto em</th>
+                  <th scope="col">Última atualização</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((ticket) => (
+                  <tr key={ticket.id}>
+                    <td data-label="Assunto" className="ticket-table__title">
+                      <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
+                    </td>
+                    <td data-label="Tipo">{CATEGORY_LABELS[ticket.category]}</td>
+                    <td data-label="Situação"><StatusBadge status={ticket.status} audience="requester" /></td>
+                    <td data-label="Atendido por" className={ticket.assignee ? undefined : 'text-muted'}>{ticket.assignee?.name ?? 'Aguardando a equipe'}</td>
+                    <td data-label="Aberto em" className="ticket-table__date">
+                      {ticket.createdAt ? <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt)}</time> : 'Data não registrada'}
+                    </td>
+                    <td data-label="Última atualização" className="ticket-table__date">
+                      {ticket.updatedAt ? <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt)}</time> : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
           <table className="ticket-table">
             <caption className="sr-only">Lista de chamados</caption>
             <thead>
@@ -272,6 +308,11 @@ export function TicketsPage() {
                 <tr key={ticket.id}>
                   <td data-label="Título" className="ticket-table__title">
                     <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
+                    {ticket.incident && (
+                      <span className={`incident-tag${ticket.incident.status === 'closed' ? ' incident-tag--closed' : ''}`}>
+                        {ticket.incident.status === 'active' ? `Incidente · ${affectedLabel(ticket.incident.affectedCount)}` : 'Incidente encerrado'}
+                      </span>
+                    )}
                   </td>
                   <td data-label="Categoria">{CATEGORY_LABELS[ticket.category]}</td>
                   <td data-label="Prioridade">
@@ -292,6 +333,7 @@ export function TicketsPage() {
               ))}
             </tbody>
           </table>
+          )}
         </div>
       )}
 

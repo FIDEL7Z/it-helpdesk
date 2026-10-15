@@ -9,10 +9,13 @@ import { getDashboardSummary, type DashboardSummary } from '../services/dashboar
 import {
   CATEGORY_LABELS,
   PRIORITY_LABELS,
+  STATUS_LABELS,
   TICKET_CATEGORIES,
   type TicketPriority,
 } from '../services/tickets'
+import { affectedLabel, listManagedIncidents, type ManagedIncident } from '../services/incidents'
 import { getErrorMessage } from '../utils/errors'
+import { RequesterHomePage } from './RequesterHomePage'
 import { formatDateTime } from '../utils/format'
 
 type LoadState = {
@@ -24,8 +27,14 @@ type LoadState = {
 /** Highest first: what needs attention comes first. */
 const PRIORITY_ORDER: TicketPriority[] = ['alta', 'media', 'baixa']
 
+/** Each profile gets a different home: requesters ask for help; the team works the queue. */
 export function DashboardPage() {
-  useDocumentTitle('Dashboard')
+  const { user } = useAuth()
+  return user?.role === 'solicitante' ? <RequesterHomePage /> : <TeamDashboard />
+}
+
+function TeamDashboard() {
+  useDocumentTitle('Atendimento')
   const { user } = useAuth()
   const [dataOrigin, setDataOrigin] = useState<'operational' | 'demo' | 'legacy'>('operational')
   const [reloadCount, setReloadCount] = useState(0)
@@ -52,19 +61,17 @@ export function DashboardPage() {
   const { summary } = state
 
   return (
-    <section className="page">
+    <section className="page team-home">
       <header className="page__header page__header--with-action">
         <div>
-          <h1 className="page__title">Olá, {user.name}</h1>
-          <p className="page__subtitle">
-            {seesAllTickets
-              ? 'Visão geral dos chamados de TI da empresa.'
-              : 'Acompanhe as suas solicitações para a equipe de TI.'}
-          </p>
+          <p className="eyebrow">{user.role === 'gestor' ? 'Gestão de TI' : 'Suporte TI'}</p>
+          <h1 className="page__title">Atendimento</h1>
+          <p className="page__subtitle">Chamados que precisam da equipe e problemas coletivos em andamento.</p>
         </div>
-        <Link to="/tickets/new" className="button button--primary">
-          Abrir chamado
-        </Link>
+        <div className="page__actions">
+          <Link to="/tickets?pending=true" className="button button--primary">Ver fila de chamados</Link>
+          <Link to="/tickets/new" className="button button--secondary">Abrir chamado</Link>
+        </div>
       </header>
 
       {DEMO_MODE && <div className="field">
@@ -126,6 +133,8 @@ export function DashboardPage() {
               />
             </div>
           )}
+
+          {can(user.role, 'incidents:manage') && <ActiveIncidentsCard />}
 
           {summary.byStatus.total === 0 ? (
             <div className="card card--empty">
@@ -196,6 +205,51 @@ export function DashboardPage() {
             </>
           )}
         </div>
+      )}
+    </section>
+  )
+}
+
+/** Active shared incidents, most affected first, with a direct link to the main ticket. */
+function ActiveIncidentsCard() {
+  const [state, setState] = useState<{ incidents: ManagedIncident[] | null; error: string | null }>({ incidents: null, error: null })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    listManagedIncidents('active', controller.signal)
+      .then(({ incidents }) => setState({ incidents, error: null }))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setState({ incidents: null, error: getErrorMessage(error, 'incident') })
+      })
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <section className="card incidents-card" aria-labelledby="active-incidents">
+      <div className="card__header">
+        <h2 id="active-incidents" className="card__title">Incidentes ativos</h2>
+        {state.incidents && state.incidents.length > 0 && <span className="text-muted">{state.incidents.length} publicado{state.incidents.length === 1 ? '' : 's'}</span>}
+      </div>
+      {state.error ? (
+        <p className="field__error" role="alert">{state.error}</p>
+      ) : !state.incidents ? (
+        <p className="text-muted" role="status">Carregando incidentes...</p>
+      ) : state.incidents.length === 0 ? (
+        <p className="text-muted">Nenhum problema coletivo publicado. Para avisar os usuários, publique o incidente a partir do chamado principal.</p>
+      ) : (
+        <ul className="incident-rows">
+          {state.incidents.slice(0, 5).map((incident) => (
+            <li key={incident.id} className="incident-row">
+              <div className="incident-row__main">
+                <Link to={`/tickets/${incident.ticketId}`} className="incident-row__title">{incident.title}</Link>
+                <span className="incident-row__meta">
+                  {incident.ticketStatus ? STATUS_LABELS[incident.ticketStatus] : 'Chamado indisponível'} · {incident.assignee ? incident.assignee.name : 'Sem responsável'}
+                </span>
+              </div>
+              <span className="affected-pill">{affectedLabel(incident.affectedCount)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )

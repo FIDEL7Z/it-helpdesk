@@ -1,6 +1,10 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { can } from '../auth/permissions'
+import { useAuth } from '../auth/useAuth'
+import { KnownIncidents } from '../components/KnownIncidents'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { listActiveIncidents, type PublicIncident } from '../services/incidents'
 import {
   CATEGORY_LABELS,
   PRIORITY_LABELS,
@@ -27,9 +31,9 @@ function validate(title: string, description: string, category: TicketCategory |
   const cleanDescription = description.trim()
 
   if (cleanTitle.length < TICKET_LIMITS.titleMin) {
-    errors.title = `Informe um título com pelo menos ${TICKET_LIMITS.titleMin} caracteres.`
+    errors.title = `Informe um assunto com pelo menos ${TICKET_LIMITS.titleMin} caracteres.`
   } else if (cleanTitle.length > TICKET_LIMITS.titleMax) {
-    errors.title = `O título deve ter no máximo ${TICKET_LIMITS.titleMax} caracteres.`
+    errors.title = `O assunto deve ter no máximo ${TICKET_LIMITS.titleMax} caracteres.`
   }
 
   if (cleanDescription.length < TICKET_LIMITS.descriptionMin) {
@@ -46,8 +50,22 @@ function validate(title: string, description: string, category: TicketCategory |
 }
 
 export function NewTicketPage() {
-  useDocumentTitle('Abrir chamado')
+  const { user } = useAuth()
+  // People asking for help get plain wording; the team keeps the operational terms.
+  const forRequester = !can(user?.role, 'tickets:view-all')
+  useDocumentTitle(forRequester ? 'Solicitar suporte' : 'Abrir chamado')
   const navigate = useNavigate()
+  const [incidents, setIncidents] = useState<PublicIncident[]>([])
+  const [incidentsReload, setIncidentsReload] = useState(0)
+
+  // Known problems are shown before the form; they never block opening a separate request.
+  useEffect(() => {
+    const controller = new AbortController()
+    listActiveIncidents(controller.signal)
+      .then((result) => setIncidents(result.incidents))
+      .catch(() => { /* The form works without this list; errors are not worth blocking it. */ })
+    return () => controller.abort()
+  }, [incidentsReload])
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -81,8 +99,10 @@ export function NewTicketPage() {
         category,
         priority,
       })
-      navigate('/tickets', { state: { createdTitle: ticket.title } })
+      // Straight to the new request, where the person can follow it.
+      navigate(`/tickets/${ticket.id}`, { state: { created: true } })
     } catch (error) {
+      // The typed content stays in the form so nothing has to be written again.
       setFormError(getErrorMessage(error))
       setSubmitting(false)
     }
@@ -95,12 +115,24 @@ export function NewTicketPage() {
   return (
     <section className="page page--narrow">
       <header className="page__header">
-        <Link to="/tickets" className="back-link">
-          ← Voltar para chamados
+        <Link to={forRequester ? '/dashboard' : '/tickets'} className="back-link">
+          {forRequester ? '← Voltar ao início' : '← Voltar para chamados'}
         </Link>
-        <h1 className="page__title">Abrir chamado</h1>
-        <p className="page__subtitle">Descreva o problema para que a equipe de TI possa ajudar.</p>
+        <h1 className="page__title">{forRequester ? 'Solicitar suporte' : 'Abrir chamado'}</h1>
+        <p className="page__subtitle">
+          {forRequester
+            ? 'Conte o que aconteceu. Quanto mais detalhes, mais rápido a equipe consegue ajudar.'
+            : 'Registre um chamado em nome próprio.'}
+        </p>
       </header>
+
+      <KnownIncidents
+        incidents={incidents}
+        onChange={(updated) => setIncidents((list) => list.map((item) => (item.id === updated.id ? updated : item)))}
+        onStale={() => setIncidentsReload((n) => n + 1)}
+        title="Antes de enviar: é um destes problemas?"
+        description="Se for, avise com um clique e acompanhe por aqui, sem abrir outro pedido. Se o seu caso for diferente, continue abaixo."
+      />
 
       <div className="card">
         {formError && (
@@ -112,7 +144,7 @@ export function NewTicketPage() {
         <form className="form" onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label htmlFor="title" className="field__label">
-              Título
+              Assunto
             </label>
             <input
               ref={titleRef}
@@ -138,13 +170,16 @@ export function NewTicketPage() {
 
           <div className="field">
             <label htmlFor="description" className="field__label">
-              Descrição
+              O que aconteceu?
             </label>
+            <p id="description-examples" className="field__hint">
+              Ajuda muito informar: o que você estava fazendo, a mensagem de erro (se houver), desde quando acontece e o que já tentou.
+            </p>
             <textarea
               ref={descriptionRef}
               id="description"
               className="field__input"
-              placeholder="O que aconteceu, desde quando e o que você já tentou."
+              placeholder="Ex.: Desde hoje cedo o Wi-Fi do 2º andar cai a cada poucos minutos. Já reiniciei o notebook."
               value={description}
               maxLength={TICKET_LIMITS.descriptionMax}
               onChange={(event) => {
@@ -152,7 +187,7 @@ export function NewTicketPage() {
                 clearError('description')
               }}
               aria-invalid={Boolean(fieldErrors.description)}
-              aria-describedby={fieldErrors.description ? 'description-error description-hint' : 'description-hint'}
+              aria-describedby={fieldErrors.description ? 'description-examples description-error description-hint' : 'description-examples description-hint'}
               disabled={submitting}
             />
             <p id="description-hint" className="field__hint">
@@ -168,7 +203,7 @@ export function NewTicketPage() {
           <div className="form__row">
             <div className="field">
               <label htmlFor="category" className="field__label">
-                Categoria
+                Tipo de problema
               </label>
               <select
                 ref={categoryRef}
@@ -200,7 +235,7 @@ export function NewTicketPage() {
 
             <div className="field">
               <label htmlFor="priority" className="field__label">
-                Prioridade
+                Prioridade sugerida
               </label>
               <select
                 id="priority"
@@ -210,6 +245,7 @@ export function NewTicketPage() {
                   const value = event.target.value
                   if (isTicketPriority(value)) setPriority(value)
                 }}
+                aria-describedby="priority-hint"
                 disabled={submitting}
               >
                 {TICKET_PRIORITIES.map((value) => (
@@ -218,16 +254,17 @@ export function NewTicketPage() {
                   </option>
                 ))}
               </select>
+              <p id="priority-hint" className="field__hint">A equipe de TI pode ajustar depois de analisar.</p>
             </div>
           </div>
 
           <div className="form__actions">
-            <Link to="/tickets" className="button button--secondary">
+            <Link to={forRequester ? '/dashboard' : '/tickets'} className="button button--secondary">
               Cancelar
             </Link>
             <button type="submit" className="button button--primary" disabled={submitting}>
               {submitting && <span className="spinner spinner--small" aria-hidden="true" />}
-              {submitting ? 'Enviando...' : 'Abrir chamado'}
+              {submitting ? 'Enviando...' : forRequester ? 'Enviar solicitação' : 'Abrir chamado'}
             </button>
           </div>
         </form>

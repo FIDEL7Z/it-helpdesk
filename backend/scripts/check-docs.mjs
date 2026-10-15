@@ -63,9 +63,11 @@ for (const file of ['backend/.env.example', 'frontend/.env.example']) {
 }
 const manifest = JSON.parse(readFileSync('docs/assets/screenshots/capture-info.json', 'utf8'));
 assert.equal(manifest.origin, 'demo');
-assert.equal(manifest.mode, 'read-only');
-assert.equal(manifest.captures.length, 19);
-assert.equal(new Set(manifest.captures.map(capture => capture.file)).size, 19);
+assert.equal(manifest.mode, 'isolated');
+assert.equal(manifest.captures.length, 25);
+assert.equal(new Set(manifest.captures.map(capture => capture.file)).size, 25);
+// The file name says the viewport and the theme: -mobile 390, -tablet 768, -amplo 1920, otherwise 1440; -escuro is dark.
+const VIEWPORTS = { mobile: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, amplo: { width: 1920, height: 1080 } };
 for (const capture of manifest.captures) {
   assert.equal(capture.file, capture.file.split('/').pop());
   const png = readFileSync(`docs/assets/screenshots/${capture.file}`);
@@ -82,7 +84,8 @@ for (const capture of manifest.captures) {
     assert.equal(capture.user.role, role);
     assert.ok(capture.title.startsWith(title));
   } else assert.equal(dimensions.height, capture.viewport.height);
-  assert.deepEqual(capture.viewport, capture.file.endsWith('-mobile.png') ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+  assert.deepEqual(capture.viewport, VIEWPORTS[capture.file.match(/-(mobile|tablet|amplo)\.png$/)?.[1]] ?? { width: 1440, height: 900 });
+  assert.equal(capture.theme, capture.file.includes('-escuro') ? 'dark' : 'light');
 }
 assert.equal(diagrams, 4);
 console.log(JSON.stringify({ screenshots: manifest.captures.length, markdownFiles: files.length, relativeLinksAndAnchors: links, mermaidDiagrams: diagrams,

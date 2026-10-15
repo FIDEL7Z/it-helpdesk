@@ -17,7 +17,7 @@
     "seed:articles": "tsx src/scripts/seed-articles.ts",
     "seed:scenarios": "tsx src/scripts/seed-scenarios.ts",
     "seed:manager": "tsx src/scripts/seed-manager.ts",
-    "docs:capture": "node scripts/capture-docs.mjs",
+    "docs:capture": "tsx scripts/capture-docs.mjs",
     "docs:check": "node scripts/check-docs.mjs"
   },
   "engines": {

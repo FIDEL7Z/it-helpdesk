@@ -2825,3 +2825,25 @@ a:hover {
   letter-spacing: -0.01em;
 }
 
+
+/* ---------- Board: a single visible column uses the whole width ---------- */
+
+.board--1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.board--1 .board-column__cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
+/* Equal-height cards keep their actions on the bottom edge. */
+.board-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-card__actions,
+.board-card__resolve {
+  margin-top: auto;
+  padding-top: var(--space-1);
+}

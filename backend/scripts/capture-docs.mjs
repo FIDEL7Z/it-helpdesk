@@ -1,4 +1,5 @@
-// Read-only application evidence: isolated browser profile, existing local demo data.
+// Application evidence from existing local demo data, in an isolated browser profile.
+// Read-only, except one follow/leave on the demo incident (see the requester section).
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -115,10 +116,18 @@ async function run() {
     const page = await evaluate('({ path: location.pathname + location.search, title: document.title, heading: document.querySelector("h1")?.textContent, width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth })');
     if (fullPage) {
       const manager = authenticatedRole === 'gestor';
-      if (page.path.split('?')[0] !== (manager ? '/manager' : '/dashboard') || !page.title.startsWith(manager ? 'Visão gerencial' : 'Dashboard') || page.overflow) throw new Error('Incorrect dashboard URL/title or page overflow');
-      if (manager ? page.heading !== 'Visão gerencial' : page.heading !== `Olá, ${identity.name}`) throw new Error('Incorrect dashboard heading');
+      const home = { gestor: ['/manager', 'Visão gerencial', 'Visão gerencial'], ti: ['/dashboard', 'Atendimento', 'Atendimento'], solicitante: ['/dashboard', 'Início', 'Como podemos ajudar?'] }[authenticatedRole];
+      if (page.path.split('?')[0] !== home[0] || !page.title.startsWith(home[1]) || page.overflow) throw new Error('Incorrect home URL/title or page overflow');
+      if (page.heading !== home[2]) throw new Error('Incorrect home heading');
       if (manager) await ready('all charts complete', 'document.querySelectorAll(".chart-container .recharts-surface").length === 4 && document.querySelectorAll(".recharts-area-curve").length === 2');
-      else {
+      else if (authenticatedRole === 'solicitante') {
+        // The requester home has no origin selector: in demo mode it counts every origin, like "Meus pedidos".
+        const expected = await evaluate(`(async () => { const r = await fetch('http://localhost:3000/api/dashboard/summary', { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); return (await r.json()).summary; })()`);
+        if (expected.scope !== 'mine' || expected.byStatus.total <= 0) throw new Error('Incorrect requester scope or unexpectedly empty data');
+        await ready('requester totals match UI', `document.querySelector('.stat-card__value')?.textContent === ${JSON.stringify(String(expected.byStatus.total))} && document.querySelectorAll('.request-card').length === ${Math.min(5, expected.byStatus.total)}`);
+        if (!(await evaluate('!!document.getElementById("known-incidents")'))) throw new Error('No active known problem: run npm run seed:incidents first');
+        if (!(await evaluate(`!!document.querySelector('a[href="/tickets/new"]')`))) throw new Error('Missing support request action');
+      } else {
         const expected = await evaluate(`(async () => { const r = await fetch('http://localhost:3000/api/dashboard/summary?dataOrigin=demo', { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); return (await r.json()).summary; })()`);
         if (expected.scope !== (authenticatedRole === 'solicitante' ? 'mine' : 'all') || expected.byStatus.total <= 0) throw new Error('Incorrect dashboard scope or unexpectedly empty data');
         await ready('persisted demo totals match UI', `document.querySelector('.stat-card__value')?.textContent === ${JSON.stringify(String(expected.byStatus.total))} && document.querySelectorAll('.recent-list__item').length === ${expected.recent.length}`);
@@ -155,17 +164,34 @@ async function run() {
   await capture('login-desktop.png');
   }
   await login('SOLICITANTE');
-  await go('/dashboard', '!!document.getElementById("dashboard-origin") && !!document.querySelector(".stat-card__value")');
-  await evaluate('const source = document.getElementById("dashboard-origin"); source.value = "demo"; source.dispatchEvent(new Event("change", { bubbles: true }));');
-  await ready('requester demo data', '!!document.querySelector(".stat-card__value") && document.getElementById("dashboard-origin").value === "demo" && !document.querySelector("[aria-busy=true]")');
+  const requesterHome = '!!document.querySelector(".requester-hero") && !!document.querySelector(".stat-card__value") && !document.querySelector(".spinner")';
+  await go('/dashboard', requesterHome);
   await delay(150); await capture('dashboard-solicitante-desktop.png', null, true);
   if (!profilesOnly) {
-  await go('/tickets/new', '!!document.getElementById("title")');
+  await go('/tickets/new', '!!document.getElementById("title") && !!document.querySelector(".incident-card")');
   await capture('abertura-chamado-desktop.png');
+  // The only write in this script: follow the demo incident for one capture, then leave it,
+  // so the requester's public state ends as it started. Tickets and users are not touched.
+  await go('/dashboard', requesterHome);
+  const card = 'document.querySelector("[aria-labelledby=known-incidents] .incident-card button")';
+  await ready('known problem card', `!!${card}`);
+  if (await evaluate(`${card}?.getAttribute("aria-pressed") === "false"`)) {
+    await evaluate(`${card}.click()`);
+    await ready('requester following', `${card}?.getAttribute("aria-pressed") === "true" && !${card}.disabled`);
+    await capture('incidente-solicitante-desktop.png', '[aria-labelledby=known-incidents]');
+    await evaluate(`${card}.click()`);
+    await ready('requester left again', `${card}?.getAttribute("aria-pressed") === "false" && !${card}.disabled`);
+  } else {
+    await capture('incidente-solicitante-desktop.png', '[aria-labelledby=known-incidents]');
+  }
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await go('/dashboard', requesterHome);
+  await delay(150); await capture('dashboard-solicitante-mobile.png', null, true);
+  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   }
   await logout();
   await login('TI');
-  await go('/dashboard', '!!document.getElementById("dashboard-origin") && !!document.querySelector(".stat-card__value")');
+  await go('/dashboard', '!!document.getElementById("dashboard-origin") && !!document.querySelector(".stat-card__value") && !!document.querySelector(".incident-row")');
   await evaluate('const source = document.getElementById("dashboard-origin"); source.value = "demo"; source.dispatchEvent(new Event("change", { bubbles: true }));');
   await ready('TI demo data', '!!document.querySelector(".stat-card__value") && !document.querySelector("[aria-busy=true]")');
   await delay(150); await capture('dashboard-ti-desktop.png', null, true);
@@ -176,6 +202,10 @@ async function run() {
   if (!selected) throw new Error('No explicit structured cross-assignee demo resolution exists');
   await go(`/tickets/${selected}`, '!!document.querySelector(".timeline")');
   await capture('auditoria-chamado-desktop.png', '.timeline');
+  const incidentTicket = await evaluate(`(async () => { const response = await fetch('http://localhost:3000/api/incidents/manage?status=active', { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); return (await response.json()).incidents[0]?.ticketId; })()`);
+  if (!incidentTicket) throw new Error('No active incident: run npm run seed:incidents first');
+  await go(`/tickets/${incidentTicket}`, '!!document.querySelector(".incident-panel__public")');
+  await capture('incidente-ti-desktop.png', '.incident-panel');
   }
   await logout();
   await login('GESTOR');
@@ -195,8 +225,8 @@ async function run() {
     const previous = JSON.parse(await readFile(join(output, 'capture-info.json'), 'utf8'));
     for (const capture of previous.captures) if (!captures.some(current => current.file === capture.file)) captures.push({ ...capture, capturedAt: capture.capturedAt ?? previous.capturedAt });
   }
-  await writeFile(join(output, 'capture-info.json'), JSON.stringify({ capturedAt: new Date().toISOString(), timezone: 'America/Fortaleza', origin: 'demo', mode: 'read-only', tool: `${basename(executable)} headless via Chrome DevTools Protocol`, captures }, null, 2) + '\n');
-  console.log(`${captures.length} real application screenshots saved. No tickets or users were changed.`);
+  await writeFile(join(output, 'capture-info.json'), JSON.stringify({ capturedAt: new Date().toISOString(), timezone: 'America/Fortaleza', origin: 'demo', mode: 'read-only', exception: 'The requester follows the demo incident for one capture and leaves it right after; tickets and users are not changed.', tool: `${basename(executable)} headless via Chrome DevTools Protocol`, captures }, null, 2) + '\n');
+  console.log(`${captures.length} real application screenshots saved. No tickets or users were changed; the demo incident follow was undone.`);
 }
 run().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
   socket?.close();

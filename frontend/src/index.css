@@ -734,6 +734,21 @@ textarea.field__input {
   gap: 12px;
 }
 
+/* The "Filtros" toggle exists only on phones, where the filters start collapsed. */
+.toolbar__toggle {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .toolbar__toggle {
+    display: inline-flex;
+  }
+
+  .toolbar__filters:not(.is-open) {
+    display: none;
+  }
+}
+
 .filter {
   display: grid;
   gap: 4px;
@@ -3196,6 +3211,11 @@ a:hover {
     align-items: start;
     gap: var(--space-5);
   }
+}
+
+/* A single known problem takes the whole band instead of leaving an empty half. */
+.portal-band .known-incidents__list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
 }
 
 /* ---------- Service desk (TI) ---------- */

@@ -600,7 +600,12 @@ async function run() {
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await waitDom('board on mobile', `!!${cardOf('Quadro: monitor piscando')}`);
   check(await evaluate('document.documentElement.scrollWidth <= 390 && !!document.querySelector(".board-jump")'), 'Board fits 390px with links to each column');
+  check(await evaluate('getComputedStyle(document.getElementById("ticket-filters")).display === "none" && document.querySelector(".toolbar__toggle")?.getAttribute("aria-expanded") === "false"'), 'On a phone the filters start collapsed, so the queue comes first');
+  await evaluate('document.querySelector(".toolbar__toggle").click()');
+  await waitDom('filters expanded', 'getComputedStyle(document.getElementById("ticket-filters")).display !== "none" && !!document.getElementById("filter-status")?.offsetParent');
+  check(await evaluate('document.documentElement.scrollWidth <= 390'), 'Expanded filters still fit 390px');
   await command('Emulation.clearDeviceMetricsOverride');
+  check(await evaluate('getComputedStyle(document.querySelector(".toolbar__toggle")).display === "none" && getComputedStyle(document.getElementById("ticket-filters")).display !== "none"'), 'Larger screens always show the filters, without the toggle');
   await logout('ti');
 
   await login('solicitante');

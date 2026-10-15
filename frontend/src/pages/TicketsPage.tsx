@@ -100,6 +100,9 @@ export function TicketsPage() {
   const hasFilters = Boolean(
     filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && filters.dataOrigin) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
+  // On a phone the filters start collapsed, so the queue is visible first; larger screens always show them.
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const activeSelects = [filters.status, filters.priority, filters.category, canFilterByAssignee && filters.assignee, DEMO_MODE && filters.dataOrigin].filter(Boolean).length
 
   useEffect(() => {
     // The board loads its own columns.
@@ -204,7 +207,12 @@ export function TicketsPage() {
             onSearch={(value) => updateFilter('search', value)}
           />
 
-          <div className="toolbar__filters">
+          <button type="button" className="button button--secondary toolbar__toggle" aria-expanded={filtersOpen} aria-controls="ticket-filters"
+            onClick={() => setFiltersOpen((open) => !open)}>
+            Filtros{activeSelects > 0 && ` (${activeSelects} ${activeSelects === 1 ? 'ativo' : 'ativos'})`}
+          </button>
+
+          <div id="ticket-filters" className={`toolbar__filters${filtersOpen ? ' is-open' : ''}`}>
             <FilterSelect
               id="filter-status"
               label="Status"

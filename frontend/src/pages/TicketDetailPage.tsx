@@ -9,6 +9,7 @@ import { ApiError } from '../services/api'
 import type { User } from '../services/auth'
 import {
   CATEGORY_LABELS,
+  SUBJECT_LABELS,
   PRIORITY_LABELS,
   TICKET_CATEGORIES,
   TICKET_LIMITS,
@@ -166,6 +167,31 @@ export function TicketDetailPage() {
               <p className="ticket-description">{ticket.description}</p>
             )}
           </div>
+
+          {ticket.intake && (
+            <section className="card intake-card" aria-labelledby="intake-title">
+              <h2 id="intake-title" className="card__title">Informações do pedido</h2>
+              <p className="intake-card__subject">
+                Assunto escolhido: <strong>{SUBJECT_LABELS[ticket.intake.category]}</strong>
+                {teamView && ticket.intake.category !== ticket.category && <> · categoria corrigida para {CATEGORY_LABELS[ticket.category]}</>}
+              </p>
+              {ticket.intake.answers.length > 0 && (
+                <dl className="intake-card__answers">
+                  {ticket.intake.answers.map((item) => (
+                    <div key={item.key} className="intake-card__row">
+                      <dt>{item.question}</dt>
+                      <dd>{item.answer}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {ticket.intake.article && (
+                <p className="intake-card__article">
+                  Orientação consultada antes do pedido: <Link to={`/help/${ticket.intake.article.id}`}>{ticket.intake.article.title}</Link>
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Next to the description: what the team tells users about this same problem. */}
           {can(user?.role, 'incidents:manage') && <IncidentPanel ticket={ticket} />}

@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { KnownIncidents } from '../components/KnownIncidents'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { getArticle, searchArticles, type Article } from '../services/articles'
 import { listActiveIncidents, type PublicIncident } from '../services/incidents'
 import {
-  CATEGORY_LABELS,
   PRIORITY_LABELS,
-  TICKET_CATEGORIES,
+  SUBJECT_LABELS,
+  SUBJECT_ORDER,
   TICKET_LIMITS,
   TICKET_PRIORITIES,
   createTicket,
+  getIntakeQuestions,
   isTicketCategory,
   isTicketPriority,
+  type IntakeQuestion,
   type TicketCategory,
   type TicketPriority,
 } from '../services/tickets'
@@ -25,10 +28,24 @@ type FieldErrors = {
   category?: string
 }
 
+const SUBJECT_HINTS: Record<TicketCategory, string> = {
+  hardware: 'Computador, notebook, monitor, impressora ou periféricos.',
+  rede: 'Wi-Fi, cabo de rede ou internet lenta.',
+  software: 'Programas que não abrem, travam ou mostram erro.',
+  acesso: 'Login, senha expirada ou falta de permissão.',
+  outros: 'Algo que não se encaixa nas opções acima.',
+}
+
+const OBJECT_ID = /^[a-f\d]{24}$/i
+
 function validate(title: string, description: string, category: TicketCategory | ''): FieldErrors {
   const errors: FieldErrors = {}
   const cleanTitle = title.trim()
   const cleanDescription = description.trim()
+
+  if (!category) {
+    errors.category = 'Escolha com o que você precisa de ajuda.'
+  }
 
   if (cleanTitle.length < TICKET_LIMITS.titleMin) {
     errors.title = `Informe um assunto com pelo menos ${TICKET_LIMITS.titleMin} caracteres.`
@@ -42,10 +59,6 @@ function validate(title: string, description: string, category: TicketCategory |
     errors.description = `A descrição deve ter no máximo ${TICKET_LIMITS.descriptionMax} caracteres.`
   }
 
-  if (!category) {
-    errors.category = 'Selecione uma categoria.'
-  }
-
   return errors
 }
 
@@ -55,29 +68,82 @@ export function NewTicketPage() {
   const forRequester = !can(user?.role, 'tickets:view-all')
   useDocumentTitle(forRequester ? 'Solicitar suporte' : 'Abrir chamado')
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+
+  // Coming from a help article ("Ainda preciso de ajuda"): subject and article are suggestions
+  // the person can change or remove.
+  const categoryParam = params.get('category')
+  const articleParam = params.get('article')
+  const [category, setCategory] = useState<TicketCategory | ''>(isTicketCategory(categoryParam) ? categoryParam : '')
+  const [articleId, setArticleId] = useState<string | null>(articleParam && OBJECT_ID.test(articleParam) ? articleParam : null)
+  const [contextArticle, setContextArticle] = useState<{ id: string; title: string } | null>(null)
+
+  const [questions, setQuestions] = useState<Record<TicketCategory, IntakeQuestion[]> | null>(null)
+  // Answers are kept per subject, so going back to correct the subject does not lose them.
+  const [answers, setAnswers] = useState<Partial<Record<TicketCategory, Record<string, string>>>>({})
   const [incidents, setIncidents] = useState<PublicIncident[]>([])
   const [incidentsReload, setIncidentsReload] = useState(0)
-
-  // Known problems are shown before the form; they never block opening a separate request.
-  useEffect(() => {
-    const controller = new AbortController()
-    listActiveIncidents(controller.signal)
-      .then((result) => setIncidents(result.incidents))
-      .catch(() => { /* The form works without this list; errors are not worth blocking it. */ })
-    return () => controller.abort()
-  }, [incidentsReload])
+  const [related, setRelated] = useState<{ category: TicketCategory | ''; articles: Article[] }>({ category: '', articles: [] })
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState<TicketCategory | ''>('')
   const [priority, setPriority] = useState<TicketPriority>('media')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const subjectRef = useRef<HTMLFieldSetElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
-  const categoryRef = useRef<HTMLSelectElement>(null)
+
+  // The form works without these lists; failures are not worth blocking a request.
+  useEffect(() => {
+    const controller = new AbortController()
+    getIntakeQuestions(controller.signal).then((result) => setQuestions(result.questions)).catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    listActiveIncidents(controller.signal).then((result) => setIncidents(result.incidents)).catch(() => {})
+    return () => controller.abort()
+  }, [incidentsReload])
+
+  useEffect(() => {
+    if (!category) return
+    const controller = new AbortController()
+    searchArticles({ category, limit: 3 }, controller.signal)
+      .then((result) => setRelated({ category, articles: result.articles }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [category])
+
+  useEffect(() => {
+    if (!articleId) return
+    const controller = new AbortController()
+    getArticle(articleId, controller.signal)
+      .then(({ article }) => setContextArticle({ id: article.id, title: article.title }))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [articleId])
+
+  const subjectQuestions = category && questions ? questions[category] : []
+  const subjectAnswers = (category && answers[category]) || {}
+  const article = articleId && contextArticle?.id === articleId ? contextArticle : null
+  // The article already read is shown as context, not suggested again.
+  const relatedArticles = (related.category === category ? related.articles : []).filter((item) => item.id !== article?.id)
+  const relatedIncidents = category ? incidents.filter((incident) => incident.category === category) : incidents
+  const othersAffected = category === 'rede' && subjectAnswers.othersAffected === 'Sim'
+
+  function answer(key: string, value: string) {
+    if (!category) return
+    setAnswers((previous) => ({ ...previous, [category]: { ...previous[category], [key]: value } }))
+  }
+
+  function chooseSubject(value: TicketCategory) {
+    setCategory(value)
+    if (fieldErrors.category) setFieldErrors((previous) => ({ ...previous, category: undefined }))
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -87,9 +153,14 @@ export function NewTicketPage() {
     setFieldErrors(errors)
     setFormError(null)
 
+    if (errors.category || !category) return subjectRef.current?.focus()
     if (errors.title) return titleRef.current?.focus()
     if (errors.description) return descriptionRef.current?.focus()
-    if (errors.category || !category) return categoryRef.current?.focus()
+
+    // Only answers of the final subject, without blanks.
+    const guided = Object.entries(answers[category] ?? {})
+      .filter(([, value]) => value.trim())
+      .map(([key, value]) => ({ key, answer: value.trim() }))
 
     setSubmitting(true)
     try {
@@ -98,11 +169,12 @@ export function NewTicketPage() {
         description: description.trim(),
         category,
         priority,
+        ...((guided.length > 0 || article) && { intake: { answers: guided, ...(article && { articleId: article.id }) } }),
       })
       // Straight to the new request, where the person can follow it.
       navigate(`/tickets/${ticket.id}`, { state: { created: true } })
     } catch (error) {
-      // The typed content stays in the form so nothing has to be written again.
+      // Everything typed and chosen stays in the form so nothing has to be done again.
       setFormError(getErrorMessage(error))
       setSubmitting(false)
     }
@@ -126,22 +198,78 @@ export function NewTicketPage() {
         </p>
       </header>
 
-      <KnownIncidents
-        incidents={incidents}
-        onChange={(updated) => setIncidents((list) => list.map((item) => (item.id === updated.id ? updated : item)))}
-        onStale={() => setIncidentsReload((n) => n + 1)}
-        title="Antes de enviar: é um destes problemas?"
-        description="Se for, avise com um clique e acompanhe por aqui, sem abrir outro pedido. Se o seu caso for diferente, continue abaixo."
-      />
+      {formError && (
+        <div className="alert alert--error form-alert" role="alert">
+          {formError}
+        </div>
+      )}
 
-      <div className="card">
-        {formError && (
-          <div className="alert alert--error form-alert" role="alert">
-            {formError}
+      <form className="form request-form" onSubmit={handleSubmit} noValidate>
+        <fieldset
+          ref={subjectRef}
+          tabIndex={-1}
+          className="card subject-picker"
+          aria-describedby={fieldErrors.category ? 'subject-error' : undefined}
+          disabled={submitting}
+        >
+          <legend className="subject-picker__legend">Com o que você precisa de ajuda?</legend>
+          <div className="subject-picker__options">
+            {SUBJECT_ORDER.map((value) => (
+              <label key={value} className="subject-option">
+                <input type="radio" name="subject" value={value} checked={category === value} onChange={() => chooseSubject(value)} />
+                <span className="subject-option__label">{SUBJECT_LABELS[value]}</span>
+                <span className="subject-option__hint">{SUBJECT_HINTS[value]}</span>
+              </label>
+            ))}
+          </div>
+          {fieldErrors.category && <p id="subject-error" className="field__error">{fieldErrors.category}</p>}
+        </fieldset>
+
+        {article && (
+          <div className="context-chip" role="status">
+            <span>Você consultou a orientação <strong>{article.title}</strong>. Ela será enviada junto com o pedido.</span>
+            <button type="button" className="button button--ghost button--small" onClick={() => setArticleId(null)}>Remover</button>
           </div>
         )}
 
-        <form className="form" onSubmit={handleSubmit} noValidate>
+        <KnownIncidents
+          incidents={relatedIncidents}
+          onChange={(updated) => setIncidents((list) => list.map((item) => (item.id === updated.id ? updated : item)))}
+          onStale={() => setIncidentsReload((n) => n + 1)}
+          headingId="form-known-incidents"
+          title={category ? 'A TI já está cuidando destes problemas' : 'Antes de enviar: é um destes problemas?'}
+          description="Se for o mesmo problema, avise com um clique e acompanhe por aqui, sem abrir outro pedido. Se o seu caso for diferente, continue abaixo."
+        />
+
+        {relatedArticles.length > 0 && (
+          <section className="related-articles" aria-labelledby="related-articles-title">
+            <h2 id="related-articles-title" className="section-title">Orientações que podem resolver</h2>
+            <ul className="related-articles__list">
+              {relatedArticles.map((item) => (
+                <li key={item.id}>
+                  <Link to={`/help/${item.id}`}>{item.title}</Link>
+                  <span className="text-muted"> · {item.summary}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {subjectQuestions.length > 0 && (
+          <fieldset className="card guided-questions" disabled={submitting}>
+            <legend className="guided-questions__legend">Conte um pouco mais <span className="text-muted">(opcional)</span></legend>
+            {subjectQuestions.map((question) => (
+              <GuidedQuestion key={`${category}-${question.key}`} question={question} value={subjectAnswers[question.key] ?? ''} onChange={(value) => answer(question.key, value)} />
+            ))}
+            {othersAffected && relatedIncidents.length > 0 && (
+              <p className="alert alert--info" role="status">
+                Parece ser o mesmo problema que a TI já está tratando. Você pode acompanhar acima; se preferir, envie seu pedido mesmo assim.
+              </p>
+            )}
+          </fieldset>
+        )}
+
+        <div className="card form">
           <div className="field">
             <label htmlFor="title" className="field__label">
               Assunto
@@ -200,62 +328,28 @@ export function NewTicketPage() {
             )}
           </div>
 
-          <div className="form__row">
-            <div className="field">
-              <label htmlFor="category" className="field__label">
-                Tipo de problema
-              </label>
-              <select
-                ref={categoryRef}
-                id="category"
-                className="field__input field__select"
-                value={category}
-                onChange={(event) => {
-                  const value = event.target.value
-                  setCategory(isTicketCategory(value) ? value : '')
-                  clearError('category')
-                }}
-                aria-invalid={Boolean(fieldErrors.category)}
-                aria-describedby={fieldErrors.category ? 'category-error' : undefined}
-                disabled={submitting}
-              >
-                <option value="">Selecione...</option>
-                {TICKET_CATEGORIES.map((value) => (
-                  <option key={value} value={value}>
-                    {CATEGORY_LABELS[value]}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.category && (
-                <p id="category-error" className="field__error">
-                  {fieldErrors.category}
-                </p>
-              )}
-            </div>
-
-            <div className="field">
-              <label htmlFor="priority" className="field__label">
-                Prioridade sugerida
-              </label>
-              <select
-                id="priority"
-                className="field__input field__select"
-                value={priority}
-                onChange={(event) => {
-                  const value = event.target.value
-                  if (isTicketPriority(value)) setPriority(value)
-                }}
-                aria-describedby="priority-hint"
-                disabled={submitting}
-              >
-                {TICKET_PRIORITIES.map((value) => (
-                  <option key={value} value={value}>
-                    {PRIORITY_LABELS[value]}
-                  </option>
-                ))}
-              </select>
-              <p id="priority-hint" className="field__hint">A equipe de TI pode ajustar depois de analisar.</p>
-            </div>
+          <div className="field">
+            <label htmlFor="priority" className="field__label">
+              Prioridade sugerida
+            </label>
+            <select
+              id="priority"
+              className="field__input field__select"
+              value={priority}
+              onChange={(event) => {
+                const value = event.target.value
+                if (isTicketPriority(value)) setPriority(value)
+              }}
+              aria-describedby="priority-hint"
+              disabled={submitting}
+            >
+              {TICKET_PRIORITIES.map((value) => (
+                <option key={value} value={value}>
+                  {PRIORITY_LABELS[value]}
+                </option>
+              ))}
+            </select>
+            <p id="priority-hint" className="field__hint">A equipe de TI pode ajustar depois de analisar.</p>
           </div>
 
           <div className="form__actions">
@@ -267,8 +361,38 @@ export function NewTicketPage() {
               {submitting ? 'Enviando...' : forRequester ? 'Enviar solicitação' : 'Abrir chamado'}
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </section>
+  )
+}
+
+function GuidedQuestion({ question, value, onChange }: { question: IntakeQuestion; value: string; onChange: (value: string) => void }) {
+  const id = `question-${question.key}`
+  if (question.type === 'text') {
+    return (
+      <div className="field">
+        <label htmlFor={id} className="field__label">{question.label}</label>
+        {question.hint && <p id={`${id}-hint`} className="field__hint">{question.hint}</p>}
+        <input id={id} className="field__input" value={value} maxLength={question.maxLength}
+          onChange={(event) => onChange(event.target.value)} aria-describedby={question.hint ? `${id}-hint` : undefined} />
+      </div>
+    )
+  }
+  return (
+    <fieldset className="choice-group">
+      <legend className="field__label">{question.label}</legend>
+      <div className="choice-group__options">
+        {question.options?.map((option) => (
+          <label key={option} className="choice-pill">
+            <input type="radio" name={id} value={option} checked={value === option} onChange={() => onChange(option)} />
+            <span>{option}</span>
+          </label>
+        ))}
+        {value && (
+          <button type="button" className="button button--ghost button--small" onClick={() => onChange('')}>Limpar</button>
+        )}
+      </div>
+    </fieldset>
   )
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../auth/useAuth'
 import { KnownIncidents } from '../components/KnownIncidents'
 import { StatusBadge } from '../components/TicketBadges'
@@ -7,7 +7,7 @@ import { DEMO_MODE } from '../config/demo'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getDashboardSummary, type DashboardSummary } from '../services/dashboard'
 import { listActiveIncidents, listFollowedIncidents, type PublicIncident } from '../services/incidents'
-import { CATEGORY_LABELS, listTickets, type TicketSummary } from '../services/tickets'
+import { CATEGORY_LABELS, SUBJECT_LABELS, SUBJECT_ORDER, listTickets, type TicketSummary } from '../services/tickets'
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
@@ -73,10 +73,20 @@ export function RequesterHomePage() {
         <div className="requester-hero__text">
           {firstName && <p className="eyebrow">Olá, {firstName}</p>}
           <h1 className="requester-hero__title">Como podemos ajudar?</h1>
-          <p className="requester-hero__subtitle">Descreva o que aconteceu ou acompanhe seus pedidos de suporte.</p>
+          <p className="requester-hero__subtitle">Encontre uma solução ou envie um pedido para nossa equipe.</p>
+          <HelpSearchBox />
         </div>
         <Link to="/tickets/new" className="button button--primary button--large">Solicitar suporte</Link>
       </header>
+
+      <nav className="subject-shortcuts" aria-labelledby="subject-shortcuts-title">
+        <h2 id="subject-shortcuts-title" className="section-title">Escolha um assunto</h2>
+        <ul className="subject-shortcuts__list">
+          {SUBJECT_ORDER.map((value) => (
+            <li key={value}><Link to={`/help?category=${value}`} className="subject-shortcut">{SUBJECT_LABELS[value]}</Link></li>
+          ))}
+        </ul>
+      </nav>
 
       {loading ? (
         <div className="card card--empty" role="status"><span className="spinner" aria-hidden="true" />Carregando seus pedidos...</div>
@@ -144,6 +154,27 @@ export function RequesterHomePage() {
         </>
       )}
     </section>
+  )
+}
+
+/** Search box of the portal: opens the help center with the typed words. */
+function HelpSearchBox() {
+  const navigate = useNavigate()
+  const [value, setValue] = useState('')
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const q = value.trim()
+    navigate(q ? `/help?q=${encodeURIComponent(q)}` : '/help')
+  }
+
+  return (
+    <form className="help-search requester-hero__search" role="search" onSubmit={handleSubmit}>
+      <label htmlFor="home-help-search" className="sr-only">Buscar uma solução</label>
+      <input id="home-help-search" type="search" className="field__input" placeholder="Ex.: impressora, Wi-Fi, acesso"
+        value={value} maxLength={100} onChange={(event) => setValue(event.target.value)} />
+      <button type="submit" className="button button--secondary">Buscar</button>
+    </form>
   )
 }
 

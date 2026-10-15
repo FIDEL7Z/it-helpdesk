@@ -74,7 +74,13 @@ export function ArticlePage() {
             <section className="article-feedback" aria-labelledby="article-feedback-title">
               <h2 id="article-feedback-title" className="section-title">A orientação ajudou?</h2>
               {article.myFeedback === true ? (
-                <p className="article-feedback__thanks" role="status">Que bom que resolveu. Obrigado por avisar.</p>
+                // The answer can be changed: if the problem comes back, asking for help stays one click away.
+                <div className="article-feedback__actions">
+                  <p className="article-feedback__thanks" role="status">Que bom que resolveu. Obrigado por avisar.</p>
+                  <button type="button" className="button button--secondary" disabled={sending} onClick={() => answer(false)}>
+                    Ainda preciso de ajuda.
+                  </button>
+                </div>
               ) : (
                 <div className="article-feedback__actions">
                   <button type="button" className="button button--primary" disabled={sending} onClick={() => answer(true)}>

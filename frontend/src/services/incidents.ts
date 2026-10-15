@@ -1,6 +1,6 @@
 import { apiRequest } from './api'
 import type { User } from './auth'
-import type { TicketPriority, TicketStatus } from './tickets'
+import type { TicketCategory, TicketPriority, TicketStatus } from './tickets'
 
 export type IncidentStatus = 'active' | 'closed'
 
@@ -15,6 +15,8 @@ export type PublicIncident = {
   resolutionMessage: string | null
   affectedCount: number
   following: boolean
+  /** Subject of the problem, used to suggest it in the request form. */
+  category: TicketCategory | null
 }
 
 export type IncidentEvent = {

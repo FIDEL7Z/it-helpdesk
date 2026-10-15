@@ -544,6 +544,32 @@ async function run() {
   await go(`/help/${draft.body.article.id}`);
   await waitDom('draft hidden', 'document.querySelector("[role=alert]")?.textContent.includes("não está disponível")');
   check(true, 'A draft article answers as unavailable to requesters');
+
+  // Guided request: "still need help" brings the subject and the article; answers survive a subject change.
+  const keyboardArticle = (await browserApi('GET', '/articles?q=teclado')).body.articles[0];
+  await go(`/help/${keyboardArticle.id}`);
+  await waitDom('article page again', '!!document.querySelector(".article-feedback")');
+  await clickButton('Ainda preciso de ajuda.');
+  await waitDom('guided form from article', 'location.pathname === "/tickets/new" && document.querySelector("input[name=subject][value=hardware]")?.checked && !!document.querySelector(".context-chip") && !!document.querySelector(".guided-questions")');
+  check(true, 'Still needing help opens the request form with the subject and the article as context');
+  const pick = (name, value) => evaluate(`document.querySelector('input[name=${JSON.stringify(name)}][value=${JSON.stringify(value)}]').click()`);
+  await pick('question-equipment', 'Notebook');
+  await pick('question-powersOn', 'Sim');
+  await pick('subject', 'rede');
+  await waitDom('network questions', '!!document.querySelector("input[name=question-connection]")');
+  await pick('subject', 'hardware');
+  await waitDom('hardware answers kept', 'document.querySelector("input[name=question-equipment][value=Notebook]")?.checked === true');
+  check(true, 'Answers are kept when the subject is changed and changed back');
+  await fill('title', 'Teclado do notebook parou');
+  await fill('description', 'O teclado do notebook parou de responder depois da atualização.');
+  await submit();
+  await waitDom('guided ticket created', 'location.pathname.startsWith("/tickets/") && !!document.querySelector(".intake-card")');
+  const guidedId = await evaluate('location.pathname.split("/").pop()');
+  const guided = (await browserApi('GET', `/tickets/${guidedId}`)).body.ticket;
+  check(guided.category === 'hardware' && guided.priority === 'media' && guided.description === 'O teclado do notebook parou de responder depois da atualização.'
+    && JSON.stringify(guided.intake.answers.map((item) => item.answer)) === JSON.stringify(['Notebook', 'Sim']) && guided.intake.article.id === keyboardArticle.id,
+  'Guided request keeps the description, the answers of the final subject and the article read');
+  check(await evaluate('document.querySelector(".intake-card").textContent.includes("Qual equipamento está com problema?")'), 'The request page shows the guided answers');
   await logout('solicitante');
 
   await login('gestor');

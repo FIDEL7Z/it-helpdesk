@@ -114,6 +114,7 @@ export type TicketSummary = {
 
 export type TicketDetail = TicketSummary & {
   description: string
+  intake: TicketIntake | null
   history: TicketEvent[]
 }
 
@@ -152,14 +153,36 @@ export type TicketFilters = {
   limit?: number
 }
 
+/** A guided-form question, from the catalog the API validates against. */
+export type IntakeQuestion = {
+  key: string
+  label: string
+  type: 'choice' | 'text'
+  options?: string[]
+  maxLength?: number
+  hint?: string
+}
+
+/** Answers given when the ticket was opened, apart from the description. */
+export type TicketIntake = {
+  category: TicketCategory
+  answers: { key: string; question: string; answer: string }[]
+  article: { id: string; title: string } | null
+}
+
 export type CreateTicketInput = {
   title: string
   description: string
   category: TicketCategory
   priority: TicketPriority
+  intake?: { answers: { key: string; answer: string }[]; articleId?: string }
 }
 
-export type UpdateTicketInput = Partial<CreateTicketInput> & { reason?: string }
+export type UpdateTicketInput = Partial<Omit<CreateTicketInput, 'intake'>> & { reason?: string }
+
+export function getIntakeQuestions(signal?: AbortSignal): Promise<{ questions: Record<TicketCategory, IntakeQuestion[]> }> {
+  return apiRequest('/tickets/intake-questions', { signal })
+}
 
 export function listTickets(
   filters: TicketFilters,

@@ -4,7 +4,7 @@
 
 ## Dashboard básico
 
-O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. O frontend seleciona operacional inicialmente; demonstração e legado ficam separados. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
+O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. Na página Atendimento, o frontend seleciona operacional inicialmente; demonstração e legado ficam separados. A página Início do solicitante não tem seletor: fora do modo demonstração conta só dados operacionais, e no modo demonstração conta todas as origens, igual à lista **Meus pedidos**. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
 
 | Indicador / pergunta | Definição e campos | Filtros e limitações |
 |---|---|---|
@@ -78,6 +78,17 @@ Fontes: [manager.service.ts](../backend/src/services/manager.service.ts), [contr
 
 SLA, tempo médio/corrido/útil de atendimento, duração completa por ciclo e evolução histórica de backlog exigem definições adicionais e cobertura confiável. `updatedAt` não é data de resolução. Não há ranking de qualidade, pontuação de desempenho ou dados artificiais para preencher gráficos.
 
+## Incidentes compartilhados
+
+O bloco **Incidentes compartilhados** da visão gerencial respeita a origem selecionada; a lista **Incidentes ativos** da página Atendimento mostra todas as origens, como a fila, e identifica os de demonstração.
+
+- **Ativos / Encerrados:** incidentes por status atual.
+- **Pessoas afetadas nos ativos:** soma, nos incidentes ativos, das participações do ciclo atual sem saída. Uma pessoa em dois incidentes conta duas vezes.
+- **Novas adesões (30 dias):** participações criadas nos últimos 30 dias, inclusive de quem saiu depois. Sair e voltar no mesmo ciclo não conta de novo.
+- **Mais afetados:** até cinco incidentes ativos, do maior para o menor número de afetados.
+
+Esses números mostram o alcance de um problema. Não medem chamados evitados: não há como saber se a pessoa abriria um chamado sem o incidente. Também não medem tempo de resolução. Fonte: [incident.service.ts](../backend/src/services/incident.service.ts).
+
 ## Decisões presentes no código
 
 As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, sem afirmar quais alternativas o autor considerou pessoalmente.
@@ -94,6 +105,9 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **bcryptjs e node:test:** hash em JavaScript e testes sem biblioteca de testes adicional. Integração exige MongoDB real.
 - **Gráficos shadcn/ui adaptados com Recharts:** contêiner e tooltip usam tokens CSS existentes, sem introduzir Tailwind ou reconstruir o frontend. Gráfico gerencial é carregado sob demanda; barras ordenam categorias e pizza mantém a ordem semântica de prioridades.
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
+- **Paleta Slate + Teal em tokens CSS:** cores definidas uma vez em `:root`, com variante escura. Os pares de texto e fundo foram calculados acima de 4,5:1 e as bordas de campos acima de 3:1, nos dois temas; o E2E confere o contraste dos botões em cada execução. Situação nunca depende só de cor: selos têm texto e o status do incidente tem ponto e rótulo.
+- **Incidentes em coleções próprias:** a revisão do chamado não é usada para participações, então cliques de muitas pessoas não geram 409 no atendimento. O custo é não ter transação entre chamado e incidente, compensado pela reconciliação na leitura.
+- **Formato público explícito:** o backend monta o objeto público campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
 
 ## Segurança e limites operacionais
 
@@ -105,20 +119,20 @@ CORS restringe origens configuradas; autenticação/autorização continuam resp
 
 MongoDB local roda sem autenticação, publicado somente em loopback. Produção exige configuração própria de banco e segredos. `.env` e variantes são ignorados pelo Git; `.env.example` tem apenas configuração e credenciais demonstrativas.
 
-Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
+Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
 
 ## Evidências visuais
 
-Capturas reais em 10/10/2026, com origem **Demonstração — dados fictícios**, mês atual e fuso America/Fortaleza. O conjunto local ampliado tinha cinco usuários e 64 chamados demonstrativos. Os indicadores têm populações diferentes: nem todo chamado foi criado no período e uma reabertura permite mais de uma resolução por chamado. Não use esses números como avaliação operacional.
+Capturas reais em 15/10/2026, com origem **Demonstração — dados fictícios**, mês atual e fuso America/Fortaleza. O conjunto local ampliado tinha cinco usuários, 64 chamados demonstrativos e um incidente de demonstração ativo. Os indicadores têm populações diferentes: nem todo chamado foi criado no período e uma reabertura permite mais de uma resolução por chamado. Não use esses números como avaliação operacional.
 
 <details>
 <summary>Visão geral, equipe e carga</summary>
 
 ![Visão geral do gestor com origem, período, alertas e indicadores](assets/screenshots/gestor-visao-geral-desktop.png)
 
-Os alertas levam às filas correspondentes; as contagens distinguem período e situação atual.
+Os alertas levam às filas correspondentes; as contagens distinguem período e situação atual. O bloco Incidentes compartilhados fica entre os alertas e a visão geral.
 
 ![Equipe de suporte com pendências atuais, resoluções por autor e carga por prioridade](assets/screenshots/gestor-equipe-carga-desktop.png)
 

@@ -6,7 +6,7 @@
 
 O setor de TI recebe solicitações internas em volume, com dificuldade para organizar a fila e acompanhar cada atendimento. O IT-Helpdesk centraliza a abertura, a classificação, a atribuição e o acompanhamento dos chamados. O histórico permite consultar quem realizou as alterações e quando.
 
-O produto atende três necessidades: o solicitante comunica e acompanha seu problema; a TI organiza e executa o atendimento; o gestor consulta o conjunto das demandas com permissão para também operar chamados. O dashboard aparece após o login normal e mantém o escopo permitido para cada usuário. Uma rota protegida acessada anteriormente pode ser restaurada após o login.
+O produto atende três necessidades: o solicitante comunica e acompanha seu problema; a TI organiza e executa o atendimento; o gestor consulta o conjunto das demandas com permissão para também operar chamados. Cada perfil tem sua página inicial após o login, com o escopo permitido para aquele usuário. Uma rota protegida acessada anteriormente pode ser restaurada após o login.
 
 ## Como pensei na solução
 
@@ -26,8 +26,10 @@ Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de c
 | Atribuir responsável | Não | Se não resolvido; destino TI/gestor ativo | Mesma regra |
 | Ser responsável | Não | Sim | Sim |
 | Consultar equipe TI | Não | Sim | Sim |
-| Dashboard básico | Próprio | Global e fila pessoal | Global (rota disponível) |
+| Página inicial | Início: pedidos próprios e problemas conhecidos | Atendimento: fila global, pessoal e incidentes ativos | Visão gerencial (Atendimento também disponível) |
 | Visão gerencial e dados de equipe | Não | Não | Exclusiva |
+| Publicar, editar, encerrar e republicar incidente | Não | Sim | Sim |
+| Ver incidentes ativos e indicar que foi afetado | Sim | Sim | Sim |
 
 O endpoint gerencial exige o papel gestor, validado na rota após autenticação. As permissões operacionais estão em [backend/src/auth/permissions.ts](../backend/src/auth/permissions.ts). O frontend mantém uma cópia apenas para controlar a interface. A API aplica a autorização mesmo em chamadas diretas. Status e atribuição exigem permissão na rota; consulta e edição aplicam escopo e propriedade no service.
 
@@ -52,9 +54,29 @@ Toda alteração exige `expectedRevision` da leitura do frontend. Conflitos reto
 
 Novos eventos registram autor autenticado, snapshot de identidade, responsável no momento, valores anteriores/novos, data, revisão e ciclo. Eventos legados permanecem intactos; informação ausente é exibida como não registrada. Veja [integridade e auditoria](06-integridade-e-auditoria.md).
 
+## Incidentes compartilhados
+
+Quando várias pessoas sofrem o mesmo problema (Wi-Fi fora, sistema lento), cada uma tende a abrir um chamado igual. O incidente compartilhado permite que a TI avise uma vez e que cada pessoa afetada diga "também estou com esse problema" sem abrir outro pedido. A equipe passa a ver quantas pessoas foram atingidas.
+
+**Publicação.** TI ou gestor publica a partir de um chamado existente, o chamado principal, com título público (5–120 caracteres) e mensagem para os usuários (10–600). Um chamado tem no máximo um incidente. Chamado resolvido não pode publicar. O texto público é escrito pela equipe; a descrição privada do chamado nunca é exibida a outros usuários.
+
+**Contrato público.** O solicitante recebe somente `id`, `title`, `publicMessage`, `status`, `publishedAt`, `closedAt`, `resolutionMessage`, `affectedCount` e `following`. Não recebe o chamado, sua descrição, solicitante, responsável, histórico nem a lista de participantes. Esse formato é montado explicitamente no backend, não filtrado na interface.
+
+**Participação.** "Também estou com esse problema" grava uma participação do usuário autenticado; o corpo da requisição não aceita outro usuário. Repetir o clique, ou duas requisições simultâneas, mantém uma única participação (índice único por incidente, ciclo e usuário). "Não estou mais com esse problema" marca a saída; voltar reativa o mesmo registro. A contagem de afetados é calculada a partir dessas participações, nunca de um contador incrementado.
+
+**Edição e concorrência.** O incidente tem revisão própria, separada da revisão do chamado. Editar, encerrar e republicar exigem `expectedRevision`; uma tela desatualizada recebe 409 e recarrega. Participar não altera a revisão do incidente nem a do chamado, então muitas pessoas clicando ao mesmo tempo não bloqueiam o atendimento.
+
+**Encerramento.** Resolver o chamado principal encerra o incidente, com o autor da resolução registrado como quem encerrou. Se a gravação do encerramento falhar logo após a resolução, a próxima leitura detecta o chamado resolvido e conclui o encerramento. TI e gestor também podem encerrar manualmente, com mensagem de encerramento. Depois de encerrado, ninguém entra como afetado; quem acompanhava vê o problema como resolvido. Reabrir o chamado não reativa o incidente: se o problema voltar, a equipe reabre o chamado e republica o incidente, o que inicia um novo ciclo e pede nova confirmação de quem está afetado.
+
+**Auditoria.** Publicação, edição do texto, encerramento e republicação geram eventos com autor, papel, data, revisão, ciclo e valores anteriores/novos. Participações não geram eventos, para não transformar o histórico em um registro de cliques.
+
+**Limites.** Não há notificação ativa (e-mail, push), vínculo de outros chamados ao incidente nem sugestão automática de incidentes parecidos. O número de afetados mede alcance; não indica quantos chamados deixaram de ser abertos.
+
+Contrato HTTP em [fluxos e API](03-fluxos-e-api.md#incidentes-compartilhados), modelo em [arquitetura e dados](02-arquitetura-e-dados.md#incidentes-e-participações) e indicadores em [métricas](04-metricas-decisoes-e-limites.md#incidentes-compartilhados).
+
 ## Escopo entregue e evolução futura
 
-**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, dashboards por perfil, visão gerencial exclusiva com filtros e métricas comprovadas, temas seguindo o sistema e layout responsivo.
+**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, incidentes compartilhados, visão gerencial exclusiva com filtros e métricas comprovadas, temas seguindo o sistema e layout responsivo.
 
 A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 

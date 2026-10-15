@@ -1,62 +1,82 @@
 # IT Helpdesk
 
-Central de chamados internos de TI: abertura, atendimento e acompanhamento em um só lugar, com permissões por perfil, histórico auditável e indicadores gerenciais.
+Central de chamados internos de TI: quem precisa de ajuda pede e acompanha, a equipe de TI atende, e a gestão acompanha a operação. Permissões por perfil, histórico auditável e indicadores gerenciais.
 
-## Tecnologias
+[Como executar](#instalação) · [Usuários demonstrativos](#usuários-demonstrativos) · [Testes](#testes) · [Documentação](#documentação-complementar)
 
-- **Frontend:** React 19, Vite 8, TypeScript, React Router 8, Recharts e CSS próprio. Os gráficos adaptam os componentes de referência do shadcn/ui.
+## O problema
+
+O setor de TI recebe pedidos por vários canais, sem fila organizada nem registro de quem fez o quê. Quando um problema atinge muita gente, como o Wi-Fi caindo, chegam dezenas de chamados iguais e ninguém sabe se a TI já está cuidando. O IT Helpdesk centraliza os pedidos, registra cada ação com autor e data e permite que a TI avise todos de uma vez.
+
+## Principais funcionalidades
+
+- **Solicitante:** página Início com o botão **Solicitar suporte**, problemas já conhecidos e seus pedidos em linguagem simples (Aguardando atendimento, Em atendimento, Resolvido). Edita o texto enquanto o pedido não foi iniciado.
+- **Suporte TI:** fila com busca, filtros e atalhos; atribuição, classificação, início, resolução e reabertura, com motivo quando a regra exige; publicação de incidentes compartilhados.
+- **Gestor:** visão gerencial exclusiva com alertas, carga da equipe, resoluções comprovadas por autor, solicitantes, gráficos e incidentes; também opera chamados como a TI.
+- **Para todos:** login com e-mail e senha, sessão restaurada ao recarregar, histórico de cada chamado, tema claro/escuro conforme o sistema e layout para celular.
+
+Regras detalhadas em [produto e regras](docs/01-produto-e-regras.md).
+
+## Os três perfis
+
+Telas reais da aplicação, com dados fictícios de demonstração.
+
+**Solicitante (Mariana Souza) — Início.** Um pedido de ajuda a um clique, problemas conhecidos e os próprios pedidos.
+
+![Página Início da solicitante com Solicitar suporte, problema conhecido e Meus pedidos](docs/assets/screenshots/dashboard-solicitante-desktop.png)
+
+**Suporte TI (Carlos Andrade) — Atendimento.** Incidentes ativos com afetados, fila sem responsável, atendimentos próprios e chamados recentes.
+
+![Página Atendimento da TI com incidentes ativos, contagens da fila e chamados recentes](docs/assets/screenshots/dashboard-ti-desktop.png)
+
+**Gestor (Ana Ribeiro) — Visão gerencial.** Alertas que abrem a fila, incidentes, carga por analista e gráficos de demanda.
+
+![Visão gerencial com alertas, incidentes compartilhados, equipe e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
+
+Outras telas (formulário, lista, histórico, celular) estão em [fluxos e API](docs/03-fluxos-e-api.md#capturas-por-perfil), [métricas](docs/04-metricas-decisoes-e-limites.md#evidências-visuais) e [auditoria](docs/06-integridade-e-auditoria.md#evidência-visual-da-autoria).
+
+## Incidentes compartilhados
+
+Quando a TI identifica um problema que atinge várias pessoas, publica um aviso a partir do chamado principal. Quem também está afetado clica em **Também estou com esse problema**, sem abrir outro chamado. A equipe vê quantas pessoas foram atingidas; ao resolver o chamado, o aviso é encerrado para todos.
+
+![Problema conhecido acompanhado pela solicitante, com a opção de sair](docs/assets/screenshots/incidente-solicitante-desktop.png)
+
+- O solicitante recebe só o texto público escrito pela TI; a descrição do chamado e a lista de afetados não saem do backend.
+- Clicar duas vezes, ou várias pessoas ao mesmo tempo, não duplica a contagem.
+- Participar não interfere no atendimento do chamado.
+- Publicação, edição, encerramento e republicação ficam no histórico do incidente, com autor.
+- O número de afetados mostra alcance. O sistema não afirma quantos chamados foram evitados.
+
+Regras completas em [produto e regras](docs/01-produto-e-regras.md#incidentes-compartilhados) e roteiro de demonstração em [demonstração](docs/05-demonstracao.md#roteiro-do-incidente-compartilhado--cerca-de-3-minutos).
+
+## Stack
+
+- **Frontend:** React 19, Vite 8, TypeScript, React Router 8, Recharts e CSS próprio com tokens de cor. Os gráficos adaptam os componentes de referência do shadcn/ui.
 - **Backend:** Node.js, Express 5, TypeScript, Zod, JWT, bcryptjs e express-rate-limit.
 - **Dados:** MongoDB 7 e Mongoose 9.
-- **Infra local:** Docker Compose apenas para MongoDB; API e frontend executados com npm.
-- **Validação:** node:test com Express/MongoDB reais, typecheck, oxlint, builds e E2E mínimo em Edge/Chrome headless.
+- **Ambiente local:** Docker Compose apenas para o MongoDB; API e frontend rodam com npm.
+- **Testes:** node:test com Express e MongoDB reais, typecheck, oxlint, builds e E2E em Edge/Chrome headless sem biblioteca extra.
 
-[Conheça o produto](#conheça-o-it-helpdesk) · [Como executar](#como-executar) · [Credenciais demo](#credenciais-demonstrativas) · [Documentação técnica](#documentação-técnica)
+```mermaid
+flowchart LR
+  FRONT[React e Vite] -->|HTTP e JWT| API[API Express: validação e regras]
+  API -->|Mongoose| MONGO[(MongoDB)]
+```
 
-## Conheça o IT-Helpdesk
+Controllers validam a entrada; services aplicam escopo, propriedade e regras; models representam os documentos. Veja [arquitetura e dados](docs/02-arquitetura-e-dados.md).
 
-O projeto organiza o fluxo entre quem solicita ajuda, quem atende e quem acompanha a operação. O desafio técnico reúne autenticação, autorização no backend, persistência MongoDB e rastreabilidade das ações.
+## Requisitos
 
-As telas abaixo são da aplicação real, com logins separados e dados fictícios. Capturas completas, sem cortar o final das páginas; os registros de testes manuais existentes foram preservados.
+- Node.js **22.22 ou superior** e npm.
+- Docker Desktop (ou Docker Engine) com Docker Compose, para o MongoDB local. Dispensável se houver outro MongoDB disponível; nesse caso ajuste `MONGODB_URI`.
+- Edge ou Chrome instalado, apenas para o teste E2E e as capturas.
+- Portas livres: 27017 (MongoDB), 3000 (API) e 5173 (interface).
 
-### Gestor — visão gerencial
+> **Se a execução local utilizar Docker para o MongoDB, é necessário iniciar o Docker Desktop antes de subir os serviços ou executar testes de integração.**
 
-**Ana Ribeiro · Gestor · `/manager`**. Acompanha indicadores, alertas acionáveis, carga da equipe, solicitações e gráficos. Carga atual e resoluções comprovadas por autor são conceitos distintos.
+## Instalação
 
-![Dashboard completo do gestor Ana Ribeiro, com indicadores, alertas, equipe, solicitantes e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
-
-### Suporte TI — atendimento
-
-**Carlos Andrade · Suporte TI · `/dashboard`**. Visualiza os chamados da empresa, a fila sem responsável e os atendimentos sob sua responsabilidade, além de prioridades, categorias e chamados recentes.
-
-![Dashboard completo do suporte TI Carlos Andrade, com fila de atendimento e chamados recentes](docs/assets/screenshots/dashboard-ti-desktop.png)
-
-### Solicitante — meus chamados
-
-**Mariana Souza · Solicitante · `/dashboard`**. Consulta somente suas solicitações, acompanha os status e abre um novo chamado pelo botão **Abrir chamado**. Compartilha a rota com a TI, mas o escopo e os controles seguem seu perfil autenticado.
-
-![Dashboard completo da solicitante Mariana Souza, com seus chamados e a opção Abrir chamado](docs/assets/screenshots/dashboard-solicitante-desktop.png)
-
-Veja também [login e abertura de chamados](docs/03-fluxos-e-api.md#capturas-por-perfil), [detalhes dos gráficos e versão mobile](docs/04-metricas-decisoes-e-limites.md#evidências-visuais) e [histórico de autoria](docs/06-integridade-e-auditoria.md#evidência-visual-da-autoria). O [roteiro de demonstração](docs/05-demonstracao.md) orienta a avaliação dos três perfis.
-
-## Funcionalidades e perfis
-
-- **Solicitante:** abre chamados, consulta apenas os próprios e edita título/descrição enquanto estão abertos.
-- **TI:** vê todos os chamados, atribui responsáveis da TI ou gestores ativos, faz triagem, inicia, resolve e reabre atendimentos.
-- **Gestor:** acessa uma visão gerencial exclusiva com carga por operador, resoluções comprovadas por autor, solicitantes, alertas acionáveis, tendências em área, pizza de prioridades, barras de categorias e as 24 horas de criação; também assume, atribui, faz triagem, inicia, resolve e reabre chamados. A edição de título/descrição continua restrita aos próprios chamados abertos.
-
-Todos utilizam login com e-mail/senha. O gestor entra em **Visão gerencial**; TI e solicitante entram no dashboard de seu perfil. A sessão é restaurada ao recarregar. Lista possui pesquisa por título, filtros e paginação, com filtros na URL e retorno do detalhe para a fila consultada. O detalhe apresenta histórico de autoria e alterações. A interface adapta o layout ao tamanho da tela e segue o tema claro/escuro do sistema.
-
-**Estado atual:** o formulário solicita título, descrição, categoria e prioridade. Gestão possui períodos Hoje, Últimos sete dias, Mês atual e Ano atual; filtros de analista, solicitante e classificação. O seletor de origem é habilitado apenas por configuração demonstrativa. Impacto, SLA, tempo médio de atendimento e backlog histórico ainda não estão implementados. Consulte as [regras e o escopo](docs/01-produto-e-regras.md).
-
-## Como executar
-
-### Pré-requisitos
-
-Node.js **22.22 ou superior**, npm e Docker com Docker Compose. Docker é dispensável se houver MongoDB externo ou local disponível; configure MONGODB_URI. Para clonar o repositório privado, sua conta precisa de acesso no GitHub.
-
-### Instalação
-
-Os comandos usam `cp`, disponível no Git Bash/macOS/Linux e como alias no PowerShell; neste último também pode usar `Copy-Item`. Se o PowerShell bloquear `npm.ps1`, substitua `npm` por `npm.cmd` nos comandos, sem alterar a política de execução.
+Os comandos usam `cp`, disponível no Git Bash/macOS/Linux e como alias no PowerShell (onde também vale `Copy-Item`). Se o PowerShell bloquear `npm.ps1`, use `npm.cmd` no lugar de `npm`, sem alterar a política de execução.
 
 ```bash
 git clone https://github.com/FIDEL7Z/it-helpdesk.git
@@ -66,74 +86,23 @@ docker compose up -d --wait
 cd backend
 npm ci
 cp .env.example .env
-```
-
-Preencha **JWT_SECRET** em `backend/.env` com um valor aleatório de pelo menos 32 caracteres. O exemplo vem vazio. Para gerar um valor local:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-```
-
-Ainda em `backend`, crie os usuários e, opcionalmente, os chamados de demonstração:
-
-```bash
-npm run seed
-npm run seed:demo
 
 cd ../frontend
 npm ci
 cp .env.example .env
 ```
 
-O seed cria TI e solicitante; com as duas variáveis SEED_GESTOR preenchidas, cria também o gestor. Usuários existentes são pulados, sem trocar senha ou papel. O seed demo insere até 10 chamados de exemplo; se já existir o mesmo título para o mesmo solicitante, pula. Os scripts encerram com código 1 em caso de erro.
+O repositório é privado: sua conta do GitHub precisa ter acesso.
 
-Para avaliar os exemplos, configure **`DEMO_MODE=true`** em `backend/.env` e **`VITE_DEMO_MODE=true`** em `frontend/.env` antes de iniciar os serviços. Os exemplos vêm com `false`: sem essa opção, os indicadores começam no conjunto operacional e podem aparecer vazios. Após entrar, selecione **Demonstração** no controle de origem; a lista básica também possui esse filtro. Mantenha as opções desabilitadas em produção.
+## Configuração
 
-Uma instalação nova usa os três perfis do seed e já permite percorrer criação, atendimento, reabertura e gestão. O conjunto ampliado de cinco contas é opcional, conforme as restrições abaixo.
-
-### Execução
-
-Abra dois terminais, ambos inicialmente na raiz do repositório:
+Preencha **JWT_SECRET** em `backend/.env` com um valor aleatório de pelo menos 32 caracteres (o exemplo vem vazio). Para gerar um:
 
 ```bash
-# Terminal 1: API em http://localhost:3000
-cd backend
-npm run dev
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-```bash
-# Terminal 2: interface em http://localhost:5173
-cd frontend
-npm run dev
-```
-
-Acesse **http://localhost:5173** e use uma das credenciais abaixo. A API só aceita requisições depois de conectar ao MongoDB; configuração inválida ou falha de conexão impede a inicialização.
-
-Para parar o banco, execute `docker compose down` na raiz. O volume `mongo-data` preserva os dados. `docker compose down -v` remove o volume e seus dados; não é necessário para a execução ou demonstração.
-
-### Build de produção local
-
-Em terminais separados, a partir da raiz:
-
-```bash
-# API
-cd backend
-npm run build
-npm start
-```
-
-```bash
-# Interface: preview local em http://localhost:4173
-cd frontend
-npm run build
-npm run preview
-```
-
-Para esse preview, inclua `http://localhost:4173` em CORS_ORIGIN e reinicie a API. Preview serve para conferir o build local; não define a hospedagem de produção.
-
-## Variáveis de ambiente
-
-Copie os exemplos para `.env`; arquivos de ambiente e variantes são ignorados pelo Git, preservando `.env.example`. Não use as credenciais demonstrativas em produção.
+Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`VITE_DEMO_MODE=true`** em `frontend/.env`. Sem isso, os indicadores mostram só dados operacionais e começam vazios. Mantenha as duas opções desligadas em produção.
 
 | Backend: variável | Configuração |
 |---|---|
@@ -148,17 +117,23 @@ Copie os exemplos para `.env`; arquivos de ambiente e variantes são ignorados p
 | `SEED_SOLICITANTE_EMAIL` / `SEED_SOLICITANTE_PASSWORD` | Obrigatórias para seed; mesmos requisitos |
 | `SEED_GESTOR_EMAIL` / `SEED_GESTOR_PASSWORD` | Opcionais para seed; preencher ambas ou nenhuma; senha com pelo menos 8 caracteres |
 
-No frontend, **VITE_DEMO_MODE** tem padrão `false`; habilite `true` somente no ambiente local de demonstração para mostrar os seletores de origem. **VITE_API_URL** define a URL da API, incluindo `/api`: `http://localhost:3000/api`. Esse também é o fallback do cliente. Variáveis de configuração do backend são validadas com Zod; o seed valida suas próprias credenciais.
+No frontend, **VITE_API_URL** é a URL da API com `/api` (`http://localhost:3000/api`, também o padrão do cliente) e **VITE_DEMO_MODE** mostra os seletores de origem (padrão `false`). As variáveis do backend são validadas com Zod na inicialização. Arquivos `.env` são ignorados pelo Git; só os `.env.example` são versionados.
 
-MongoDB no Compose roda sem autenticação e publica a porta apenas em `127.0.0.1`. Essa configuração é destinada ao desenvolvimento e à avaliação local. Um banco externo com credenciais exige uma MONGODB_URI adequada, mantida fora do Git.
+O MongoDB do Compose roda sem autenticação e publica a porta apenas em `127.0.0.1`, para desenvolvimento e avaliação local.
 
-### Dados gerenciais fictícios opcionais
+### Dados de demonstração
 
-O seed gerencial cria **24 novos chamados por mês**, com eventos v2, dois solicitantes, dois analistas, resoluções e reaberturas. Não transforma registros antigos em histórico comprovado, não altera contas e não gera credenciais.
+Em `backend`, com o MongoDB no ar:
 
-Requer as cinco contas demonstrativas já existentes no ambiente de apresentação: os três perfis abaixo e as contas adicionais `demo.ti2@helpdesk.local` e `demo.solicitante2@helpdesk.local`. O seed inicial cria apenas os três perfis; sem as duas contas adicionais, o seed gerencial interrompe. Consulte as instruções e restrições no [roteiro local](docs/05-demonstracao.md#seed-gerencial-local).
+```bash
+npm run seed            # cria os usuários TI, solicitante e (com SEED_GESTOR) gestor
+npm run seed:demo       # até 10 chamados de exemplo
+npm run seed:incidents  # publica o incidente "Instabilidade na rede Wi-Fi"
+```
 
-Em PowerShell, a partir da raiz:
+Os três podem ser executados de novo sem duplicar dados: usuários existentes não têm senha nem papel alterados, chamados com o mesmo título são pulados e o incidente existente é mantido. Em caso de erro, encerram com código 1.
+
+O seed gerencial opcional (`npm run seed:manager`) cria 24 chamados fictícios por mês para os gráficos da gestão. Exige as contas adicionais `demo.ti2@helpdesk.local` e `demo.solicitante2@helpdesk.local` e a variável `LOCAL_DEMO_SEED=1`, e recusa bancos remotos ou de produção. Em PowerShell, a partir da raiz:
 
 ```powershell
 cd backend
@@ -167,63 +142,63 @@ npm run seed:manager
 Remove-Item Env:LOCAL_DEMO_SEED
 ```
 
-O comando recusa produção, bancos remotos e bancos diferentes de `it-helpdesk`. Repetir no mesmo mês não duplica nem atualiza exemplos existentes. Para visualizar: `http://localhost:5173/manager?dataOrigin=demo`, com os seletores habilitados e login do gestor.
+Detalhes e restrições em [seed gerencial local](docs/05-demonstracao.md#seed-gerencial-local).
 
-## Credenciais demonstrativas
+## Execução
 
-Valores do `backend/.env.example`, usados por `npm run seed`:
+Com o Docker Desktop iniciado e o MongoDB no ar (`docker compose up -d --wait`), abra dois terminais na raiz:
 
-| Perfil | Nome | E-mail | Senha |
-|---|---|---|---|
-| TI | Carlos Andrade | `ti@helpdesk.local` | `TiDemo@2026` |
-| Solicitante | Mariana Souza | `solicitante@helpdesk.local` | `Solicitante@2026` |
-| Gestor | Ana Ribeiro | `gestor@helpdesk.local` | `Gestor@2026` |
-
-Se seu `.env` foi criado antes do gestor, acrescente as duas variáveis SEED_GESTOR do exemplo e execute o seed novamente. Contas já existentes mantêm suas credenciais anteriores. Não há cadastro público na aplicação.
-
-## Arquitetura
-
-```mermaid
-flowchart LR
-  FRONT[React e Vite] -->|HTTP e JWT| API[API Express: validação e regras]
-  API -->|Mongoose| MONGO[(MongoDB)]
+```bash
+# Terminal 1: API em http://localhost:3000
+cd backend
+npm run dev
 ```
 
-Controllers validam a entrada; services aplicam escopo, propriedade e regras; models representam os documentos. Middlewares tratam autenticação, permissão e erros. O app Express é separado da inicialização do servidor para permitir testes de integração. Veja [arquitetura e modelo de dados](docs/02-arquitetura-e-dados.md).
-
-## Estrutura do repositório
-
-```text
-backend/
-  src/              API, autenticação, controllers, services e models
-  src/scripts/      Seeds e manutenção local protegida
-  tests/            Integração e E2E em ambiente isolado
-  scripts/          Verificação documental e captura da aplicação
-frontend/
-  src/pages/        Telas dos três perfis
-  src/components/   Interface, controles e gráficos
-  src/auth/         Sessão e autenticação do cliente
-  src/services/     Cliente HTTP e contratos
-docs/               Produto, arquitetura, API, métricas e demonstração
-  assets/screenshots/  Capturas reais e metadados
-docker-compose.yml  MongoDB local
+```bash
+# Terminal 2: interface em http://localhost:5173
+cd frontend
+npm run dev
 ```
 
-## Decisões técnicas
+Acesse **http://localhost:5173**. A API só aceita requisições depois de conectar ao MongoDB; configuração inválida ou banco indisponível impedem a inicialização.
 
-Solicitante, responsável atribuído e autor da resolução são identidades distintas. Resolver um chamado de outro responsável exige justificativa; reabrir exige motivo e inicia um novo ciclo. A tabela e o histórico apresentam autoria explícita. Eventos legados permanecem preservados, sem reconstrução presumida de autores ou datas.
+Para parar o banco: `docker compose down` na raiz. O volume `mongo-data` preserva os dados; `docker compose down -v` apaga o volume e não é necessário para a demonstração.
 
-O dashboard começa com dados operacionais. Somente no ambiente local, configure `DEMO_MODE=true` no backend e `VITE_DEMO_MODE=true` no frontend e reinicie ambos. Use **Origem dos dados → Demonstração** na visão gerencial ou **Origem dos indicadores → Demonstração** no dashboard para os exemplos do seed; legado não classificado possui opção separada. Esses dados não entram nas contagens operacionais.
+Build de produção local, em terminais separados:
 
-Na visão gerencial, criações usam `createdAt`; resoluções usam eventos v2 por autor e ciclo, preservados após reabertura. Carga usa a atribuição atual. Histórico legado sem evidência não gera produtividade presumida. Consulte as [definições exatas e limites](docs/04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
+```bash
+# API
+cd backend
+npm run build
+npm start
+```
 
-Permissões centralizadas no backend e usuário consultado a cada request mantêm o papel atual como autoridade. Validação Zod e rotas por ação restringem campos de escrita. Histórico e alterações são gravados juntos, com controle de concorrência pela revisão numérica consultada no frontend. Lista e dashboard compartilham os filtros de autorização, sem prometer um snapshot único durante alterações simultâneas.
+```bash
+# Interface: preview em http://localhost:4173
+cd frontend
+npm run build
+npm run preview
+```
 
-JWT fica no localStorage, com risco de exposição por XSS e logout apenas local. Login limita 10 tentativas por IP em 15 minutos. Esses tradeoffs, o modelo local do MongoDB e os limites das métricas estão detalhados em [métricas, decisões e limites](docs/04-metricas-decisoes-e-limites.md).
+Para o preview, inclua `http://localhost:4173` em CORS_ORIGIN e reinicie a API.
+
+## Usuários demonstrativos
+
+Valores do `backend/.env.example`, criados por `npm run seed`:
+
+| Perfil | Nome | E-mail | Senha | Página inicial |
+|---|---|---|---|---|
+| Solicitante | Mariana Souza | `solicitante@helpdesk.local` | `Solicitante@2026` | Início |
+| TI | Carlos Andrade | `ti@helpdesk.local` | `TiDemo@2026` | Atendimento |
+| Gestor | Ana Ribeiro | `gestor@helpdesk.local` | `Gestor@2026` | Visão gerencial |
+
+Se o seu `.env` foi criado antes do gestor, acrescente as duas variáveis SEED_GESTOR do exemplo e rode o seed de novo. Não há cadastro público. Não use essas credenciais em produção.
+
+O passo a passo de cada perfil está em [como usar, por perfil](docs/03-fluxos-e-api.md#como-usar-por-perfil).
 
 ## Testes
 
-Com dependências dos dois projetos instaladas, `.env` do backend válido e MongoDB disponível, execute a partir da raiz:
+Com as dependências instaladas, `backend/.env` válido e o MongoDB no ar (Docker Desktop iniciado), a partir da raiz:
 
 ```bash
 cd backend
@@ -238,19 +213,43 @@ npm run lint -- --deny-warnings
 npm run build
 ```
 
-A integração cobre autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboard e rate limit. Usa bancos separados `it-helpdesk-test*`, apagados ao final; não apaga o banco de desenvolvimento.
+- **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit e incidentes compartilhados. Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
+- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390 px e o fluxo completo de um incidente compartilhado. Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
+- **Documentação (`npm run docs:check`):** links, âncoras, imagens, scripts npm citados, variáveis dos exemplos e credenciais demonstrativas.
 
-O E2E exige Edge/Chrome instalado e usa Node/WebSocket, sem biblioteca adicional. Inicia API e Vite em portas livres, cria usuários e banco temporários e encerra/remove esses recursos. Verifica login/logout, sessão após reload, dashboards dos três perfis, isolamento, operações do gestor, conflito por revisão, justificativa de resolução por outro operador e edição própria persistida. Recarrega o dashboard básico três vezes por perfil; verifica o dashboard gerencial exclusivo, filtros, origem, autoria real, ciclos, analistas com zero chamados, retorno à fila e layout em 390 px/desktop. O E2E também cria o seed estruturado no banco temporário, repete-o sem duplicações e percorre os alertas até a fila e o histórico. Verifica também busca, loading, erro HTTP simulado, repetição da consulta e estado vazio da fila/gestão. Capturas claro/escuro e contraste dos botões são conferidos.
+O que cada teste cobre: [o que os testes verificam](docs/05-demonstracao.md#o-que-os-testes-verificam).
 
-Se o navegador não for encontrado, defina E2E_BROWSER_PATH com seu executável. Em falhas, os diagnósticos ficam em `backend/e2e-results/`, ignorado pelo Git, com tempos, URLs/status e captura quando disponível, sem senhas/tokens/headers. Esse E2E não substitui a revisão manual completa de acessibilidade nem identifica a causa do timeout antigo reportado. Consulte o [escopo das verificações](docs/05-demonstracao.md#o-que-os-testes-verificam).
+## Documentação complementar
 
-A verificação documental confere links relativos e âncoras, imagens, comandos npm, variáveis dos exemplos e as credenciais demonstrativas. Os quatro diagramas Mermaid também foram revisados contra o código; o verificador não renderiza Mermaid. Para gerar novamente as capturas, consulte a [preparação das evidências](docs/05-demonstracao.md#capturas-reproduzíveis).
+- [Produto, regras e incidentes compartilhados](docs/01-produto-e-regras.md)
+- [Arquitetura, coleções e índices](docs/02-arquitetura-e-dados.md)
+- [Como usar por perfil, ciclo de vida e API](docs/03-fluxos-e-api.md)
+- [Métricas, decisões técnicas e limitações](docs/04-metricas-decisoes-e-limites.md)
+- [Roteiro de demonstração, capturas e solução de problemas](docs/05-demonstracao.md)
+- [Auditoria, ciclos e compatibilidade](docs/06-integridade-e-auditoria.md)
 
-## Documentação técnica
+```text
+backend/
+  src/              API: rotas, controllers, services, models e autenticação
+  src/scripts/      Seeds e manutenção local protegida
+  tests/            Integração e E2E em ambiente isolado
+  scripts/          Verificação documental e captura de telas
+frontend/
+  src/pages/        Telas dos três perfis
+  src/components/   Interface, incidentes e gráficos
+  src/services/     Cliente HTTP e contratos
+docs/               Documentação técnica e capturas
+docker-compose.yml  MongoDB local
+```
 
-- [Produto, regras e raciocínio do autor](docs/01-produto-e-regras.md)
-- [Arquitetura, coleções, referências e índices](docs/02-arquitetura-e-dados.md)
-- [Jornadas, ciclo de vida e referência da API](docs/03-fluxos-e-api.md)
-- [Definições das métricas, decisões técnicas e limitações](docs/04-metricas-decisoes-e-limites.md)
-- [Auditoria estruturada, ciclos, compatibilidade e limitações](docs/06-integridade-e-auditoria.md)
-- [Checklist de apresentação, acesso do avaliador e solução de problemas](docs/05-demonstracao.md)
+## Limitações conhecidas
+
+- JWT fica no localStorage: um XSS poderia expor o token, e o logout só limpa a sessão local. Login limita 10 tentativas por IP a cada 15 minutos, com contador em memória.
+- Sem notificações (e-mail, push), anexos, comentários, recuperação de senha ou administração de usuários pela interface.
+- Incidentes não avisam ativamente; o usuário vê o problema ao abrir o sistema. Não há vínculo de outros chamados ao incidente nem sugestão automática de problemas parecidos.
+- Sem SLA, tempo médio de atendimento ou evolução histórica do backlog. Indicadores mostram estado atual e ações comprovadas, não qualidade da equipe.
+- O MongoDB local roda sem réplica, portanto sem transações entre coleções. Encerrar o incidente após resolver o chamado são duas escritas, e uma falha entre elas é corrigida na leitura seguinte.
+- A API do detalhe do chamado ainda envia ao solicitante os metadados de auditoria dos eventos (autor, ciclo, justificativa). A interface do solicitante não os exibe.
+- Dashboards não atualizam em tempo real. O tema segue o sistema operacional; não há seletor manual.
+
+Mais detalhes em [métricas, decisões e limites](docs/04-metricas-decisoes-e-limites.md).

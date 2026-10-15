@@ -33,6 +33,14 @@ Reabertura exige motivo, incrementa `activeCycleId` e limpa essas projeções do
 
 Chamados legados sem esses campos não recebem autor/data de resolução presumidos. A interface direciona ao histórico quando não há projeção estruturada. Eventos sem autor/data retornam null, exibidos como não registrados; IDs existentes continuam disponíveis mesmo se o usuário tiver sido removido.
 
+## Eventos dos incidentes compartilhados
+
+Cada incidente guarda seu próprio `history[]`, fora do chamado. Os eventos são `published`, `updated`, `closed` e `republished`, com `actorId`, `actorSnapshot` (nome e papel), data, revisão do incidente, ciclo e os valores `from`/`to` alterados. Editar sem mudar o texto não gera evento.
+
+O encerramento automático registra como autor quem resolveu o chamado. Se essa gravação falhar e for concluída depois, pela reconciliação na leitura, o autor continua sendo quem resolveu; na falta dessa informação (chamado legado), fica quem publicou. A interface mostra se o incidente foi encerrado com a resolução do chamado ou manualmente.
+
+Participações (entrar e sair) não entram no histórico. Ficam na coleção de participações, com data de entrada e de saída, suficientes para contar afetados sem registrar um evento por clique. Regras em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
+
 ## Origem dos dados e métricas
 
 `dataOrigin` distingue `operational`, `demo` e `legacy`. Criações pela API com contas demonstrativas reservadas são classificadas como demonstração; outras criações são operacionais. Seeds de exemplo são demonstrativos. Documentos antigos não classificados ficam como legado, sem inclusão automática no conjunto operacional.
@@ -51,7 +59,7 @@ Histórico embutido continua sujeito ao limite de tamanho do documento MongoDB. 
 
 ## Verificação
 
-`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil e viewport de 390 px.
+`audit.test.ts` cobre resolução por terceiro, gestor, ciclos, revisão ausente/antiga, concorrência, legado incompleto, datas, snapshots, usuários desativados e separação de origens. `manager.test.ts` confere períodos/fuso, autoria, ciclos, duplicação, legado, referências removidas, filtros e isolamento de origens. `incidents.test.ts` cobre permissões, campos aceitos, publicação simultânea, formato público sem dados privados, participação repetida e simultânea, saída e retorno, edição concorrente, encerramento pela resolução (com autor), reconciliação de um encerramento perdido, reabertura, republicação e chamados legados. O E2E verifica justificativa e autoria no histórico/tabela, conflito de uma tela antiga, operações do gestor, três reloads por perfil, viewport de 390 px e o fluxo de incidente entre TI, solicitante e gestor.
 
 ## Evidência visual da autoria
 

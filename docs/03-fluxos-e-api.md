@@ -2,13 +2,32 @@
 
 [Voltar ao README](../README.md) · [Permissões](01-produto-e-regras.md#permissões-implementadas) · [Demonstração](05-demonstracao.md)
 
-## Jornadas implementadas
+## Como usar, por perfil
 
-- **Solicitante:** login → dashboard próprio → abrir chamado → lista com confirmação → detalhe e histórico. Pode editar seu texto enquanto aberto; acompanha a atualização feita pela TI.
-- **TI:** login → dashboard global/fila pessoal → lista filtrada → detalhe → atribuição, triagem e status. O responsável precisa ser TI ou gestor ativo, mas o técnico autenticado não precisa ser o responsável atual para operar.
-- **Gestor:** login → visão gerencial → operação de chamados → lista e detalhe de qualquer chamado. Recebe controles de atendimento e pode assumir, atribuir, triar, iniciar, resolver e reabrir. Pode abrir e editar o texto de seus próprios chamados abertos.
+### Solicitante
 
-Filtros na lista ficam na URL e sobrevivem a recarregamentos e ao botão Voltar do navegador. Ao abrir um chamado pela lista, o link explícito do detalhe restaura a URL dessa fila, incluindo filtros e página. Acesso direto ao detalhe usa `/tickets` como fallback. A confirmação de criação guarda o título no estado da navegação e aparece na lista.
+1. Entre com seu e-mail. A página **Início** mostra **Problemas conhecidos** (quando houver) e **Meus pedidos**.
+2. Se um problema conhecido também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se o problema passar, clique em **Não estou mais com esse problema**.
+3. Para outro problema, clique em **Solicitar suporte**. Antes do formulário aparecem os problemas conhecidos; eles não impedem o envio. Preencha **Assunto**, **O que aconteceu?**, **Tipo de problema** e **Prioridade sugerida**, e clique em **Enviar solicitação**.
+4. Após o envio, a página do pedido abre com a confirmação. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**. Enquanto ninguém iniciou o atendimento, **Editar chamado** permite corrigir o texto.
+5. Em **Meus pedidos**, acompanhe todos os pedidos. Quando a TI encerra um problema que você acompanhava, ele aparece em **Problemas que você acompanhou**, na página Início, como resolvido.
+
+### Suporte TI
+
+1. A página **Atendimento** mostra os **Incidentes ativos** com o número de pessoas afetadas, as contagens da fila e os chamados recentes. **Ver fila de chamados** abre as pendências.
+2. Na lista **Chamados**, use os atalhos **Sem responsável**, **Atribuídos a mim** e **Em andamento**, a busca e os filtros. Chamados com incidente publicado têm a marca **Incidente · N pessoas afetadas**.
+3. No chamado, o bloco **Atendimento** permite escolher o responsável e **Atribuir**, ajustar categoria/prioridade com **Salvar classificação**, **Iniciar atendimento** e **Marcar como resolvido**. Algumas ações pedem motivo (reatribuição, prioridade durante o atendimento, resolução de chamado de outro responsável, reabertura).
+4. Quando o problema atinge mais pessoas, use **Publicar como incidente** no bloco **Incidente compartilhado** do chamado. Escreva um título e uma mensagem para os usuários, sem dados do chamado original, e clique em **Publicar incidente**. O bloco mostra o texto exatamente como os usuários o veem e quantas pessoas informaram que estão afetadas.
+5. **Editar comunicação** atualiza o texto público. Ao resolver o chamado, o incidente é encerrado automaticamente; **Encerrar incidente** permite encerrar antes, com uma mensagem de encerramento. Se o problema voltar, reabra o chamado e use **Republicar**.
+
+### Gestor
+
+1. O login abre a **Visão gerencial**. Escolha o **Período** (e a **Origem dos dados**, presente só no modo demonstração); **Filtros de equipe e classificação** refinam por analista, solicitante, categoria, prioridade e status.
+2. **Precisa de atenção** reúne alertas que abrem a fila correspondente. **Equipe de suporte** e **Carga por responsável e prioridade** mostram a distribuição atual; **Ver chamados** abre a fila do analista.
+3. **Incidentes compartilhados** mostra quantos estão ativos, quantas pessoas estão afetadas, novas adesões em 30 dias, encerrados e os incidentes com mais afetados, com link para o chamado principal.
+4. Pelos menus **Atendimento** e **Chamados**, o gestor opera chamados como a TI: assume, atribui, classifica, resolve, reabre e publica incidentes. O texto de chamados de outras pessoas continua restrito ao autor.
+
+Filtros na lista ficam na URL e sobrevivem a recarregamentos e ao botão Voltar do navegador. Ao abrir um chamado pela lista, o link explícito do detalhe restaura a URL dessa fila, incluindo filtros e página. Acesso direto ao detalhe usa `/tickets` como fallback.
 
 ## Visão gerencial
 
@@ -64,10 +83,29 @@ Base local: `http://localhost:3000/api`. Rotas autenticadas exigem `Authorizatio
 | GET | `/users/it-staff` | TI ou gestor; lista operadores ativos atribuíveis (TI/gestor) |
 | GET | `/dashboard/summary` | Escopo autorizado; `dataOrigin?` → `{ summary }` |
 | GET | `/dashboard/manager` | Somente gestor; filtros gerenciais → `{ dashboard }` |
+| GET / POST | `/tickets/:id/incident` | TI/gestor; consulta (`{ incident }` ou `null`) ou publica `{ title, publicMessage }` → 201 |
 
 Lista aceita `dataOrigin` (`operational`/`demo`/`legacy`), `status`, `priority`, `category`, `assignee` (`none`/`me`), `search` por título, `page` (padrão 1) e `limit` (padrão 10, máximo 50). Pesquisa tem limite de 100 caracteres. O frontend oferece filtro de responsável para TI e gestor. IDs inválidos retornam 400. `assigneeId` permite consultar responsável específico para TI/gestor; `requesterId` filtra solicitante sem ampliar o escopo autorizado. Solicitante não pode consultar outros IDs. `pending=true` restringe a abertos/em andamento; combinado com status resolvido retorna fila vazia.
 
 Erros têm `message`; validações também podem incluir `errors` por campo e `formErrors`. Códigos: 400 entrada inválida; 401 autenticação inválida/ausente/expirada; 403 sem permissão; 404 recurso ausente ou chamado alheio ao solicitante; 409 conflito de alteração/estado; 413 corpo acima de 100 KB; 429 limite de login; 500 falha inesperada sem stack na resposta.
+
+### Incidentes compartilhados
+
+Rotas em `/api/incidents`, todas autenticadas. Regras e motivos em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
+
+| Método | Rota | Acesso e contrato |
+|---|---|---|
+| GET | `/incidents` | Todos os perfis; incidentes ativos no formato público → `{ incidents }` |
+| GET | `/incidents/following` | Incidentes em que o usuário está como afetado, ativos ou encerrados |
+| GET | `/incidents/:id` | Formato público; encerrado só para quem participou ou para a equipe, senão 404 |
+| GET / PUT / DELETE | `/incidents/:id/participation` | Própria participação: consultar, entrar (corpo `{}`) ou sair; incidente encerrado → 409 |
+| GET | `/incidents/manage` | TI/gestor; `status?`, `dataOrigin?` → visão da equipe com chamado, responsável e histórico |
+| GET | `/incidents/indicators` | TI/gestor; `dataOrigin?` → `{ active, closed, affectedInActive, newParticipations30Days, top }` |
+| PATCH | `/incidents/:id` | TI/gestor; `{ title?, publicMessage?, expectedRevision }`, somente ativo |
+| POST | `/incidents/:id/close` | TI/gestor; `{ resolutionMessage, expectedRevision }` |
+| POST | `/incidents/:id/republish` | TI/gestor; `{ title, publicMessage, expectedRevision }`, somente encerrado e com chamado não resolvido |
+
+Entrar duas vezes devolve 200 com a mesma contagem. O corpo de participação não aceita `userId`: enviar campos extras retorna 400. A lista de chamados inclui `incident: { id, status, affectedCount }` apenas para TI/gestor. Publicar em chamado resolvido, publicar de novo no mesmo chamado ou usar uma revisão antiga retorna 409.
 
 ### Filtros dos alertas e do período de criação
 
@@ -79,31 +117,41 @@ Erros têm `message`; validações também podem incluir `errors` por campo e `f
 
 ## Capturas por perfil
 
-Imagens reais do ambiente demonstrativo, em 10/10/2026, com viewport desktop de 1440 × 900. Os dashboards foram recapturados como páginas completas, preservando título, usuário e final do conteúdo; as demais imagens representam seus respectivos trechos de tela. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores permanecem preservados; os números refletem aquele momento, não uma instalação nova.
+Imagens reais do ambiente demonstrativo, em 15/10/2026, com viewport desktop de 1440 × 900 e celular de 390 × 844. As páginas iniciais são capturas da página inteira; as demais mostram o trecho indicado. As capturas não criaram nem alteraram chamados. Registros de testes manuais anteriores, como títulos digitados ao acaso, permanecem preservados; os números refletem aquele momento, não uma instalação nova.
 
 <details>
-<summary>Login e abertura pelo solicitante</summary>
+<summary>Solicitante: login, Início, pedido e problema conhecido</summary>
 
 ![Login sem credenciais preenchidas, com servidor disponível](assets/screenshots/login-desktop.png)
 
 O login autentica os três perfis; não há cadastro público.
 
-![Dashboard do solicitante com contagens restritas aos próprios chamados demonstrativos](assets/screenshots/dashboard-solicitante-desktop.png)
+![Página Início da solicitante com Solicitar suporte, problema conhecido e Meus pedidos](assets/screenshots/dashboard-solicitante-desktop.png)
 
-O solicitante acompanha apenas seus pedidos, inclusive os tratados por outros operadores.
+A solicitante vê seus pedidos e os problemas que a TI já publicou.
 
-![Formulário de abertura com título, descrição, categoria e prioridade](assets/screenshots/abertura-chamado-desktop.png)
+![Problema conhecido acompanhado pela solicitante, com a opção de sair](assets/screenshots/incidente-solicitante-desktop.png)
 
-A captura mostra o formulário antes do envio; não representa um chamado criado pela automação.
+Depois de **Também estou com esse problema**, o cartão confirma o acompanhamento e oferece **Não estou mais com esse problema**.
+
+![Formulário Solicitar suporte com o problema conhecido exibido antes dos campos](assets/screenshots/abertura-chamado-desktop.png)
+
+O formulário mostra os problemas conhecidos antes dos campos, sem bloquear o envio. A captura é anterior ao envio.
+
+![Página Início da solicitante no celular](assets/screenshots/dashboard-solicitante-mobile.png)
 
 </details>
 
 <details>
-<summary>Atendimento da TI e listagem</summary>
+<summary>Atendimento da TI, listagem e incidente</summary>
 
-![Dashboard da TI com situação global, fila sem responsável e atendimento pessoal](assets/screenshots/dashboard-ti-desktop.png)
+![Página Atendimento da TI com incidentes ativos, contagens e chamados recentes](assets/screenshots/dashboard-ti-desktop.png)
 
-O dashboard operacional da TI combina contagens globais e fila pessoal.
+O incidente de demonstração aparece identificado como tal; as contagens abaixo seguem a origem escolhida.
+
+![Bloco Incidente compartilhado no chamado principal, com afetados e texto público](assets/screenshots/incidente-ti-desktop.png)
+
+No chamado principal, a equipe vê quantas pessoas estão afetadas e o texto exatamente como os usuários o recebem.
 
 ![Lista de chamados demonstrativos com solicitante, responsável atribuído e autor da resolução](assets/screenshots/lista-chamados-desktop.png)
 

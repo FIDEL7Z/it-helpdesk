@@ -67,7 +67,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
   const [[snapshot], [events], users, answers] = await Promise.all([
     TicketModel.aggregate<{
       states: Count[]; priority: Count[]; category: Count[]; loads: Load[]; created: Count[];
-      requesters: Requester[]; trends: Count[]; hours: Count[]; weekdays: Count[]; incomplete: Count[]; highUnassigned: Count[]; oldPending: Count[]; inactive: Count[]; unknownActivity: Count[]; oldest: { _id: Types.ObjectId; title: string; createdAt: Date; lastOperationalAt: Date | null }[];
+      requesters: Requester[]; trends: Count[]; hours: Count[]; weekdays: Count[]; createdCategories: Count[]; incomplete: Count[]; highUnassigned: Count[]; oldPending: Count[]; inactive: Count[]; unknownActivity: Count[]; oldest: { _id: Types.ObjectId; title: string; createdAt: Date; lastOperationalAt: Date | null }[];
     }>([{ $match: current }, { $addFields: { lastOperationalAt: lastOperationalActivity(now) } }, { $facet: {
       states: grouped('$status'),
       highUnassigned: [{ $match: { status: { $in: ['aberto', 'em_andamento'] }, priority: 'alta', assignee: null } }, { $count: 'count' }],
@@ -83,6 +83,8 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
       trends: [created, { $group: { _id: bucket('$createdAt'), count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
       hours: [created, { $group: { _id: { $hour: { date: '$createdAt', timezone: range.timezone } }, count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
       weekdays: [created, { $group: { _id: { $isoDayOfWeek: { date: '$createdAt', timezone: range.timezone } }, count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+      // Subjects that generate requests: creations in the period by category (not the current backlog).
+      createdCategories: [created, { $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }],
     } }]),
     TicketModel.aggregate<EventFacets>([{ $match: common }, { $project: { history: 1, status: 1, assignee: 1, activeCycleId: 1, dataOrigin: 1 } }, { $unwind: '$history' },
       { $match: { 'history.audit.schemaVersion': 2, 'history.audit.actorId': { $type: 'objectId' }, 'history.audit.eventId': { $type: 'string', $ne: '' }, 'history.audit.cycleId': { $gte: 1 }, 'history.audit.actorSnapshot.role': { $in: ['ti', 'gestor'] }, 'history.audit.occurredAt': { $type: 'date', $lte: now },
@@ -153,7 +155,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     requesters: snapshot.requesters.map(row => ({ id: row._id.toString(), name: userMap.get(row._id.toString())?.name ?? 'Usuário indisponível', created: row.created, pending: row.pending, categories: row.categories })),
     options: { analysts: users.filter(u => ['ti', 'gestor'].includes(u.role)).map(u => ({ id: u._id.toString(), name: u.name })), requesters: users.map(u => ({ id: u._id.toString(), name: u.name })) },
     // Hour zeros are factual absence in the selected set; no synthetic historical events are introduced.
-    trends: [...periods.values()].sort((a, b) => a.period.localeCompare(b.period)), demand: { hours: Array.from({ length: 24 }, (_, hour) => ({ _id: hour, count: snapshot.hours.find(row => row._id === hour)?.count ?? 0 })), weekdays: snapshot.weekdays },
+    trends: [...periods.values()].sort((a, b) => a.period.localeCompare(b.period)), demand: { hours: Array.from({ length: 24 }, (_, hour) => ({ _id: hour, count: snapshot.hours.find(row => row._id === hour)?.count ?? 0 })), weekdays: snapshot.weekdays, categories: snapshot.createdCategories },
     quality,
     coverage: { resolvedWithoutStructuredHistory: Math.max(0, state('resolvido') - count(events.currentVerified)), conflictingResolutionCycles: count(events.conflicts) },
   };

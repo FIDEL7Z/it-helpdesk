@@ -3,11 +3,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { KnownIncidents } from '../components/KnownIncidents'
+import { SubjectIcon } from '../components/SubjectCards'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getArticle, searchArticles, type Article } from '../services/articles'
 import { listActiveIncidents, type PublicIncident } from '../services/incidents'
 import {
   PRIORITY_LABELS,
+  SUBJECT_DESCRIPTIONS,
   SUBJECT_LABELS,
   SUBJECT_ORDER,
   TICKET_LIMITS,
@@ -26,14 +28,6 @@ type FieldErrors = {
   title?: string
   description?: string
   category?: string
-}
-
-const SUBJECT_HINTS: Record<TicketCategory, string> = {
-  hardware: 'Computador, notebook, monitor, impressora ou periféricos.',
-  rede: 'Wi-Fi, cabo de rede ou internet lenta.',
-  software: 'Programas que não abrem, travam ou mostram erro.',
-  acesso: 'Login, senha expirada ou falta de permissão.',
-  outros: 'Algo que não se encaixa nas opções acima.',
 }
 
 const OBJECT_ID = /^[a-f\d]{24}$/i
@@ -217,8 +211,8 @@ export function NewTicketPage() {
             {SUBJECT_ORDER.map((value) => (
               <label key={value} className="subject-option">
                 <input type="radio" name="subject" value={value} checked={category === value} onChange={() => chooseSubject(value)} />
-                <span className="subject-option__label">{SUBJECT_LABELS[value]}</span>
-                <span className="subject-option__hint">{SUBJECT_HINTS[value]}</span>
+                <span className="subject-option__label"><SubjectIcon category={value} />{SUBJECT_LABELS[value]}</span>
+                <span className="subject-option__hint">{SUBJECT_DESCRIPTIONS[value]}</span>
               </label>
             ))}
           </div>

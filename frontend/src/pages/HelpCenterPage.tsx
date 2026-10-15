@@ -4,7 +4,8 @@ import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { searchArticles, type Article } from '../services/articles'
-import { SUBJECT_LABELS, SUBJECT_ORDER, isTicketCategory, type Pagination } from '../services/tickets'
+import { SubjectCards, SubjectIcon } from '../components/SubjectCards'
+import { SUBJECT_LABELS, isTicketCategory, type Pagination } from '../services/tickets'
 import { getErrorMessage } from '../utils/errors'
 
 const PAGE_SIZE = 8
@@ -54,27 +55,12 @@ export function HelpCenterPage() {
           <h1 className="page__title">Encontre uma solução</h1>
           <p className="page__subtitle">Pesquise por um problema ou escolha um assunto.</p>
         </div>
-        <div className="page__actions">
-          {can(user?.role, 'kb:manage') && <Link to="/help/manage" className="button button--secondary">Gerenciar artigos</Link>}
-          <Link to="/tickets/new" className="button button--primary">Solicitar suporte</Link>
-        </div>
+        {can(user?.role, 'kb:manage') && <Link to="/help/manage" className="button button--secondary">Gerenciar artigos</Link>}
       </header>
 
       <HelpSearch key={q} initialValue={q} onSearch={(value) => update({ q: value })} />
 
-      <div className="subject-chips" role="group" aria-label="Filtrar por assunto">
-        {SUBJECT_ORDER.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className="subject-chip"
-            aria-pressed={category === value}
-            onClick={() => update({ category: category === value ? '' : value })}
-          >
-            {SUBJECT_LABELS[value]}
-          </button>
-        ))}
-      </div>
+      <SubjectCards mode="filter" compact selected={category} onSelect={(value) => update({ category: value ?? '' })} />
 
       {state.error ? (
         <div className="alert alert--error" role="alert">
@@ -86,11 +72,8 @@ export function HelpCenterPage() {
       ) : state.articles.length === 0 ? (
         <div className="card card--empty">
           <p><strong>{filtered ? 'Nenhuma orientação encontrada.' : 'Ainda não há orientações publicadas.'}</strong></p>
-          {filtered && <p className="text-muted">Tente outras palavras ou outro assunto. Se preferir, conte o problema para a equipe de TI.</p>}
-          <div className="page__actions">
-            {filtered && <button type="button" className="button button--secondary" onClick={() => setParams(new URLSearchParams())}>Limpar busca</button>}
-            <Link to={`/tickets/new${category ? `?category=${category}` : ''}`} className="button button--primary">Solicitar suporte</Link>
-          </div>
+          {filtered && <p className="text-muted">Tente outras palavras ou outro assunto.</p>}
+          {filtered && <button type="button" className="button button--secondary" onClick={() => setParams(new URLSearchParams())}>Limpar busca</button>}
         </div>
       ) : (
         <>
@@ -100,7 +83,7 @@ export function HelpCenterPage() {
           <ul className={`article-list${loading ? ' is-loading' : ''}`} aria-busy={loading}>
             {state.articles.map((article) => (
               <li key={article.id} className="article-card">
-                <span className="article-card__subject">{SUBJECT_LABELS[article.category]}</span>
+                <span className="article-card__subject"><SubjectIcon category={article.category} />{SUBJECT_LABELS[article.category]}</span>
                 <Link to={`/help/${article.id}`} className="article-card__title">{article.title}</Link>
                 <p className="article-card__summary">{article.summary}</p>
               </li>
@@ -119,8 +102,11 @@ export function HelpCenterPage() {
       )}
 
       <aside className="help-center__fallback">
-        <p>Não encontrou o que procurava?</p>
-        <Link to={`/tickets/new${category ? `?category=${category}` : ''}`} className="button button--secondary">Solicitar suporte</Link>
+        <div>
+          <p className="help-center__fallback-title">Não encontrou o que procurava?</p>
+          <p className="text-muted">Conte o problema para a equipe de TI. Você acompanha a resposta em Meus pedidos.</p>
+        </div>
+        <Link to={`/tickets/new${category ? `?category=${category}` : ''}`} className="button button--primary">Solicitar suporte</Link>
       </aside>
     </section>
   )

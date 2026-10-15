@@ -39,6 +39,15 @@ export const SUBJECT_LABELS: Record<TicketCategory, string> = {
   outros: 'Outro problema',
 }
 
+/** One line under each subject: what kind of problem belongs there. */
+export const SUBJECT_DESCRIPTIONS: Record<TicketCategory, string> = {
+  hardware: 'Computador, notebook, monitor, impressora ou periféricos.',
+  rede: 'Wi-Fi, cabo de rede ou internet lenta.',
+  software: 'Programas que não abrem, travam ou mostram erro.',
+  acesso: 'Login, senha expirada ou falta de permissão.',
+  outros: 'Algo que não se encaixa nas opções acima.',
+}
+
 /** Order shown to requesters. */
 export const SUBJECT_ORDER: TicketCategory[] = ['hardware', 'rede', 'software', 'acesso', 'outros']
 

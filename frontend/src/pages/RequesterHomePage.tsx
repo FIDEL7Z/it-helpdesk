@@ -7,7 +7,8 @@ import { DEMO_MODE } from '../config/demo'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getDashboardSummary, type DashboardSummary } from '../services/dashboard'
 import { listActiveIncidents, listFollowedIncidents, type PublicIncident } from '../services/incidents'
-import { CATEGORY_LABELS, SUBJECT_LABELS, SUBJECT_ORDER, listTickets, type TicketSummary } from '../services/tickets'
+import { SubjectCards } from '../components/SubjectCards'
+import { SUBJECT_LABELS, listTickets, type TicketSummary } from '../services/tickets'
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
@@ -68,25 +69,27 @@ export function RequesterHomePage() {
   const data = loading ? null : state.data
 
   return (
-    <section className="page requester-home">
-      <header className="requester-hero">
-        <div className="requester-hero__text">
-          {firstName && <p className="eyebrow">Olá, {firstName}</p>}
-          <h1 className="requester-hero__title">Como podemos ajudar?</h1>
-          <p className="requester-hero__subtitle">Encontre uma solução ou envie um pedido para nossa equipe.</p>
-          <HelpSearchBox />
+    <section className="page portal">
+      {/* A. Entry: one question, one search, one main action. */}
+      <header className="portal-hero">
+        {firstName && <p className="portal-hero__greeting">Olá, {firstName}</p>}
+        <h1 className="portal-hero__title">Como podemos ajudar?</h1>
+        <p className="portal-hero__subtitle">Procure uma orientação para resolver agora ou peça ajuda à equipe de TI.</p>
+        <HelpSearchBox />
+        <div className="portal-hero__actions">
+          <Link to="/tickets/new" className="button button--primary button--large">Solicitar suporte</Link>
+          <Link to="/help" className="portal-hero__link">Ver todas as orientações</Link>
         </div>
-        <Link to="/tickets/new" className="button button--primary button--large">Solicitar suporte</Link>
       </header>
 
-      <nav className="subject-shortcuts" aria-labelledby="subject-shortcuts-title">
-        <h2 id="subject-shortcuts-title" className="section-title">Escolha um assunto</h2>
-        <ul className="subject-shortcuts__list">
-          {SUBJECT_ORDER.map((value) => (
-            <li key={value}><Link to={`/help?category=${value}`} className="subject-shortcut">{SUBJECT_LABELS[value]}</Link></li>
-          ))}
-        </ul>
-      </nav>
+      {/* B. Subject cards open the guided request already set to the right category. */}
+      <section className="portal-section" aria-labelledby="portal-subjects">
+        <div className="portal-section__header">
+          <h2 id="portal-subjects" className="section-title">Com o que você precisa de ajuda?</h2>
+          <p className="portal-section__hint">Escolha o assunto e responda poucas perguntas.</p>
+        </div>
+        <SubjectCards mode="link" />
+      </section>
 
       {loading ? (
         <div className="card card--empty" role="status"><span className="spinner" aria-hidden="true" />Carregando seus pedidos...</div>
@@ -97,21 +100,29 @@ export function RequesterHomePage() {
         </div>
       ) : (
         <>
-          <KnownIncidents incidents={data.activeIncidents} onChange={updateIncident} onStale={() => setReload((n) => n + 1)} />
+          {/* C. Known problems: a distinct band, only when there is something to show. */}
+          {data.activeIncidents.length > 0 && (
+            <div className="portal-band">
+              <KnownIncidents incidents={data.activeIncidents} onChange={updateIncident} onStale={() => setReload((n) => n + 1)} />
+            </div>
+          )}
 
-          <section className="requests" aria-labelledby="my-requests">
-            <div className="requests__header">
+          {/* D. My requests: the latest ones in plain language, not a dashboard. */}
+          <section className="portal-section requests" aria-labelledby="my-requests">
+            <div className="portal-section__header portal-section__header--row">
               <h2 id="my-requests" className="section-title">Meus pedidos</h2>
-              {data.summary.byStatus.total > 0 && <Link to="/tickets" className="card__link">Ver todos</Link>}
+              {data.summary.byStatus.total > 0 && <Link to="/tickets" className="card__link">Ver todos os pedidos</Link>}
             </div>
 
-            {/* Each number opens the same list, filtered; the API counts only this person's requests. */}
-            <div className="stats stats--compact" aria-label="Resumo dos seus pedidos">
-              <SummaryItem to="/tickets" label="Total" value={data.summary.byStatus.total} />
-              <SummaryItem to="/tickets?status=aberto" label="Aguardando atendimento" value={data.summary.byStatus.aberto} tone="aberto" />
-              <SummaryItem to="/tickets?status=em_andamento" label="Em atendimento" value={data.summary.byStatus.em_andamento} tone="em_andamento" />
-              <SummaryItem to="/tickets?status=resolvido" label="Resolvidos" value={data.summary.byStatus.resolvido} tone="resolvido" />
-            </div>
+            {data.summary.byStatus.total > 0 && (
+              // Discreet personal summary; each part opens the list filtered the same way.
+              <p className="portal-summary" aria-label="Resumo dos seus pedidos">
+                <SummaryItem to="/tickets" label="no total" value={data.summary.byStatus.total} />
+                <SummaryItem to="/tickets?status=aberto" label="aguardando atendimento" value={data.summary.byStatus.aberto} />
+                <SummaryItem to="/tickets?status=em_andamento" label="em atendimento" value={data.summary.byStatus.em_andamento} />
+                <SummaryItem to="/tickets?status=resolvido" label="resolvidos" value={data.summary.byStatus.resolvido} />
+              </p>
+            )}
 
             {data.requests.length === 0 ? (
               <div className="card card--empty requests__empty">
@@ -126,16 +137,13 @@ export function RequesterHomePage() {
                     <div className="request-card__main">
                       <Link to={`/tickets/${request.id}`} className="request-card__title">{request.title}</Link>
                       <p className="request-card__meta">
-                        {CATEGORY_LABELS[request.category]} · Aberto em <time dateTime={request.createdAt ?? undefined}>{formatDateTime(request.createdAt)}</time>
-                      </p>
-                      <p className="request-card__meta">
-                        Última atualização: <time dateTime={request.updatedAt ?? undefined}>{formatDateTime(request.updatedAt)}</time>
+                        {SUBJECT_LABELS[request.category]} · aberto em <time dateTime={request.createdAt ?? undefined}>{formatDateTime(request.createdAt)}</time>
+                        {' · '}atualizado em <time dateTime={request.updatedAt ?? undefined}>{formatDateTime(request.updatedAt)}</time>
                       </p>
                     </div>
                     <div className="request-card__side">
+                      {request.awaitingConfirmation && <Link to={`/tickets/${request.id}`} className="attention-tag">Confirme se resolveu</Link>}
                       <StatusBadge status={request.status} audience="requester" />
-                      {request.awaitingConfirmation && <span className="attention-tag">Confirme se resolveu</span>}
-                      <Link to={`/tickets/${request.id}`} className="button button--ghost button--small">Ver detalhes</Link>
                     </div>
                   </li>
                 ))}
@@ -170,20 +178,22 @@ function HelpSearchBox() {
   }
 
   return (
-    <form className="help-search requester-hero__search" role="search" onSubmit={handleSubmit}>
-      <label htmlFor="home-help-search" className="sr-only">Buscar uma solução</label>
-      <input id="home-help-search" type="search" className="field__input" placeholder="Ex.: impressora, Wi-Fi, acesso"
+    <form className="portal-search" role="search" onSubmit={handleSubmit}>
+      <label htmlFor="home-help-search" className="sr-only">Buscar uma orientação</label>
+      <svg className="portal-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+      </svg>
+      <input id="home-help-search" type="search" className="portal-search__input" placeholder="Descreva o problema: impressora, Wi-Fi, senha expirada..."
         value={value} maxLength={100} onChange={(event) => setValue(event.target.value)} />
-      <button type="submit" className="button button--secondary">Buscar</button>
+      <button type="submit" className="button button--secondary">Buscar orientações</button>
     </form>
   )
 }
 
-function SummaryItem({ to, label, value, tone }: { to: string; label: string; value: number; tone?: string }) {
+function SummaryItem({ to, label, value }: { to: string; label: string; value: number }) {
   return (
-    <Link to={to} className={`stat-card stat-card--compact${tone ? ` stat-card--${tone}` : ''}`}>
-      <span className="stat-card__value">{value}</span>
-      <span className="stat-card__label">{label}</span>
+    <Link to={to} className="portal-summary__item">
+      <span className="stat-card__value">{value}</span> {label}
     </Link>
   )
 }

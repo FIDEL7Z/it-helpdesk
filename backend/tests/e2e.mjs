@@ -460,6 +460,80 @@ async function run() {
     await waitDom(`${role} logout`, 'location.pathname === "/login" && !!document.getElementById("email")');
     check(await evaluate('localStorage.getItem("it-helpdesk:token") === null'), `${role}: logout clears session`);
   }
+
+  // Shared incidents, after the per-role counts above: its own ticket, so no earlier expectation changes.
+  const { SharedIncidentModel, IncidentParticipationModel } = await import('../src/models/incident.model.ts');
+  await Promise.all([SharedIncidentModel.syncIndexes(), IncidentParticipationModel.syncIndexes()]);
+  const outage = await ticket('Rede do terceiro andar fora do ar', other, 'em_andamento', users.ti);
+  const login = async (role) => {
+    await go(`/login?incidents=${role}`);
+    await waitDom(`${role} incident login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
+    await fill('email', users[role].email);
+    await fill('password', password);
+    await submit();
+    await waitDom(`${role} incident login`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
+  };
+  const logout = async (role) => {
+    await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent === "Sair").click()');
+    await waitDom(`${role} incident logout`, 'location.pathname === "/login"');
+  };
+  const clickButton = (text) => evaluate(`Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === ${JSON.stringify(text)}).click()`);
+  const cardCount = '(document.querySelector(".incident-card .incident-card__count")?.textContent ?? "")';
+
+  await login('ti');
+  await go(`/tickets/${outage.id}`);
+  await waitDom('incident panel', '!!document.querySelector(".incident-panel")');
+  await clickButton('Publicar como incidente');
+  await waitDom('incident publish form', '!!document.getElementById("incident-title")');
+  await fill('incident-title', 'Rede do terceiro andar indisponível');
+  await fill('incident-message', 'A rede cabeada do terceiro andar está fora do ar. A equipe já está atuando.');
+  await evaluate('document.getElementById("incident-title").closest("form").requestSubmit()');
+  await waitDom('incident published', 'document.querySelector(".incident-panel .incident-status")?.textContent === "Publicado"');
+  check((await browserApi('GET', `/tickets/${outage.id}`)).body.ticket.revision === outage.revision, 'Publishing an incident does not change the ticket revision');
+  await go('/tickets?search=terceiro');
+  await waitDom('incident tag in queue', '!!document.querySelector(".ticket-table .incident-tag")');
+  check(await evaluate('document.querySelector(".ticket-table .incident-tag").textContent.includes("0 pessoas afetadas")'), 'TI queue marks the ticket as a shared incident');
+  await logout('ti');
+
+  await login('solicitante');
+  await go('/dashboard');
+  await waitDom('requester known problems', '!!document.querySelector(".incident-card")');
+  const publicView = (await browserApi('GET', '/incidents')).body.incidents[0];
+  check(!('ticketId' in publicView) && !('history' in publicView) && !JSON.stringify(publicView).includes('Problema de teste'), 'Requester receives only the public incident fields');
+  await clickButton('Também estou com esse problema');
+  await waitDom('requester follows', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "true" && ${cardCount} === "1 pessoa afetada"`);
+  const again = await browserApi('PUT', `/incidents/${publicView.id}/participation`, {});
+  check(again.status === 200 && again.body.incident.affectedCount === 1, 'Following twice keeps one participation');
+  await command('Page.reload', { ignoreCache: true });
+  await waitDom('follow survives reload', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "true" && ${cardCount} === "1 pessoa afetada"`);
+  await clickButton('Não estou mais com esse problema');
+  await waitDom('requester leaves', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "false" && ${cardCount} === "0 pessoas afetadas"`);
+  await clickButton('Também estou com esse problema');
+  await waitDom('requester follows again', `${cardCount} === "1 pessoa afetada"`);
+  check(true, 'Requester follows, leaves and follows again with the count kept exact');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Requester home with known problems fits 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
+  await logout('solicitante');
+
+  await login('gestor');
+  const overview = '(document.querySelector(".incidents-overview dl")?.textContent ?? "")';
+  await waitDom('manager incident block', `${overview}.includes("Ativos1") && ${overview}.includes("Pessoas afetadas nos ativos1")`);
+  check(true, 'Manager sees active incidents and affected people');
+  const closed = await browserApi('PATCH', `/tickets/${outage.id}/status`, { status: 'resolvido', reason: 'Switch substituído; rede normalizada.' });
+  check(closed.status === 200, 'Manager resolves the main ticket');
+  await go('/manager');
+  await waitDom('manager sees closed incident', `${overview}.includes("Ativos0") && ${overview}.includes("Encerrados1")`);
+  const managed = (await browserApi('GET', '/incidents/manage')).body.incidents[0];
+  check(managed.status === 'closed' && managed.closeReason === 'ticket_resolved' && managed.closedBy.id === users.gestor.id, 'Resolving the ticket closes the incident, attributed to the resolver');
+  await logout('gestor');
+
+  await login('solicitante');
+  await go('/dashboard');
+  await waitDom('requester sees result', '!!document.getElementById("followed-incidents")');
+  check(await evaluate('!document.getElementById("known-incidents") && document.querySelector(".incident-card--closed .incident-status")?.textContent === "Resolvido"'), 'Requester sees the closed problem as resolved and no longer as active');
+  await logout('solicitante');
+
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);
   console.log(`Longest observed wait: ${Math.max(...timings.map((item) => item.ms))} ms.`);

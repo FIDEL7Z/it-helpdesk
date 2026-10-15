@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
@@ -315,6 +315,96 @@ describe('closing', () => {
     assert.equal(stored?.status, 'closed');
     assert.equal(stored?.closeReason, 'ticket_resolved');
     assert.equal(stored?.closedBy?.toString(), tech.id);
+  });
+});
+
+describe('closing stays consistent under failures and races', () => {
+  const failIncidentWrites = () => mock.method(SharedIncidentModel, 'findOneAndUpdate', () => {
+    throw new Error('Simulated failure writing the incident');
+  });
+  const isListed = async (incidentId: string) =>
+    (await api('GET', '/incidents', otherRequester)).body.incidents.some((item: Json) => item.id === incidentId);
+
+  it('a resolved main ticket is never shown as active, even while the close cannot be written', async () => {
+    const ticket = await createTicket(requester);
+    const incident = await publish(ticket.id);
+    const writes = failIncidentWrites();
+    try {
+      await resolveTicket(ticket.id);
+      assert.equal(await isListed(incident.id), false);
+      const teamView = await api('GET', `/incidents/${incident.id}`, tech);
+      assert.equal(teamView.status, 200);
+      assert.equal(teamView.body.incident.status, 'closed');
+      assert.equal((await join(incident.id, otherRequester)).status, 409, 'nobody joins a problem whose ticket is resolved');
+      const list = await api('GET', `/tickets?search=${encodeURIComponent(ticket.title)}`, tech);
+      assert.equal(list.body.tickets.find((item: Json) => item.id === ticket.id).incident.status, 'closed');
+      assert.equal((await SharedIncidentModel.findById(incident.id))?.status, 'active', 'the repair has not been written yet');
+    } finally {
+      writes.mock.restore();
+    }
+
+    // The next read writes the repair, attributed to who resolved the ticket.
+    assert.equal(await isListed(incident.id), false);
+    const stored = await SharedIncidentModel.findById(incident.id);
+    assert.equal(stored?.status, 'closed');
+    assert.equal(stored?.closedBy?.toString(), tech.id);
+    assert.equal(await IncidentParticipationModel.countDocuments({ incident: incident.id, leftAt: null }), 0);
+  });
+
+  it('a lost close still applies when the ticket is reopened before anyone reads the incident', async () => {
+    const ticket = await createTicket(requester);
+    const incident = await publish(ticket.id);
+    const writes = failIncidentWrites();
+    try {
+      await resolveTicket(ticket.id);
+    } finally {
+      writes.mock.restore();
+    }
+    const reopened = await api('PATCH', `/tickets/${ticket.id}/status`, tech, { status: 'em_andamento', expectedRevision: await ticketRevision(ticket.id), reason: 'Usuários relataram nova queda' });
+    assert.equal(reopened.status, 200);
+
+    assert.equal(await isListed(incident.id), false, 'reopening does not reactivate an incident the resolution closed');
+    const stored = await SharedIncidentModel.findById(incident.id);
+    assert.equal(stored?.status, 'closed');
+    assert.equal(stored?.closeReason, 'ticket_resolved');
+    assert.equal(stored?.closedBy?.toString(), tech.id);
+  });
+
+  it('a publication that races a resolution ends closed, never active', async () => {
+    const ticket = await createTicket(requester);
+    await resolveTicket(ticket.id);
+    // The open-ticket check reads the state from just before the resolution was written.
+    const reads = mock.method(TicketModel, 'findById');
+    const stored = await TicketModel.findById(ticket.id);
+    reads.mock.mockImplementationOnce((() => Object.assign(stored!, { status: 'em_andamento' })) as never);
+    let published;
+    try {
+      published = await api('POST', `/tickets/${ticket.id}/incident`, tech, publishBody);
+    } finally {
+      reads.mock.restore();
+    }
+    assert.equal(published.status, 201);
+    assert.equal(published.body.incident.status, 'closed');
+    assert.equal(await isListed(published.body.incident.id), false);
+  });
+
+  it('a republication that races a resolution ends closed, never active', async () => {
+    const ticket = await createTicket(requester);
+    const incident = await publish(ticket.id);
+    await resolveTicket(ticket.id);
+    const closed = (await api('GET', `/tickets/${ticket.id}/incident`, tech)).body.incident;
+    const reads = mock.method(TicketModel, 'findById');
+    reads.mock.mockImplementationOnce((() => ({ select: async () => ({ status: 'em_andamento' }) })) as never);
+    let republished;
+    try {
+      republished = await api('POST', `/incidents/${incident.id}/republish`, tech, { ...publishBody, expectedRevision: closed.revision });
+    } finally {
+      reads.mock.restore();
+    }
+    assert.equal(republished.status, 200);
+    assert.equal(republished.body.incident.status, 'closed');
+    assert.equal(republished.body.incident.closeReason, 'ticket_resolved');
+    assert.equal(await isListed(incident.id), false);
   });
 });
 

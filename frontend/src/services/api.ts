@@ -34,11 +34,14 @@ export const tokenStorage = {
 /** Error returned by the API. `status` is 0 when the server could not be reached. */
 export class ApiError extends Error {
   readonly status: number
+  /** Stable business code sent by the API for rules the interface explains (e.g. INSUFFICIENT_STOCK). */
+  readonly code?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -103,7 +106,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       tokenStorage.clear()
       onUnauthorized?.()
     }
-    throw new ApiError(response.status, errorMessageFrom(data, response.status))
+    const code = typeof data === 'object' && data !== null && 'code' in data && typeof data.code === 'string' ? data.code : undefined
+    throw new ApiError(response.status, errorMessageFrom(data, response.status), code)
   }
 
   // The response shape is defined by our own API; each caller declares the type it expects.

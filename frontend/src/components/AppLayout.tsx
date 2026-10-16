@@ -48,6 +48,9 @@ export function AppLayout() {
                 {can(user?.role, 'kb:manage') && (
                   <NavLink to="/help/manage" className={`app-nav__link${isManager ? ' app-nav__link--secondary' : ''}`}>Artigos</NavLink>
                 )}
+                {can(user?.role, 'inventory:read') && (
+                  <NavLink to="/inventory" className={`app-nav__link${isManager ? ' app-nav__link--secondary' : ''}`}>Estoque</NavLink>
+                )}
               </>
             )}
           </nav>

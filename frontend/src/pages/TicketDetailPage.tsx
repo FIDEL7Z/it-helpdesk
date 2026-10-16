@@ -5,6 +5,8 @@ import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import { IncidentPanel } from '../components/IncidentPanel'
+import { TicketMaterials } from '../components/inventory/TicketMaterials'
+import { locationLabel } from '../services/organization'
 import { ResolutionAnswer } from '../components/ResolutionAnswer'
 import { ApiError } from '../services/api'
 import type { User } from '../services/auth'
@@ -206,6 +208,9 @@ export function TicketDetailPage() {
           {/* Next to the description: what the team tells users about this same problem. */}
           {can(user?.role, 'incidents:manage') && <IncidentPanel ticket={ticket} />}
 
+          {/* Materials and equipment delivered for this ticket (stock ledger). */}
+          <TicketMaterials ticket={{ id: ticket.id, requesterId: ticket.requesterId, location: ticket.location ?? null, affectedAsset: ticket.affectedAsset ?? null }} />
+
           <div className="card">
             <h2 className="card__title">Histórico</h2>
             <ol className="timeline">
@@ -253,6 +258,16 @@ export function TicketDetailPage() {
                 <dt>{teamView ? 'Categoria' : 'Assunto'}</dt>
                 <dd>{teamView ? CATEGORY_LABELS[ticket.category] : SUBJECT_LABELS[ticket.category]}</dd>
               </div>
+              <div className="details__row">
+                <dt>Local</dt>
+                <dd>{ticket.location ? locationLabel(ticket.location) : <span className="text-muted">Não informado</span>}</dd>
+              </div>
+              {ticket.affectedAsset && (
+                <div className="details__row">
+                  <dt>Equipamento</dt>
+                  <dd>{teamView && ticket.affectedAsset.id ? <Link to={`/inventory/assets/${ticket.affectedAsset.id}`}>{ticket.affectedAsset.assetTag}</Link> : ticket.affectedAsset.assetTag} · {ticket.affectedAsset.name}</dd>
+                </div>
+              )}
               {teamView ? (
                 <>
                   <div className="details__row">

@@ -105,13 +105,13 @@ Os quatro últimos usam as contas adicionais `demo.solicitante2@helpdesk.local` 
 | Kanban e fila | E2E: colunas e totais iguais aos da lista, filtros preservados entre Lista e Quadro, iniciar atendimento por teclado, resolução de outro responsável com justificativa, conflito 409 com cartão antigo, 390 px com filtros recolhidos; `resolution.test.ts`: filas "reabertos pelo solicitante" e "mais antigos primeiro" |
 | Cenários de demonstração | `demo-scenarios.test.ts`: cria só os cenários cujas contas existem, percorre o fluxo real (confirmação, avaliação, contestação, resolução por outro responsável, incidente com afetados), não altera chamados existentes e é idempotente |
 | Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
-| Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, capturas claro/escuro e contraste de texto dos botões; não substitui auditoria completa de acessibilidade/responsividade |
+| Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
 
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
 
-Em **15/10/2026**, após a revisão de UX/UI por perfil (portal do solicitante, mesa de atendimento da TI, ordem da visão gerencial, gestão de artigos, nova paleta, filtros recolhidos no celular e capturas em ambiente isolado): **195 testes backend** e **144 verificações E2E** aprovados; typecheck, lint sem warnings, builds dos dois projetos e `git diff --check` aprovados. O verificador documental aprovou sete arquivos Markdown e 25 capturas PNG, com viewport e tema conferidos.
+Em **15/10/2026**, após a revisão de UX/UI por perfil (portal do solicitante, mesa de atendimento da TI, ordem da visão gerencial, gestão de artigos, nova paleta, filtros recolhidos no celular, capturas em ambiente isolado e, em 16/10, tema claro por padrão com botão de tema escuro): **195 testes backend** e **147 verificações E2E** aprovados; typecheck, lint sem warnings, builds dos dois projetos e `git diff --check` aprovados. O verificador documental aprovou sete arquivos Markdown e 25 capturas PNG, com viewport e tema conferidos.
 
 Antes dessa revisão, na mesma data, após base de conhecimento, classificação orientada, confirmação de resolução e quadro: **188 testes backend** e **141 verificações E2E** aprovados; typecheck, lint sem warnings e builds dos dois projetos aprovados. O verificador documental aprovou sete arquivos Markdown e 19 capturas PNG.
 
@@ -175,7 +175,7 @@ Os testes gerenciais validam seed idempotente, preservação de documentos anter
 
 As 25 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores, num **ambiente isolado**: o script sobe um banco temporário próprio, a API e o frontend em portas livres, cria as cinco contas demonstrativas, os artigos de ajuda e os [cenários de demonstração](#cenários-de-demonstração), e apaga tudo ao final. O banco de desenvolvimento não é lido nem alterado, por isso registros de testes manuais não aparecem nas imagens.
 
-O nome do arquivo indica viewport e tema: `-desktop` 1440 × 900, `-amplo` 1920 × 1080, `-tablet` 768 × 1024, `-mobile` 390 × 844; `-escuro` usa o tema escuro, as demais o claro. As páginas iniciais dos três perfis usam captura de página inteira (altura PNG maior que a viewport). [capture-info.json](assets/screenshots/capture-info.json) registra rota, viewport, tema, instante, dimensões, título, cabeçalho e a identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício do banco temporário, que já não existe.
+O nome do arquivo indica viewport e tema: `-desktop` 1440 × 900, `-amplo` 1920 × 1080, `-tablet` 768 × 1024, `-mobile` 390 × 844; `-escuro` usa o tema escuro, escolhido como no botão do cabeçalho; as demais, o claro padrão. As páginas iniciais dos três perfis usam captura de página inteira (altura PNG maior que a viewport). [capture-info.json](assets/screenshots/capture-info.json) registra rota, viewport, tema, instante, dimensões, título, cabeçalho e a identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício do banco temporário, que já não existe.
 
 Para conferir somente a documentação, em `backend`:
 

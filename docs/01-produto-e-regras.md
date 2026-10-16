@@ -122,7 +122,7 @@ Depois que a TI resolve, o dono do chamado responde **Seu problema foi resolvido
 
 ## Escopo entregue e evolução futura
 
-**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), visão gerencial exclusiva com filtros e métricas comprovadas, temas seguindo o sistema e layout responsivo.
+**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), visão gerencial exclusiva com filtros e métricas comprovadas, tema claro por padrão com opção de tema escuro no cabeçalho e layout responsivo.
 
 A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 

@@ -8,7 +8,7 @@
 
 1. **Buscar uma solução.** A página **Início** pergunta **Como podemos ajudar?**: digite o problema na busca e clique em **Buscar orientações**, ou escolha um dos cinco cartões de assunto, que levam direto ao pedido guiado. A **Central de ajuda** mostra as orientações publicadas; abra uma e responda **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**
 2. **Ver se é um problema conhecido.** Em **Problemas conhecidos**, se o problema também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se passar, clique em **Não estou mais com esse problema**.
-3. **Solicitar suporte.** Clique em **Solicitar suporte**, o único botão principal da página, (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio.
+3. **Solicitar suporte.** Clique em **Solicitar suporte**, o único botão principal da página, (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio. Em telas a partir de 960 px, eles ficam numa coluna ao lado do formulário, com **Como funciona o atendimento**; no celular e no tablet, aparecem antes dos campos, e a explicação vai para o fim da página.
 4. **Dizer onde é (opcional).** Em **Onde está o problema?**, o departamento e a sala começam pelo seu local de trabalho; troque se o problema for em outro lugar. Se você tiver equipamentos com patrimônio, pode indicar qual está com problema.
 5. **Responder às perguntas.** Em **Conte um pouco mais**, responda o que souber; todas são opcionais e podem ser limpas. Se trocar de assunto e voltar, as respostas continuam lá. Preencha **Assunto**, **O que aconteceu?** e **Prioridade sugerida** e clique em **Enviar solicitação**.
 6. **Acompanhar.** A página do pedido abre com a confirmação. Em Início, **Meus pedidos** resume quantos estão aguardando, em atendimento e resolvidos e lista os mais recentes. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
@@ -211,9 +211,9 @@ A solicitante busca uma orientação, escolhe um assunto ou pede suporte; vê os
 
 Depois de **Também estou com esse problema**, o cartão confirma o acompanhamento e oferece **Não estou mais com esse problema**.
 
-![Formulário Solicitar suporte com o problema conhecido exibido antes dos campos](assets/screenshots/abertura-chamado-desktop.png)
+![Formulário Solicitar suporte: assunto e campos à esquerda, problema conhecido e Como funciona o atendimento à direita](assets/screenshots/abertura-chamado-desktop.png)
 
-O formulário mostra os problemas conhecidos antes dos campos, sem bloquear o envio. A captura é anterior ao envio.
+O formulário mostra os problemas conhecidos ao lado dos campos, sem bloquear o envio. A captura é anterior ao envio.
 
 ![Página Início da solicitante no celular](assets/screenshots/dashboard-solicitante-mobile.png)
 

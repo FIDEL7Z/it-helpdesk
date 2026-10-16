@@ -521,6 +521,19 @@ async function run() {
       await waitDom('dark theme chosen', 'document.documentElement.dataset.theme === "dark"');
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
+      // Keyboard focus on the dark navigation bar: the ring must stand out from the bar (3:1).
+      // Start from the last menu link and press Tab: the next stop is the theme switch, reached by keyboard.
+      await evaluate('Array.from(document.querySelectorAll(".app-nav a")).at(-1).focus(); true');
+      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+      check(await evaluate(`(() => {
+        const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 });
+        const luminance = value => { const [r,g,b] = rgb(value); return .2126*r + .7152*g + .0722*b; };
+        const toggle = document.activeElement; const ring = getComputedStyle(toggle); const bar = getComputedStyle(document.querySelector('.app-header'));
+        const a = luminance(ring.outlineColor), b = luminance(bar.backgroundColor);
+        return toggle.classList.contains('theme-toggle') && toggle.matches(':focus-visible') && ring.outlineStyle !== 'none' && (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 3;
+      })()`), 'Dark theme keyboard focus on the navigation bar has a visible ring (3:1)');
+      await evaluate('document.activeElement?.blur(); true');
       await snap(join(output, 'manager-mobile-dark.png'));
       check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark" && document.querySelector(".theme-toggle").getAttribute("aria-pressed") === "true" && localStorage.getItem("it-helpdesk:theme") === "dark"'), 'The header switch turns the dark theme on and remembers it');
       const beforeThemeReload = await evaluate('performance.timeOrigin');

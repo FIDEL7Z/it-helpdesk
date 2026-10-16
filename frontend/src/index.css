@@ -42,6 +42,8 @@
   --color-nav-hover: #22425f;
   --color-nav-active-bg: #d9f1ee;
   --color-nav-active-text: #17324d;
+  /* Keyboard focus ring on the bar: at least 3:1 against --color-nav in both themes. */
+  --color-nav-focus: #d9f1ee;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -109,6 +111,7 @@
   --color-nav-hover: #15273a;
   --color-nav-active-bg: #123a40;
   --color-nav-active-text: #9de5ea;
+  --color-nav-focus: #9de5ea;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.35);
@@ -2910,9 +2913,10 @@ a:where(:not(.button)):hover {
   font-weight: 650;
 }
 
+/* Not --color-nav-active-bg: in the dark theme that is a dark teal (1.5:1 on the bar). */
 .app-nav__link:focus-visible,
 .button--nav:focus-visible {
-  outline: 3px solid var(--color-nav-active-bg);
+  outline: 3px solid var(--color-nav-focus);
   outline-offset: 2px;
 }
 

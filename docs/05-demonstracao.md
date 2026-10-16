@@ -8,7 +8,7 @@ Evidências para acompanhar o roteiro: [login e operação por perfil](03-fluxos
 
 - [ ] Docker Desktop iniciado (quando o MongoDB roda pelo Compose); API em `http://localhost:3000`; frontend em `http://localhost:5173`. Habilitar as configurações locais `DEMO_MODE=true` e `VITE_DEMO_MODE=true`, reiniciar os serviços e selecionar origem Demonstração para os exemplos.
 - [ ] `.env` configurado conforme README, com JWT_SECRET preenchido e origens CORS corretas.
-- [ ] `npm run seed` executado em backend; opcionalmente `npm run seed:demo` para exemplos, `npm run seed:incidents` para o incidente de demonstração, `npm run seed:articles` para os artigos de ajuda e `npm run seed:scenarios` para os [cenários de demonstração](#cenários-de-demonstração).
+- [ ] `npm run seed` executado em backend; opcionalmente `npm run seed:demo` para exemplos, `npm run seed:incidents` para o incidente de demonstração, `npm run seed:articles` para os artigos de ajuda, `npm run seed:scenarios` para os [cenários de demonstração](#cenários-de-demonstração) e `npm run seed:inventory` para o [estoque da empresa fictícia](#roteiro-do-estoque--cerca-de-4-minutos).
 - [ ] Credenciais dos três perfis disponíveis. Seed não muda senha/papel de um usuário existente.
 - [ ] Executar os comandos de testes, typecheck, lint e builds do README.
 - [ ] Deixar tempo para ensaiar e demonstrar persistência; evitar `docker compose down -v`, que apaga o volume.
@@ -70,6 +70,19 @@ O script publica o incidente **Instabilidade na rede Wi-Fi** a partir do chamado
 
 Para repetir a demonstração, reabra o chamado (com motivo) e use **Republicar** no bloco do incidente: começa um novo ciclo e as pessoas confirmam de novo. Para começar um incidente do zero, publique a partir de outro chamado não resolvido com **Publicar como incidente**.
 
+## Roteiro do estoque — cerca de 4 minutos
+
+Com `npm run seed`, `npm run seed:scenarios` e `npm run seed:inventory` executados, em `backend`. O seed já deixa pronto o caso da Maria Oliveira (Financeiro, sala 203): chamado "Teclado parou de funcionar" com um K120 entregue e o teclado antigo registrado como defeituoso. O roteiro abaixo repete o caso ao vivo com as contas públicas.
+
+1. **Solicitante (Mariana).** **Solicitar suporte** → **Computador ou equipamento**. Em **Onde está o problema?**, o RH e a sala 105 já vêm preenchidos (o local de trabalho dela); troque se quiser mostrar outro setor. Título "Teclado com teclas falhando". Enviar: o pedido mostra o local.
+2. **TI (Carlos).** Abrir o chamado. Em **Materiais e equipamentos** → **Entregar material**, escolher "Teclado Logitech K120": a lista mostra quantos há disponíveis; Mariana e o local já estão preenchidos. Tentar 50 unidades mostra o aviso de saldo insuficiente; registrar 1. A movimentação aparece no chamado com quem registrou, quem recebeu e onde. O chamado continua em aberto.
+3. **Troca.** **Registrar item retirado** → **Periférico sem patrimônio** → K120, "teclas sem resposta": o antigo fica separado como defeituoso.
+4. **Estoque.** Clicar no nome do teclado: o disponível caiu exatamente uma unidade e o histórico mostra a entrega com o link para o chamado. **Equipamentos** mostra os patrimônios por setor; em PAT-0003 (Comercial), **Transferir** para outro departamento.
+5. **Solicitante.** No pedido, **Material entregue** mostra o teclado, sem nenhuma informação de estoque. O menu dela não tem Estoque.
+6. **Gestor (Ana).** Na Visão gerencial, com origem **Demonstração** (as contas do seed geram dados de demonstração), a seção **Estoque e equipamentos** mostra o headset para repor, o monitor em manutenção, os materiais mais entregues e as entregas por departamento.
+
+Recarregar qualquer página mantém os dados: tudo está no banco.
+
 ## Cenários de demonstração
 
 `npm run seed:scenarios`, em `backend` depois de `npm run seed`, cria pedidos fictícios com títulos específicos, para apresentações e capturas sem textos genéricos. Cada etapa passa pelos mesmos serviços da aplicação (validação, revisão, auditoria e ciclos), agindo como as contas demonstrativas; por isso os pedidos ficam com origem **Demonstração** e o histórico é o que de fato aconteceu com eles, no momento em que o script rodou. Nenhum registro existente é alterado e nenhuma data é retroativa.
@@ -120,6 +133,11 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Origem dos dados | `data-origin.test.ts`: origem pela conta que abriu (nunca pela falta de dados operacionais), só operacional com o modo demo desligado e em produção (403 para outras origens), cada origem só quando pedida no modo demo, legado nunca migrado, incidentes fictícios fora dos problemas conhecidos; `audit.test.ts` nos dois modos; E2E: fila operacional por padrão, Todas as origens com etiqueta e aviso |
 | Acesso direto à API | `access-matrix.test.ts`: todas as rotas autenticadas respondem 401 sem token ou com token forjado; solicitante recebe 403 em todas as rotas da equipe e da gestão; TI recebe 403 nos indicadores do gestor; chamado alheio é 404 para ler, editar e responder a resolução; identidade sempre do token |
 | Carga desigual e tendências | `workload-balance.test.ts` (8 testes): escala operacional, 16 e 14 sem alerta, analista disponível com zero, gestor só com pendências, inativos fora, equipes de tamanhos diferentes; `manager.test.ts`: calendário completo do período com zeros, viradas de mês e ano e horário de verão |
+| Estrutura da empresa | `organization.test.ts`: só a gestão cadastra; nomes únicos sem acento; sala de um departamento só; desativação sem exclusão; ninguém define o próprio departamento; lista de pessoas sem contato |
+| Catálogo e estoque | `inventory-stock.test.ts`: tipos, características e SKU validados; tipo e controle fixos; entrada, reserva, entrega da reserva, cancelamento, devolução boa e com defeito; saldo nunca negativo; 10 retiradas simultâneas do último mouse resultam em 1 entrega; requisição repetida (inclusive simultânea) não retira outra unidade; ajuste, descarte e estorno só com permissão e motivo; sequência contínua; projeção reparada pelo livro-razão; histórico não editável |
+| Patrimônio | `inventory-assets.test.ts`: patrimônio e série únicos; cadastro repetido não duplica; transições permitidas; transferência guarda origem e destino; reserva por chamado; entregas simultâneas do mesmo equipamento resultam em uma; baixa só da gestão e final |
+| Estoque nos chamados | `inventory-tickets.test.ts`: local validado e guardado como era; equipamento só do próprio solicitante; entrega retira exatamente uma unidade, registra quem entregou e quem recebeu e não altera o chamado; resolver não move estoque; troca com patrimônio e com periférico; solicitante vê só as entregas do próprio pedido |
+| Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
 | Troca de perfil | E2E: Solicitante → Sair → TI, TI → Sair → Gestor e Gestor → Sair → Solicitante caem na página inicial do próprio perfil; URL protegida volta após o login; recarregar mantém a página; destino que o perfil não abre cai na página inicial; sessão inválida de outra pessoa não decide o destino; nenhuma resposta 5xx em toda a execução |
 | Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
 | Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
@@ -127,6 +145,8 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
+
+Em **16/10/2026**, com o módulo de estoque e patrimônio: **256 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`, e **179 verificações E2E**; typecheck, lint sem warnings, builds, `docs:check` (sete arquivos Markdown e 31 capturas) e `git diff --check` aprovados. Na última série, o E2E passou em 5 de 6 execuções seguidas; na que falhou, o sistema ocultou a janela do navegador headless 16 vezes (contra 3 ou 4 nas demais) e a página recarregada não iniciou a tempo, o mesmo efeito descrito em [solução de problemas](#solução-de-problemas). Duas instabilidades causadas pelo próprio teste foram corrigidas antes: verificações depois de recarregar que podiam ler a página antiga, e o Vite de teste recarregando ao descobrir dependências de uma página carregada sob demanda.
 
 Em **16/10/2026**, após as correções da auditoria no navegador (política de origem, navegação ao trocar de perfil, carga desigual, calendário do gráfico de evolução, ordem de atendimento, histórico legível, vocabulário de categorias, nomes acessíveis, tabelas e cabeçalho no celular e matriz de acesso): **215 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`, e **159 verificações E2E** aprovadas; o E2E passou cinco vezes seguidas. Typecheck, lint sem warnings, builds dos dois projetos, `docs:check` (sete arquivos Markdown e 25 capturas) e `git diff --check` aprovados. Uma execução isolada do E2E falhou ao abrir a lista do gestor (sessão ausente na página carregada); não se repetiu em sete execuções seguintes e a causa não foi determinada.
 
@@ -195,7 +215,7 @@ Os testes gerenciais validam seed idempotente, preservação de documentos anter
 
 ## Capturas reproduzíveis
 
-As 25 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores, num **ambiente isolado**: o script sobe um banco temporário próprio, a API e o frontend em portas livres, cria as cinco contas demonstrativas, os artigos de ajuda e os [cenários de demonstração](#cenários-de-demonstração), e apaga tudo ao final. O banco de desenvolvimento não é lido nem alterado, por isso registros de testes manuais não aparecem nas imagens.
+As 31 imagens em [assets/screenshots](assets/screenshots) foram obtidas na aplicação real, sem montagem ou substituição de valores, num **ambiente isolado**: o script sobe um banco temporário próprio, a API e o frontend em portas livres, cria as cinco contas demonstrativas, os artigos de ajuda, os [cenários de demonstração](#cenários-de-demonstração) e o estoque da empresa fictícia, e apaga tudo ao final. O banco de desenvolvimento não é lido nem alterado, por isso registros de testes manuais não aparecem nas imagens.
 
 O nome do arquivo indica viewport e tema: `-desktop` 1440 × 900, `-amplo` 1920 × 1080, `-tablet` 768 × 1024, `-mobile` 390 × 844; `-escuro` usa o tema escuro, escolhido como no botão do cabeçalho; as demais, o claro padrão. As páginas iniciais dos três perfis usam captura de página inteira (altura PNG maior que a viewport). [capture-info.json](assets/screenshots/capture-info.json) registra rota, viewport, tema, instante, dimensões, título, cabeçalho e a identidade pública do usuário autenticado, confirmada em `/auth/me`. A rota de detalhe identifica um registro fictício do banco temporário, que já não existe.
 
@@ -245,5 +265,17 @@ O README apresenta as páginas iniciais dos três perfis. As capturas das funcio
 ![Gerenciar artigos com as abas Publicados, Rascunhos, Arquivados e Todos](assets/screenshots/artigos-gerenciar-desktop.png)
 
 ![Visão gerencial em tablet](assets/screenshots/gestor-tablet.png)
+
+![Visão geral do estoque: tipos de material, unidades disponíveis, abaixo do mínimo, equipamentos e movimentações recentes](assets/screenshots/estoque-visao-geral-desktop.png)
+
+![Cadastro de material com tipo, controle, marca, modelo, mínimo e características do teclado](assets/screenshots/estoque-cadastro-material-desktop.png)
+
+![Equipamentos por número de patrimônio, com responsável, local e situação](assets/screenshots/estoque-equipamentos-desktop.png)
+
+![Movimentações com data, operação, material, quantidade, origem e destino, técnico e chamado](assets/screenshots/estoque-movimentacoes-desktop.png)
+
+![Chamado do teclado com a entrega do K120 e a devolução do antigo com defeito](assets/screenshots/chamado-entrega-material-desktop.png)
+
+![Seção Estoque e equipamentos da visão gerencial](assets/screenshots/gestor-estoque-desktop.png)
 
 A confirmação de resolução é apenas exibida na captura, sem resposta; o formulário de pedido não é enviado.

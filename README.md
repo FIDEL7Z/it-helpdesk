@@ -16,6 +16,7 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Classificação orientada:** "Com o que você precisa de ajuda?" leva à categoria técnica e a perguntas curtas sobre o assunto.
 - **Confirmação de resolução:** "Seu problema foi resolvido?", com contestação que reabre o pedido e avaliação opcional.
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
+- **Estoque e Patrimônio:** departamentos e salas, materiais por quantidade e equipamentos por número de patrimônio, cada entrada, entrega, troca e transferência registrada e ligada ao chamado.
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
 - **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados, tema claro por padrão e botão **Tema escuro** no cabeçalho (escolha guardada no navegador), contraste AA nos dois temas e layout para celular.
 
@@ -59,6 +60,20 @@ Só o dono do pedido responde, uma vez por resolução; a equipe não responde p
 ## Kanban
 
 TI e gestor alternam a fila entre **Lista** e **Quadro** (Abertos, Em andamento, Resolvidos). Um painel único reúne a forma de exibição, as **filas rápidas** (Sem responsável, Atribuídos a mim, Em andamento, Reabertos pelo solicitante) e a busca com filtros; no celular os filtros começam recolhidos atrás de **Filtros**, com a contagem dos ativos. O quadro ocupa toda a largura, inclusive quando um filtro de status deixa uma só coluna. Ele usa os mesmos filtros (guardados na URL) e a mesma API da lista, carrega 20 cartões por coluna e mostra "carregados de total". As ações são botões nos cartões (Assumir, Iniciar atendimento, Resolver), acessíveis por teclado e sujeitos às mesmas regras: justificativa para resolver chamado de outro responsável, conflito 409 com dados antigos e auditoria. Não há arrastar e soltar.
+
+## Estoque e Patrimônio
+
+Maria, do Financeiro, sala 203, abre um chamado porque o teclado parou. No próprio chamado, a TI vê quantos teclados há, entrega um Logitech K120 e registra o teclado velho como defeituoso. O saldo cai exatamente uma unidade, o chamado mostra quem entregou, quem recebeu, onde e por quê, e a gestão vê o consumo por material e por departamento.
+
+![Chamado com a seção Materiais e equipamentos: entrega de um teclado e devolução do antigo com defeito](docs/assets/screenshots/chamado-entrega-material-desktop.png)
+
+- **Dois modos de controle:** por quantidade (teclados, mouses, cabos) ou por patrimônio, com número único por equipamento (notebooks, monitores, computadores), que tem situação, local e responsável.
+- **Movimentações auditáveis:** entrada, reserva, entrega, devolução, transferência, manutenção, defeito e, com permissão da gestão e motivo, ajuste, descarte, estorno e baixa. Nada é editado ou apagado: correções são estornos.
+- **Saldo seguro:** nunca fica negativo, duas retiradas simultâneas do último item resultam em uma entrega e uma recusa, e repetir a mesma requisição não retira outra unidade.
+- **Separado do atendimento:** entregar material não resolve o chamado, e resolver não dá baixa no estoque.
+- **Solicitante:** informa onde está o problema e vê só o que foi entregue no próprio pedido, sem acesso ao estoque.
+
+Regras em [produto e regras](docs/01-produto-e-regras.md#estoque-e-patrimônio); como a consistência é garantida sem transações, em [arquitetura e dados](docs/02-arquitetura-e-dados.md#estoque-patrimônio-e-livro-razão).
 
 ## Os três perfis
 
@@ -158,11 +173,14 @@ npm run seed:demo       # até 10 chamados de exemplo
 npm run seed:incidents  # publica o incidente "Instabilidade na rede Wi-Fi"
 npm run seed:articles   # cinco artigos de ajuda fictícios
 npm run seed:scenarios  # cenários fictícios claros, percorridos pelo fluxo real
+npm run seed:inventory  # empresa fictícia: departamentos, salas, estoque e patrimônios
 ```
 
 Todos podem ser executados de novo sem duplicar dados: usuários existentes não têm senha nem papel alterados, chamados com o mesmo título são pulados, e o incidente e os artigos existentes (inclusive se editados) são mantidos. Em caso de erro, encerram com código 1.
 
 `seed:scenarios` cria pedidos com títulos específicos (por exemplo "Impressora do setor administrativo sem conexão" e "Notebook desligando sozinho durante reuniões") e executa cada etapa pelos mesmos serviços da aplicação: atendimento, resolução, confirmação com nota e contestação. Os quatro cenários de equipe (segundo solicitante e segundo analista, resolução por outro responsável e um incidente da rede cabeada) só rodam se as contas adicionais existirem. Não altera registros existentes nem cria histórico com datas passadas. Detalhes em [cenários de demonstração](docs/05-demonstracao.md#cenários-de-demonstração).
+
+`seed:inventory` cria cinco departamentos com salas (Financeiro 203, RH 105, Administração 301, TI 110, Comercial 205), coloca as contas fictícias nesses setores (só se ainda não tiverem um), cadastra materiais e patrimônios de exemplo e executa os cenários do estoque pelos serviços da aplicação: o teclado trocado no Financeiro, um mouse entregue no RH, um monitor enviado para manutenção, um notebook transferido para o Comercial, um headset abaixo do mínimo e uma retirada acima do saldo, recusada. Rodar de novo não muda nada; recusa produção e contas que não sejam as fictícias. As marcas e modelos são exemplos para a demonstração.
 
 O seed gerencial opcional (`npm run seed:manager`) cria 24 chamados fictícios por mês para os gráficos da gestão. Exige as contas adicionais `demo.ti2@helpdesk.local` e `demo.solicitante2@helpdesk.local` e a variável `LOCAL_DEMO_SEED=1`, e recusa bancos remotos ou de produção. Em PowerShell, a partir da raiz:
 
@@ -244,15 +262,15 @@ npm run lint -- --deny-warnings
 npm run build
 ```
 
-- **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit, incidentes compartilhados, privacidade das respostas, base de conhecimento, classificação orientada e confirmação de resolução. Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
-- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390 px e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução e quadro (incluindo teclado, justificativa, conflito 409 e filtros recolhidos no celular). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
+- **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit, incidentes compartilhados, privacidade das respostas, base de conhecimento, classificação orientada e confirmação de resolução, departamentos e salas, catálogo, saldo, concorrência, idempotência, estornos, patrimônio, entregas ligadas a chamados e indicadores de estoque. Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
+- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390 px e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução, quadro (incluindo teclado, justificativa, conflito 409 e filtros recolhidos no celular) e estoque (o teclado do Financeiro de ponta a ponta, com o saldo conferido na API, cadastro de material, entrada, estoque insuficiente, transferência de patrimônio, 390 px, permissões e consumo na visão gerencial). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
 - **Documentação (`npm run docs:check`):** links, âncoras, imagens, viewport e tema de cada captura, scripts npm citados, variáveis dos exemplos e credenciais demonstrativas.
 
 O que cada teste cobre: [o que os testes verificam](docs/05-demonstracao.md#o-que-os-testes-verificam).
 
 ## Documentação complementar
 
-- [Produto, regras, incidentes, base de conhecimento, classificação e confirmação](docs/01-produto-e-regras.md)
+- [Produto, regras, incidentes, base de conhecimento, classificação, confirmação e estoque](docs/01-produto-e-regras.md)
 - [Arquitetura, coleções e índices](docs/02-arquitetura-e-dados.md)
 - [Como usar por perfil, ciclo de vida e API](docs/03-fluxos-e-api.md)
 - [Métricas, decisões técnicas e limitações](docs/04-metricas-decisoes-e-limites.md)
@@ -277,6 +295,7 @@ docker-compose.yml  MongoDB local
 
 - JWT fica no localStorage: um XSS poderia expor o token, e o logout só limpa a sessão local. Login limita 10 tentativas por IP a cada 15 minutos, com contador em memória.
 - Sem notificações (e-mail, push), anexos, comentários, recuperação de senha ou administração de usuários pela interface.
+- Estoque sem compras, fornecedores, custos, notas fiscais ou código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois. Sem inteligência artificial nesta etapa: ela poderá usar depois os dados do estoque e dos chamados.
 - Incidentes não avisam ativamente; o usuário vê o problema ao abrir o sistema. Não há vínculo de outros chamados ao incidente nem sugestão automática de problemas parecidos.
 - A busca de artigos compara palavras (sem acento) por expressão regular e ordena pela atualização mais recente, sem ranking de relevância; atende o volume de demonstração, não uma base grande. Artigos não têm imagens nem anexos.
 - As perguntas do pedido guiado são fixas no código (um catálogo por categoria), não configuráveis pela interface.

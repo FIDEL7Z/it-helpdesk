@@ -35,6 +35,13 @@ Texto revisado e confirmado pelo autor. Não descreve entrevistas, pesquisa de c
 | Escrever, publicar e arquivar artigos | Não | Sim | Sim |
 | Confirmar, contestar e avaliar a resolução | Só do próprio chamado | Só do próprio chamado | Só do próprio chamado |
 | Ver a fila em Lista ou Quadro | Não (vê “Meus pedidos”) | Sim | Sim |
+| Informar departamento, sala e equipamento do problema | Sim (equipamento: só os próprios) | Sim | Sim |
+| Ver o material entregue no próprio pedido | Sim, resumido | Sim, com o registro completo | Sim, com o registro completo |
+| Consultar estoque, equipamentos e movimentações | Não | Sim | Sim |
+| Cadastrar materiais e equipamentos; entradas, reservas, entregas, devoluções, transferências, manutenção e defeito | Não | Sim | Sim |
+| Ajuste de inventário, descarte, estorno e baixa de patrimônio | Não | Não | Sim, com justificativa |
+| Cadastrar departamentos e salas; definir onde cada pessoa trabalha | Não | Não (consulta) | Sim |
+| Indicadores de estoque | Não | Não | Sim |
 
 O endpoint gerencial exige o papel gestor, validado na rota após autenticação. As permissões operacionais estão em [backend/src/auth/permissions.ts](../backend/src/auth/permissions.ts). O frontend mantém uma cópia apenas para controlar a interface. A API aplica a autorização mesmo em chamadas diretas. Status e atribuição exigem permissão na rota; consulta e edição aplicam escopo e propriedade no service.
 
@@ -120,10 +127,30 @@ Depois que a TI resolve, o dono do chamado responde **Seu problema foi resolvido
 - **Regras:** só o dono responde; TI e gestor recebem 403 ao tentar responder por ele. A resposta informa o ciclo da resolução: ciclo antigo, chamado já reaberto pela TI ou resolução já confirmada retornam 409. Requisições repetidas ou simultâneas não confirmam, avaliam ou reabrem duas vezes, porque usam a mesma revisão do chamado das demais ações. O solicitante continua sem permissão geral de mudar status: a contestação é uma rota própria.
 - **Não responder** não é tratado como insatisfação; a visão gerencial mostra "sem resposta" separadamente.
 
+## Estoque e patrimônio
+
+O módulo liga o atendimento ao controle físico do que a TI entrega. O exemplo que guiou as regras: Maria Oliveira, do Financeiro, sala 203, abre um chamado porque o teclado parou; a TI confere o estoque a partir do próprio chamado, entrega um Logitech K120, registra o teclado velho como defeituoso, e o saldo cai exatamente uma unidade, com quem entregou, quem recebeu, onde e por quê.
+
+**Estrutura da empresa.** Uma única empresa, com departamentos e salas cadastrados pela gestão (`org:manage`). Nada é apagado: departamentos e salas são desativados e continuam nos registros antigos. Cada pessoa pode ter um departamento, uma sala e uma função, definidos só pela gestão; ninguém escolhe o próprio departamento pela API.
+
+**Onde o problema acontece.** O pedido pode informar departamento e sala, começando pelo local habitual da pessoa, que ela pode trocar, e o equipamento envolvido (só entre os que ela tem). O chamado guarda o local como era na abertura: se a sala mudar de nome ou a pessoa mudar de setor, o histórico continua apontando o local original. Chamados antigos sem local continuam funcionando.
+
+**Dois modos de controle, fixos no cadastro.** Por quantidade (teclados, mouses, cabos, adaptadores) ou por patrimônio, cada unidade com número de patrimônio único (notebooks, monitores, computadores, impressoras). Um produto nunca é movimentado nos dois modos.
+
+**Saldo por quantidade.** No almoxarifado = unidades utilizáveis guardadas, inclusive reservadas; reservado = separado para um chamado; disponível = no almoxarifado − reservado; com defeito = unidades devolvidas quebradas, mantidas à parte e nunca disponíveis. Nenhum deles fica negativo. Uma reserva não é saída física; uma entrega respeita as reservas. O que foi entregue ou está instalado não é estoque: é contado pelas movimentações.
+
+**Operações.** Entrada, reserva, cancelamento de reserva, entrega (avulsa ou da reserva), devolução em bom estado ou com defeito, ajuste de inventário, descarte de defeituosos e estorno. Ajuste, descarte, estorno e baixa de patrimônio exigem `inventory:adjust` (gestão) e motivo. Um registro nunca é editado: um erro é corrigido por um estorno que aponta o original, e cada movimentação é estornada no máximo uma vez.
+
+**Patrimônio.** Situações: disponível, reservado, em uso, em manutenção, defeituoso e baixado. Só as transições previstas são aceitas (por exemplo, só um equipamento em uso é transferido; baixado é final). Em uso, o equipamento tem departamento, sala e responsável; ao sair de uso, o local de onde saiu fica na movimentação.
+
+**Chamados.** Entregar material não resolve o chamado, e resolver o chamado não dá baixa no estoque: são decisões separadas. O responsável pelo chamado, o autor da resolução, o técnico que registrou a entrega e a pessoa que recebeu são identidades distintas, cada uma registrada como de fato ocorreu. Numa troca, o equipamento com patrimônio retirado vira defeituoso; um periférico sem patrimônio é registrado como unidade com defeito, sem inventar identidade. O solicitante vê só o que foi entregue no próprio pedido: material, quantidade, data, quem entregou e, se recebeu um equipamento, o patrimônio dele. Não vê saldos, custos, outras pessoas nem o estoque.
+
+**Consistência.** Duas retiradas simultâneas do último mouse resultam em uma entrega e uma recusa; repetir a mesma requisição não retira outra unidade. Como funciona: [arquitetura e dados](02-arquitetura-e-dados.md#estoque-patrimônio-e-livro-razão).
+
 ## Escopo entregue e evolução futura
 
-**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), visão gerencial exclusiva com filtros e métricas comprovadas, tema claro por padrão com opção de tema escuro no cabeçalho e layout responsivo.
+**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), estoque e patrimônio integrados aos chamados, visão gerencial exclusiva com filtros e métricas comprovadas, tema claro por padrão com opção de tema escuro no cabeçalho e layout responsivo.
 
 A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 
-**Ainda não implementado:** campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.
+**Ainda não implementado:** inteligência artificial (fica para uma etapa posterior, que poderá usar os dados confiáveis do estoque e dos chamados), compras, fornecedores, custos e notas fiscais, leitor de código de barras, campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.

@@ -141,6 +141,20 @@ Seção da visão gerencial, com os mesmos filtros e período da página.
 
 "Reaberturas no período" continua contando só reaberturas feitas pela equipe; contestações aparecem aqui. Os números não identificam analistas individualmente na tela e não devem servir como avaliação de desempenho isolada: a nota reflete a experiência de quem respondeu, não toda a equipe.
 
+## Estoque e equipamentos
+
+Seção da visão gerencial e endpoint `GET /inventory/insights` (só gestão), com [inventory-insights.service.ts](../backend/src/services/inventory-insights.service.ts). Respondem a decisões concretas: o que repor, quais modelos dão mais defeito, quais setores consomem mais e o que está fora de uso.
+
+- **Abaixo do mínimo:** materiais ativos com disponível (no almoxarifado − reservado) menor que o mínimo; para materiais por patrimônio, equipamentos disponíveis menor que o mínimo. Sem mínimo definido, nunca aparece.
+- **Unidades disponíveis** soma unidades; **tipos de material** conta itens do catálogo. Os dois nunca se misturam.
+- **Equipamentos em manutenção / com defeito:** situação atual dos equipamentos com patrimônio.
+- **Unidades entregues no período:** soma das entregas por quantidade e das entregas de equipamentos, por data do servidor, no período e fuso da visão gerencial. Uma entrega estornada não conta.
+- **Materiais mais entregues** e **entregas por departamento:** as mesmas entregas, agrupadas por material e pelo departamento registrado na entrega (não pelo departamento atual da pessoa).
+- **Defeitos registrados por modelo:** devoluções com defeito e equipamentos registrados como defeituosos no período.
+- **Movimentações ligadas a chamados:** movimentações do período com chamado informado.
+
+O saldo do almoxarifado é físico: é um só, sem origem. O consumo do período segue a origem escolhida na visão gerencial: movimentações feitas pelas contas fictícias reservadas são de demonstração e só aparecem quando essa origem é escolhida (e nunca fora do modo demonstração). Consumir mais não é chamado de desperdício: depende do tamanho e da atividade de cada setor.
+
 ## Decisões presentes no código
 
 As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, sem afirmar quais alternativas o autor considerou pessoalmente.
@@ -164,6 +178,11 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **Catálogo de perguntas no backend:** uma única definição valida a API e alimenta o formulário (`GET /tickets/intake-questions`), evitando duas versões da mesma regra.
 - **Busca de artigos por campo normalizado:** expressão regular escapada sobre título, resumo e corpo sem acentos, todas as palavras obrigatórias. Atende o volume de demonstração sem serviço externo; não ordena por relevância.
 - **Quadro sem arrastar e soltar:** cada mudança é um botão que chama a rota existente. Assim a justificativa obrigatória, a validação de transição, a revisão (409) e o uso por teclado são os mesmos da página do chamado.
+- **Livro-razão de estoque sem transações:** cada movimentação é um documento único, gravado de forma atômica, e ocupa a próxima posição da sequência do seu produto ou equipamento (índice único). Isso serializa as operações sobre o mesmo item e impede saldo negativo sem depender de réplica do MongoDB; o saldo no produto é uma projeção reparável. O custo é uma leitura a mais por operação e novas tentativas em disputa.
+- **Chave de idempotência escolhida pelo cliente:** a interface gera a chave ao abrir o formulário e a mantém até a resposta confirmar; uma resposta perdida seguida de novo envio não retira outra unidade. A chave fica vinculada ao autor e ao conteúdo.
+- **Quantidade e patrimônio como modos fixos:** um produto é contado ou identificado, nunca os dois. Assim um mesmo item não é baixado duas vezes por caminhos diferentes.
+- **Local como snapshot:** chamados, equipamentos e movimentações guardam id e nome do departamento e da sala no momento, para o histórico não mudar quando a estrutura muda.
+- **Entrega e resolução separadas:** nenhuma das duas dispara a outra; cada uma tem o seu autor.
 - **Formato público explícito:** o backend monta o objeto público do incidente e o chamado entregue ao solicitante campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
 
 ## Segurança e limites operacionais
@@ -176,7 +195,7 @@ CORS restringe origens configuradas; autenticação/autorização continuam resp
 
 MongoDB local roda sem autenticação, publicado somente em loopback. Produção exige configuração própria de banco e segredos. `.env` e variantes são ignorados pelo Git; `.env.example` tem apenas configuração e credenciais demonstrativas.
 
-Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema; o mesmo vale para a pergunta de confirmação da resolução. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. A escolha de tema fica no navegador, não na conta do usuário.
+O estoque não tem compras, fornecedores, custos, notas fiscais nem código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois; uma entrega feita a partir de uma reserva é corrigida com devolução, não com estorno. Não há inteligência artificial: ela fica para uma etapa posterior. Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema; o mesmo vale para a pergunta de confirmação da resolução. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. A escolha de tema fica no navegador, não na conta do usuário.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
 

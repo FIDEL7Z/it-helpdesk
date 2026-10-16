@@ -1734,6 +1734,15 @@ html {
   gap: 10px;
 }
 
+/* Status always on the right on tablets and desktops: a long date line wraps inside the card
+   instead of pushing the badge below it on some cards and not others. */
+@media (min-width: 721px) {
+  .request-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
 /* Known problems (public incidents) */
 
 .known-incidents {
@@ -3415,6 +3424,12 @@ a:where(:not(.button)):hover {
 
   .portal-search {
     flex-direction: column;
+  }
+
+  /* In a column, flex: 1 (basis 0) is vertical and squeezed the 52px field to a thin line,
+     leaving the icon (centered on 26px) below it. The field keeps its own height. */
+  .portal-search__input {
+    flex: none;
   }
 
   .portal-search__icon {

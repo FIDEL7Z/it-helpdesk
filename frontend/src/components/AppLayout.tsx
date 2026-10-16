@@ -31,7 +31,7 @@ export function AppLayout() {
           </div>
 
           {/* One shared bar, a different set of destinations per profile. */}
-          <nav className="app-nav" aria-label="Navegação principal">
+          <nav className={`app-nav${isManager ? ' app-nav--manager' : ''}`} aria-label="Navegação principal">
             {isRequester ? (
               <>
                 <NavLink to="/dashboard" className="app-nav__link">Início</NavLink>

@@ -2828,6 +2828,108 @@ a:hover {
   color: var(--color-nav-text);
 }
 
+/* Up to tablets: brand and account on the first row, the whole menu on its own row below. */
+@media (max-width: 1100px) {
+  .app-header .brand {
+    flex: 1;
+  }
+
+  .app-nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+/* Phones: the header scrolls away with the page, and the manager menu gets two tidy rows —
+   the management view, then the three operation pages — instead of loose wrapped labels. */
+@media (max-width: 720px) {
+  .app-header {
+    position: static;
+  }
+
+  html {
+    scroll-padding-top: 0;
+  }
+
+  .app-nav--manager {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .app-nav--manager .app-nav__link {
+    padding-left: 6px;
+    padding-right: 6px;
+    text-align: center;
+  }
+
+  .app-nav--manager .app-nav__link:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .app-nav--manager .app-nav__group-label {
+    display: none;
+  }
+}
+
+/* Management tables become labelled cards on tablets and phones, so every value and the
+   row action stay visible without sideways scrolling. */
+@media (max-width: 900px) {
+  .manager-table--stack,
+  .manager-table--stack tbody,
+  .manager-table--stack tr,
+  .manager-table--stack th,
+  .manager-table--stack td {
+    display: block;
+    width: 100%;
+  }
+
+  .manager-table--stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .manager-table--stack tr {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .manager-table--stack th,
+  .manager-table--stack td {
+    padding: 2px 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .manager-table--stack th[scope="row"] {
+    padding-bottom: 4px;
+    font-weight: 650;
+  }
+
+  .manager-table--stack td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .manager-table--stack td[data-label]::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+  }
+
+  .manager-table--stack .manager-table__action {
+    display: block;
+    padding-top: 6px;
+  }
+
+  .manager-table--stack .manager-table__action::before {
+    content: none;
+  }
+}
+
 .button--nav:hover {
   background: var(--color-nav-hover);
   color: var(--color-nav-text);

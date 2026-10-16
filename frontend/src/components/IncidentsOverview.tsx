@@ -39,17 +39,17 @@ export function IncidentsOverview({ dataOrigin }: { dataOrigin: string }) {
             <p className="text-muted">Nenhum incidente ativo nesta origem de dados.</p>
           ) : (
             <div className="table-scroll" tabIndex={0} role="region" aria-label="Incidentes ativos com mais pessoas afetadas">
-              <table className="manager-table">
+              <table className="manager-table manager-table--stack">
                 <caption className="sr-only">Incidentes ativos, do maior para o menor número de pessoas afetadas</caption>
                 <thead><tr><th>Incidente</th><th>Afetados</th><th>Chamado principal</th><th>Responsável</th><th><span className="sr-only">Ação</span></th></tr></thead>
                 <tbody>
                   {data.top.map((incident) => (
                     <tr key={incident.id}>
                       <th scope="row">{incident.title}</th>
-                      <td>{incident.affectedCount}</td>
-                      <td>{incident.ticketStatus ? STATUS_LABELS[incident.ticketStatus] : '—'}</td>
-                      <td>{incident.assignee?.name ?? 'Sem responsável'}</td>
-                      <td><Link to={`/tickets/${incident.ticketId}`}>Ver chamado</Link></td>
+                      <td data-label="Afetados">{incident.affectedCount}</td>
+                      <td data-label="Chamado principal">{incident.ticketStatus ? STATUS_LABELS[incident.ticketStatus] : '—'}</td>
+                      <td data-label="Responsável">{incident.assignee?.name ?? 'Sem responsável'}</td>
+                      <td className="manager-table__action"><Link to={`/tickets/${incident.ticketId}`}>Ver chamado</Link></td>
                     </tr>
                   ))}
                 </tbody>

@@ -3,6 +3,7 @@ import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { ROLE_LABELS } from '../services/auth'
 import { BrandMark } from './BrandMark'
+import { ThemeToggle } from './ThemeToggle'
 
 export function AppLayout() {
   const { user, logout } = useAuth()
@@ -53,6 +54,7 @@ export function AppLayout() {
                 <span className="user-menu__name">{user.name}</span>
                 <span className="user-menu__role">{ROLE_LABELS[user.role]}</span>
               </div>
+              <ThemeToggle />
               <button type="button" className="button button--nav" onClick={handleLogout}>
                 Sair
               </button>

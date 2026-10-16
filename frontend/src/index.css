@@ -66,48 +66,47 @@
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0f1b27;
-    --color-surface: #172636;
-    --color-surface-muted: #1e3043;
-    --color-surface-accent: #12333a;
-    --color-border: #2a3d52;
-    --color-border-strong: #5f7488;
-    --color-text: #e6edf3;
-    --color-text-muted: #a3b3c3;
-    --color-primary: #3cc1cc;
-    --color-primary-hover: #6ad3db;
-    --color-primary-contrast: #04262b;
-    --color-primary-soft: #123a40;
-    --color-focus: rgba(60, 193, 204, 0.4);
-    --color-danger: #f28b82;
-    --color-danger-bg: #2c1517;
-    --color-danger-border: #7a2b26;
-    --color-success: #5bd08a;
-    --color-success-bg: #10291c;
-    --color-success-border: #1f6b3e;
-    --color-warning: #f2b544;
-    --color-warning-bg: #2d2109;
-    --color-info: #8ab8f5;
-    --color-info-bg: #142640;
-    --color-badge-ti-bg: #123a40;
-    --color-badge-ti-text: #9de5ea;
-    --color-badge-solicitante-bg: #1e3043;
-    --color-badge-solicitante-text: #c8d4df;
+/* Dark theme: chosen by the person in the header (light is the default), not by the system. */
+:root[data-theme="dark"] {
+  --color-bg: #0f1b27;
+  --color-surface: #172636;
+  --color-surface-muted: #1e3043;
+  --color-surface-accent: #12333a;
+  --color-border: #2a3d52;
+  --color-border-strong: #5f7488;
+  --color-text: #e6edf3;
+  --color-text-muted: #a3b3c3;
+  --color-primary: #3cc1cc;
+  --color-primary-hover: #6ad3db;
+  --color-primary-contrast: #04262b;
+  --color-primary-soft: #123a40;
+  --color-focus: rgba(60, 193, 204, 0.4);
+  --color-danger: #f28b82;
+  --color-danger-bg: #2c1517;
+  --color-danger-border: #7a2b26;
+  --color-success: #5bd08a;
+  --color-success-bg: #10291c;
+  --color-success-border: #1f6b3e;
+  --color-warning: #f2b544;
+  --color-warning-bg: #2d2109;
+  --color-info: #8ab8f5;
+  --color-info-bg: #142640;
+  --color-badge-ti-bg: #123a40;
+  --color-badge-ti-text: #9de5ea;
+  --color-badge-solicitante-bg: #1e3043;
+  --color-badge-solicitante-text: #c8d4df;
 
-    --color-nav: #0a1520;
-    --color-nav-text: #ffffff;
-    --color-nav-muted: #a9bccd;
-    --color-nav-hover: #15273a;
-    --color-nav-active-bg: #123a40;
-    --color-nav-active-text: #9de5ea;
+  --color-nav: #0a1520;
+  --color-nav-text: #ffffff;
+  --color-nav-muted: #a9bccd;
+  --color-nav-hover: #15273a;
+  --color-nav-active-bg: #123a40;
+  --color-nav-active-text: #9de5ea;
 
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.35);
 
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 *,
@@ -1473,9 +1472,7 @@ textarea.field__input {
 
 /* Charts retain text legends and tables for precise, accessible reading. */
 :root { --chart-blue: #2456cc; --chart-teal: #087f72; --chart-amber: #b66b09; --chart-violet: #7954bd; --chart-rose: #bb466a; }
-@media (prefers-color-scheme: dark) {
-  :root { --chart-blue: #83a6ff; --chart-teal: #58cbb7; --chart-amber: #edb85b; --chart-violet: #b29aee; --chart-rose: #ed96b0; }
-}
+:root[data-theme="dark"] { --chart-blue: #83a6ff; --chart-teal: #58cbb7; --chart-amber: #edb85b; --chart-violet: #b29aee; --chart-rose: #ed96b0; }
 .pie-chart { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
 .pie-chart__svg { width: 180px; max-width: 100%; flex: 0 0 180px; }
 .chart-legend { padding: 0; margin: 12px 0; list-style: none; display: grid; gap: 10px; font-size: .875rem; }
@@ -2834,6 +2831,32 @@ a:hover {
 .button--nav:hover {
   background: var(--color-nav-hover);
   color: var(--color-nav-text);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-toggle[aria-pressed="true"] {
+  background: var(--color-nav-hover);
+}
+
+.theme-toggle__icon {
+  flex: none;
+}
+
+/* On phones only the icon shows; the name stays available to screen readers and as a tooltip. */
+@media (max-width: 639px) {
+  .theme-toggle__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 .page__title {

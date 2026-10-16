@@ -472,8 +472,10 @@ async function run() {
       const output = resolve(root, 'backend/e2e-results');
       await mkdir(output, { recursive: true });
       await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+      // The system preference is dark here on purpose: the app must still start in the light theme.
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
       await delay(200); // Let palette transitions settle before visual capture.
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "light" && !document.documentElement.dataset.theme && document.querySelector(".theme-toggle")?.getAttribute("aria-pressed") === "false"'), 'Light theme is the default, even when the system prefers dark');
       const contrast = () => evaluate(`(() => {
         const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 });
         const luminance = value => { const [r,g,b] = rgb(value); return .2126*r + .7152*g + .0722*b; };
@@ -495,11 +497,18 @@ async function run() {
       await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
       await snap(join(output, 'manager-mobile-light.png'));
-      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+      await evaluate('document.querySelector(".theme-toggle").click()');
+      await waitDom('dark theme chosen', 'document.documentElement.dataset.theme === "dark"');
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
       await snap(join(output, 'manager-mobile-dark.png'));
-      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark"'), 'Manager dark theme uses the shared system palette');
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark" && document.querySelector(".theme-toggle").getAttribute("aria-pressed") === "true" && localStorage.getItem("it-helpdesk:theme") === "dark"'), 'The header switch turns the dark theme on and remembers it');
+      await command('Page.reload', { ignoreCache: true });
+      await waitDom('dark theme after reload', 'document.documentElement.dataset.theme === "dark" && document.querySelector(".theme-toggle")?.getAttribute("aria-pressed") === "true"');
+      check(true, 'The dark choice survives a reload, applied before the app renders');
+      await evaluate('document.querySelector(".theme-toggle").click()');
+      await waitDom('light theme again', '!document.documentElement.dataset.theme && localStorage.getItem("it-helpdesk:theme") === "light"');
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "light"'), 'The same switch returns to the light theme');
       await command('Emulation.clearDeviceMetricsOverride');
       await command('Emulation.setEmulatedMedia', { features: [] });
     }

@@ -37,6 +37,12 @@ const createTicketSchema = z.strictObject({
     answers: z.array(z.strictObject({ key: z.string().max(40), answer: z.string().max(400) })).max(10).default([]),
     articleId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid article id').optional(),
   }).optional(),
+  // Where the problem is (optional; validated against active departments and rooms).
+  location: z.strictObject({
+    departmentId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid department id').nullable().optional(),
+    roomId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid room id').nullable().optional(),
+  }).nullable().optional(),
+  affectedAssetId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid asset id').nullable().optional(),
 });
 
 const listTicketsQuerySchema = z.object({

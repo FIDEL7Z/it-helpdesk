@@ -33,6 +33,15 @@ async function createUser(name: string, role: UserRole): Promise<TestUser> {
   return { id: user.id, token: signAccessToken(user.id) };
 }
 
+// Stock and assets: team only (requesters only reach their own equipment and ticket deliveries).
+const INVENTORY_ROUTES: [string, string][] = [
+  ['GET', '/inventory/product-types'], ['GET', '/inventory/products'], ['POST', '/inventory/products'], ['GET', `/inventory/products/${ID}`], ['PATCH', `/inventory/products/${ID}`],
+  ...['receipts', 'reservations', 'issues', 'returns', 'adjustments', 'discards', 'reversals'].map((action): [string, string] => ['POST', `/inventory/products/${ID}/${action}`]),
+  ['POST', `/inventory/products/${ID}/reservations/${ID}/cancel`],
+  ['GET', '/inventory/assets'], ['POST', '/inventory/assets'], ['GET', `/inventory/assets/${ID}`], ['POST', `/inventory/assets/${ID}/assign`], ['POST', `/inventory/assets/${ID}/retire`],
+  ['GET', '/inventory/movements'], ['GET', `/inventory/movements/${ID}`],
+];
+
 // Every authenticated route of the API (method, path), with ids where the route needs one.
 const AUTHENTICATED: [string, string][] = [
   ['GET', '/auth/me'], ['GET', '/dashboard/summary'], ['GET', '/dashboard/manager'], ['GET', '/users/it-staff'],
@@ -43,6 +52,9 @@ const AUTHENTICATED: [string, string][] = [
   ['PATCH', `/incidents/${ID}`], ['POST', `/incidents/${ID}/close`], ['POST', `/incidents/${ID}/republish`],
   ['GET', `/incidents/${ID}/participation`], ['PUT', `/incidents/${ID}/participation`], ['DELETE', `/incidents/${ID}/participation`],
   ['GET', '/articles'], ['GET', '/articles/manage'], ['POST', '/articles'], ['GET', `/articles/${ID}`], ['PATCH', `/articles/${ID}`], ['PUT', `/articles/${ID}/feedback`],
+  ['GET', `/tickets/${ID}/materials`], ['GET', '/organization'], ['POST', '/organization/departments'], ['PATCH', `/organization/departments/${ID}`],
+  ['POST', '/organization/rooms'], ['PATCH', `/organization/rooms/${ID}`], ['GET', '/organization/people'], ['PATCH', `/organization/people/${ID}`],
+  ...INVENTORY_ROUTES, ['GET', '/inventory/assets/mine'],
 ];
 
 // Team or management only: a requester must get 403 before any data is read.
@@ -51,6 +63,9 @@ const TEAM_ONLY: [string, string][] = [
   ['PATCH', `/tickets/${ID}/status`], ['PATCH', `/tickets/${ID}/assignee`], ['GET', `/tickets/${ID}/incident`], ['POST', `/tickets/${ID}/incident`],
   ['GET', '/incidents/manage'], ['GET', '/incidents/indicators'], ['PATCH', `/incidents/${ID}`], ['POST', `/incidents/${ID}/close`], ['POST', `/incidents/${ID}/republish`],
   ['GET', '/articles/manage'], ['POST', '/articles'], ['PATCH', `/articles/${ID}`],
+  ['POST', '/organization/departments'], ['PATCH', `/organization/departments/${ID}`], ['POST', '/organization/rooms'], ['PATCH', `/organization/rooms/${ID}`],
+  ['GET', '/organization/people'], ['PATCH', `/organization/people/${ID}`],
+  ...INVENTORY_ROUTES,
 ];
 
 before(async () => {
@@ -85,6 +100,13 @@ describe('direct API access matrix', () => {
     for (const [method, path] of TEAM_ONLY) {
       assert.equal((await call(method, path, requester.token)).status, 403, `${method} ${path}`);
     }
+  });
+
+  it('IT cannot adjust the inventory, reverse movements or write assets off', async () => {
+    for (const path of [`/inventory/products/${ID}/adjustments`, `/inventory/products/${ID}/discards`, `/inventory/products/${ID}/reversals`, `/inventory/assets/${ID}/retire`]) {
+      assert.equal((await call('POST', path, tech.token, { operationId: 'test-key-0001', reason: 'Tentativa sem permissão', delta: 1, quantity: 1, movementId: ID })).status, 403, path);
+    }
+    assert.equal((await call('POST', '/organization/departments', tech.token, { name: 'Novo' })).status, 403);
   });
 
   it('IT operates tickets but cannot read the management indicators', async () => {

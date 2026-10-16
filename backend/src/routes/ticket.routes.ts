@@ -12,6 +12,7 @@ import {
   updateTicket,
 } from '../controllers/ticket.controller';
 import { getForTicket, publish as publishIncident } from '../controllers/incident.controller';
+import { getMaterials } from '../controllers/ticket-materials.controller';
 import { requireAuth, requirePermission } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -23,6 +24,8 @@ router.post('/', createTicket);
 router.get('/', listTickets);
 router.get('/intake-questions', getIntakeQuestions);
 router.get('/:id', getTicket);
+// Materials delivered for the ticket: the full ledger for the team, a summary for its requester.
+router.get('/:id/materials', getMaterials);
 router.patch('/:id', updateTicket);
 
 // The requester's answer to a resolution: ownership is checked in the service (no status permission).

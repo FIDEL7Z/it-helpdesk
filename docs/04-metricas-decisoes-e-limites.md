@@ -4,7 +4,7 @@
 
 ## Dashboard básico
 
-O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. Na página Atendimento, o frontend seleciona operacional inicialmente; demonstração e legado ficam separados. No modo demonstração, se a origem operacional não tem nenhum chamado e a demonstração tem, a página passa uma única vez para Demonstração e diz isso na barra de origem; escolher outra origem desfaz a troca. A página Início do solicitante não tem seletor: fora do modo demonstração conta só dados operacionais, e no modo demonstração conta todas as origens, igual à lista **Meus pedidos**. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
+O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. Na página Atendimento, a origem é sempre operacional ao abrir; demonstração e legado ficam separados. No modo demonstração, se a origem operacional não tem nenhum chamado e a demonstração tem, a página oferece **Ver dados de demonstração**, sem trocar sozinha. A página Início do solicitante não tem seletor: fora do modo demonstração conta só dados operacionais, e no modo demonstração conta todas as origens, igual à lista **Meus pedidos**. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
 
 | Indicador / pergunta | Definição e campos | Filtros e limitações |
 |---|---|---|
@@ -31,9 +31,28 @@ A página é organizada pelo que pede ação, não pelo resumo. Os quatro cartõ
 | Sem movimentação há 3 dias | `attention=inactive&pending=true`, mesma definição da visão gerencial |
 | Sem responsável | `assignee=none&pending=true` |
 
-**Meus atendimentos** (só para quem pode ser responsável) lista até cinco pendências atribuídas à pessoa, e **Sem responsável — mais antigos primeiro** até cinco pendências sem responsável, ambas da mais antiga para a mais recente. Depois vêm os incidentes ativos e, por último, a situação da fila (total, abertos, em andamento, resolvidos) do resumo acima.
+**Meus atendimentos** (só para quem pode ser responsável) lista até cinco pendências atribuídas à pessoa, e **Sem responsável** até cinco pendências sem responsável, ambas em ordem de atendimento (`sort=priority`): alta, média e baixa prioridade, e o mais antigo primeiro dentro de cada uma. A ordem não altera a prioridade de nenhum chamado; a fila "mais antigos primeiro" continua disponível em **Ordenar por** e no alerta gerencial. Depois vêm os incidentes ativos e, por último, a situação da fila (total, abertos, em andamento, resolvidos) do resumo acima.
 
 Fonte: [dashboard.service.ts](../backend/src/services/dashboard.service.ts).
+
+## Origem dos dados
+
+Uma única política, em [data-origin.ts](../backend/src/services/data-origin.ts), vale para a lista, o quadro, o resumo, a visão gerencial e os incidentes. Assim filtros e indicadores usam a mesma definição.
+
+| Origem | O que é | Como um registro a recebe |
+|---|---|---|
+| Operacional | Trabalho real | Chamado aberto por uma conta real |
+| Demonstração | Dados fictícios de apresentação | Chamado aberto por uma das contas fictícias reservadas (as do seed: `ti@`, `solicitante@`, `gestor@`, `demo.ti2@`, `demo.solicitante2@helpdesk.local`) |
+| Legado | Registro antigo sem origem comprovada | Documento anterior à classificação; mantido como está |
+
+- A origem vem de **quem abriu** o chamado, nunca da ausência de dados operacionais. Em um ambiente que só tem as contas fictícias, todo chamado aberto pela interface é de demonstração. Com contas reais, é operacional.
+- **Fora do modo demonstração** (`DEMO_MODE=false`) **e sempre em produção** (`NODE_ENV=production`), a API entrega só dados operacionais: pedir Demonstração ou Legado retorna 403, e incidentes fictícios não aparecem como problemas conhecidos.
+- **No modo demonstração local**, cada origem é consultada quando pedida; sem filtro, a API devolve todas as origens, e a interface só faz isso quando a pessoa escolhe **Todas as origens**.
+- **Na interface da equipe**, Lista, Quadro, Atendimento e Visão gerencial começam em operacional. Outra origem é sempre escolha explícita, com faixa fixa de aviso; em Todas as origens, cada chamado de demonstração ou legado tem etiqueta na linha da lista e no cartão do quadro. Nenhuma tela troca de origem sozinha.
+- O solicitante vê os próprios pedidos, sem seletor de origem.
+- Registros legados não são migrados por nenhuma consulta: continuam legado, rastreáveis.
+
+Testes: `data-origin.test.ts` (criação, modo normal, produção, modo demonstração e incidentes) e o E2E (fila operacional por padrão, Todas as origens com etiqueta e aviso).
 
 ## Visão gerencial exclusiva
 
@@ -43,7 +62,7 @@ Somente gestor acessa `/manager` e `GET /api/dashboard/manager`. O painel separa
 
 `today`: desde 00h local de hoje; `week`: desde 00h de seis dias atrás, incluindo hoje; `month`: desde o primeiro dia do mês; `year`: desde 1º de janeiro. Todos usam intervalo `[início, instante da consulta)`, com `APP_TIMEZONE` (IANA, padrão `America/Fortaleza`). Ano agrupa tendências por mês; demais períodos, por dia. Não há intervalo personalizado.
 
-Origem padrão `operational`. `demo` mantém dados fictícios separados; `legacy` inclui documentos sem origem ou classificados explicitamente como legado. Selecionar legado não inventa eventos: somente ações v2 comprovadas podem integrar produtividade, mesmo nesse conjunto. Simulações não sustentam avaliação operacional.
+Origem padrão `operational`, sempre; a página não troca de origem sozinha e, sem dados operacionais, apenas oferece os de demonstração. `demo` mantém dados fictícios separados; `legacy` inclui documentos sem origem ou classificados explicitamente como legado. Selecionar legado não inventa eventos: somente ações v2 comprovadas podem integrar produtividade, mesmo nesse conjunto. Simulações não sustentam avaliação operacional.
 
 Solicitante filtra `requester`; categoria, prioridade e status filtram o **estado atual** do chamado em todas as consultas. Não reconstituem classificação histórica. Analista tem dois sentidos explícitos: responsável atual nas contagens de estado/criação/ranking e autor autenticado nos indicadores de eventos. Por isso, resolver chamado de outro pode produzir resoluções maiores que sua carga atual. Combinar filtros pode excluir um chamado hoje resolvido ou reclassificado de uma série; a tela informa essa semântica.
 
@@ -60,11 +79,11 @@ Solicitante filtra `requester`; categoria, prioridade e status filtram o **estad
 - **Participação:** chamados distintos com ao menos uma ação v2 válida do operador no período. Várias ações no mesmo chamado contam uma participação por autor; o mesmo chamado pode ter participação de vários operadores, portanto não somar como total de chamados únicos da equipe.
 - **Reaberturas por operador:** eventos v2 `reopened`, uma vez por chamado e novo ciclo, executados pelo próprio autor no período. Não atribuem falha/culpa ao resolvedor anterior ou responsável atual.
 - **Solicitantes:** até dez maiores volumes de criação no período, com empate por ID estável. Categorias são agrupadas nos mesmos documentos; a tela mostra as três mais frequentes. Pendências pertencem a esse conjunto criado no período. Usuários TI/gestor também podem abrir solicitações.
-- **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de área adaptado do shadcn/ui com Recharts e tabela exibem somente períodos com registros, em ordem temporal. O eixo é categórico: intervalos de calendário ausentes não representam pontos medidos. As duas áreas são independentes, sem soma/empilhamento de criações e resoluções. Um período único aparece como pontos. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
-- **Assuntos mais solicitados no período:** `demand.categories`, criações do período agrupadas pela categoria atual, da maior para a menor, exibidas com o nome do assunto que o solicitante escolhe. Diferente de "Backlog por categoria", que conta só as pendências atuais de qualquer data.
+- **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de área adaptado do shadcn/ui com Recharts e tabela exibem **todos os dias do período** (meses, no ano), no fuso `APP_TIMEZONE`, do início do período até o instante da consulta, inclusive em viradas de mês, de ano e de horário de verão. Dia sem criação ou resolução aparece com zero: é ausência de registros, não um valor inventado. As duas áreas são independentes, sem soma/empilhamento de criações e resoluções. "Hoje" tem um único ponto. Período sem nenhum evento não desenha o gráfico e diz isso.
+- **Categorias mais solicitadas no período:** `demand.categories`, criações do período agrupadas pela categoria atual, da maior para a menor, com os mesmos nomes técnicos dos filtros e dos demais gráficos da gestão (o solicitante vê sempre o nome do assunto). Diferente de "Backlog por categoria", que conta só as pendências atuais de qualquer data.
 - **Demanda horária/semanal:** criações no período agrupadas por hora local (0–23) e dia ISO da semana (segunda–domingo), sem extrair horário de mensagens ou `updatedAt`. As 24 horas são retornadas: zero indica nenhuma criação naquela hora no conjunto consultado, sem simulação de dados.
 
-A página segue a ordem das decisões: **Situação atual**, **Precisa de atenção**, **Equipe**, **Incidentes**, **Qualidade** e **Demanda e tendências**. Período e origem ficam numa barra compacta que informa de onde vêm os números; os filtros de equipe, solicitante e classificação ficam em "Mais filtros". Sem o parâmetro de origem, no modo demonstração e sem dados operacionais, a página passa para Demonstração uma vez e avisa. Se a origem escolhida não tem chamados com os filtros atuais, um aviso explica que os zeros indicam ausência de registros, não desempenho da equipe.
+A página segue a ordem das decisões: **Situação atual**, **Precisa de atenção**, **Equipe**, **Incidentes**, **Qualidade** e **Demanda e tendências**. Período e origem ficam numa barra compacta que informa de onde vêm os números; os filtros de equipe, solicitante e classificação ficam em "Mais filtros". A origem começa em operacional. Se a origem escolhida não tem chamados com os filtros atuais, um aviso explica que os zeros indicam ausência de registros, não desempenho da equipe; no modo demonstração, se houver dados de demonstração, o mesmo aviso oferece **Ver dados de demonstração**.
 
 Equipe inclui TI, gestores operadores e referências históricas/atribuídas pertinentes. Operadores sem chamados aparecem com zero; removidos usam ID/snapshot disponível, sem inventar identidade. A ordem por pendências auxilia triagem, sem premiar baixo volume de resolução ou penalizar alta carga. Links da equipe consultam a atribuição atual, sem restringir data de criação. Links dos solicitantes e do card de criações preservam `createdFrom` inclusivo e `createdTo` exclusivo, correspondentes ao período consultado.
 
@@ -75,7 +94,11 @@ Equipe inclui TI, gestores operadores e referências históricas/atribuídas per
 - Inatividade: desde o maior `occurredAt` de uma ação operacional v2 consistente (`updated`, `assigned`, `status_changed`, `resolved` ou `reopened`) realizada por TI/gestor. Criação e edição do solicitante não provam atendimento; eventos legados, inválidos, futuros ou com origem divergente não provam movimentação. `updatedAt` nunca substitui esse cálculo.
 - `inactivityDays` padrão 3 (1–90); link `attention=inactive`. Pendências sem ação comprovada ficam em `unknownActivity`, separadas do alerta. Não presumimos inatividade desde a abertura.
 - Carga por prioridade/responsável conta somente pendências atuais, incluindo responsável nulo. Alta/Média/Baixa mantêm cores e ordem. Maior carga atual indica apenas o maior número de pendências na equipe filtrada; empates recebem a mesma indicação, sem ranking de qualidade.
-- **Carga desigual:** aviso exibido quando há mais de um operador e a maior carga atual supera a média de pendências por operador. Nomeia quem tem a maior carga e a média, e abre a fila dessa pessoa (num empate, a fila de pendências). É um sinal operacional para redistribuir, sobre o estado atual; não é avaliação de desempenho e não usa número de resoluções.
+- **Carga desigual:** calculada pela API (`workloadBalance`, regra em [workload-balance.ts](../backend/src/services/workload-balance.ts)).
+  - **Quem compõe a escala:** analistas de TI ativos, inclusive quem está sem chamados (um analista disponível sem atribuições faz parte do desequilíbrio); gestores entram só enquanto têm pendências atribuídas, isto é, quando atuam na operação. Contas inativas ou removidas ficam fora da comparação, embora suas pendências continuem na tabela.
+  - **Carga:** pendências atuais (abertos e em andamento) atribuídas à pessoa, com os filtros da página. Os sem responsável têm alerta próprio.
+  - **Quando alerta:** com pelo menos dois integrantes, quando a diferença entre o mais e o menos carregado é de no mínimo 3 chamados **e** de no mínimo metade da média. Exemplos: 16 e 14 (diferença 2) não alertam; 20 e 10 alertam; 3 e 0 alertam; 30 e 25 não alertam. Diferenças pequenas ou proporcionais são variação normal.
+  - O aviso nomeia o mais e o menos carregado e a média da escala, e abre a fila de quem tem a maior carga (num empate, a fila de pendências). É um sinal operacional para redistribuir, sobre o estado atual; não avalia desempenho nem usa número de resoluções.
 
 Alertas respeitam origem, equipe, solicitante e classificação. Dias não representam SLA, atraso contratual ou duração útil de atendimento. A API da fila reaplica os mesmos predicados e a autorização. Consultas separadas podem divergir durante uma atualização concorrente.
 
@@ -101,7 +124,7 @@ O bloco **Incidentes compartilhados** da visão gerencial respeita a origem sele
 
 - **Ativos / Encerrados:** incidentes por status atual.
 - **Pessoas afetadas nos ativos:** soma, nos incidentes ativos, das participações do ciclo atual sem saída. Uma pessoa em dois incidentes conta duas vezes.
-- **Novas adesões (30 dias):** participações criadas nos últimos 30 dias, inclusive de quem saiu depois. Sair e voltar no mesmo ciclo não conta de novo.
+- **Entradas nos últimos 30 dias** (antes "Novas adesões"): participações criadas nos últimos 30 dias, em incidentes ativos ou encerrados, inclusive de quem saiu depois; é um histórico de entradas, por isso uma saída não reduz o número. Sair e voltar no mesmo ciclo não conta de novo. A tela explica isso ao lado do número.
 - **Mais afetados:** até cinco incidentes ativos, do maior para o menor número de afetados.
 
 Esses números mostram o alcance de um problema. Não medem chamados evitados: não há como saber se a pessoa abriria um chamado sem o incidente. Também não medem tempo de resolução. Fonte: [incident.service.ts](../backend/src/services/incident.service.ts).

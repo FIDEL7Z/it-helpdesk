@@ -88,6 +88,19 @@ Para repetir a demonstração, reabra o chamado (com motivo) e use **Republicar*
 
 Os quatro últimos usam as contas adicionais `demo.solicitante2@helpdesk.local` e `demo.ti2@helpdesk.local` e são pulados, com aviso, se elas não existirem. Um cenário cujo título já existe para o mesmo solicitante é mantido como está; rodar de novo não duplica nada. Como as datas são reais, os gráficos de tendência mostram apenas o dia em que o script rodou.
 
+## Limpeza do banco local
+
+Testes manuais pela interface deixaram cinco chamados com títulos sem sentido ("teste", "sdfdsfds"...) no banco local de desenvolvimento `it-helpdesk`. Todos são de demonstração (abertos pelas contas fictícias em 09 e 10/10/2026) e não estão ligados a incidentes; o banco local não tem dados operacionais. Com a política de origem, eles só aparecem quando alguém escolhe Demonstração ou Todas as origens.
+
+Eles **não foram apagados**. A remoção, se aprovada, usa um script com travas: só o banco local `it-helpdesk`, fora de produção e com `LOCAL_DEMO_SEED=1`; só os IDs informados, nunca um padrão; cada chamado precisa ser de demonstração, aberto por conta fictícia reservada e sem incidente, senão nada é removido. Sem `--apply` apenas lista; com `--apply`, grava antes um backup JSON em `backend/backups/` (ignorado pelo Git).
+
+```bash
+# Em backend: simulação (não altera nada)
+LOCAL_DEMO_SEED=1 npx tsx src/scripts/remove-dev-test-tickets.ts <id> [<id>...]
+```
+
+No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac971801a2d1fec7dee10c4`, `6ac9767c1a2d1fec7dee10c6`, `6ac983aec424536aff8ecc00` e `6ac98fbcc424536aff8ecc01`; em outro banco, confira os IDs antes. Cenários novos de demonstração continuam sendo criados pelos serviços reais (`npm run seed:scenarios`).
+
 ## O que os testes verificam
 
 | Validação | Evidência disponível |
@@ -104,12 +117,18 @@ Os quatro últimos usam as contas adicionais `demo.solicitante2@helpdesk.local` 
 | Confirmação de resolução | `resolution.test.ts` (10 testes): só o dono responde, validação, confirmação repetida/simultânea, avaliação única, contestação com motivo e novo ciclo, contestação simultânea, ciclo antigo, reabertura pela TI antes da resposta, indicadores de qualidade; E2E: contestação, marca na fila, nova resolução, confirmação e avaliação |
 | Kanban e fila | E2E: colunas e totais iguais aos da lista, filtros preservados entre Lista e Quadro, iniciar atendimento por teclado, resolução de outro responsável com justificativa, conflito 409 com cartão antigo, 390 px com filtros recolhidos; `resolution.test.ts`: filas "reabertos pelo solicitante" e "mais antigos primeiro" |
 | Cenários de demonstração | `demo-scenarios.test.ts`: cria só os cenários cujas contas existem, percorre o fluxo real (confirmação, avaliação, contestação, resolução por outro responsável, incidente com afetados), não altera chamados existentes e é idempotente |
+| Origem dos dados | `data-origin.test.ts`: origem pela conta que abriu (nunca pela falta de dados operacionais), só operacional com o modo demo desligado e em produção (403 para outras origens), cada origem só quando pedida no modo demo, legado nunca migrado, incidentes fictícios fora dos problemas conhecidos; `audit.test.ts` nos dois modos; E2E: fila operacional por padrão, Todas as origens com etiqueta e aviso |
+| Acesso direto à API | `access-matrix.test.ts`: todas as rotas autenticadas respondem 401 sem token ou com token forjado; solicitante recebe 403 em todas as rotas da equipe e da gestão; TI recebe 403 nos indicadores do gestor; chamado alheio é 404 para ler, editar e responder a resolução; identidade sempre do token |
+| Carga desigual e tendências | `workload-balance.test.ts` (8 testes): escala operacional, 16 e 14 sem alerta, analista disponível com zero, gestor só com pendências, inativos fora, equipes de tamanhos diferentes; `manager.test.ts`: calendário completo do período com zeros, viradas de mês e ano e horário de verão |
+| Troca de perfil | E2E: Solicitante → Sair → TI, TI → Sair → Gestor e Gestor → Sair → Solicitante caem na página inicial do próprio perfil; URL protegida volta após o login; recarregar mantém a página; destino que o perfil não abre cai na página inicial; sessão inválida de outra pessoa não decide o destino; nenhuma resposta 5xx em toda a execução |
 | Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
 | Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
 
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
+
+Em **16/10/2026**, após as correções da auditoria no navegador (política de origem, navegação ao trocar de perfil, carga desigual, calendário do gráfico de evolução, ordem de atendimento, histórico legível, vocabulário de categorias, nomes acessíveis, tabelas e cabeçalho no celular e matriz de acesso): **215 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`, e **159 verificações E2E** aprovadas; o E2E passou cinco vezes seguidas. Typecheck, lint sem warnings, builds dos dois projetos, `docs:check` (sete arquivos Markdown e 25 capturas) e `git diff --check` aprovados. Uma execução isolada do E2E falhou ao abrir a lista do gestor (sessão ausente na página carregada); não se repetiu em sete execuções seguintes e a causa não foi determinada.
 
 Em **15/10/2026**, após a revisão de UX/UI por perfil (portal do solicitante, mesa de atendimento da TI, ordem da visão gerencial, gestão de artigos, nova paleta, filtros recolhidos no celular, capturas em ambiente isolado e, em 16/10, tema claro por padrão com botão de tema escuro): **195 testes backend** e **147 verificações E2E** aprovados; typecheck, lint sem warnings, builds dos dois projetos e `git diff --check` aprovados. O verificador documental aprovou sete arquivos Markdown e 25 capturas PNG, com viewport e tema conferidos.
 
@@ -155,6 +174,9 @@ O convite pendente não equivale a acesso ativo. O avaliador precisa aceitá-lo.
 - **Failed to start server:** verificar conexão com o banco; a API só aceita requisições depois de conectar.
 - **EBADENGINE:** usar Node 22.22 ou superior, conforme engines dos projetos.
 - **E2E lento ou com timeout de captura no Windows com a tela bloqueada:** o Windows marca a janela do Edge headless como oculta, o que pausa a renderização. O E2E desativa essa detecção, traz a página de volta quando necessário e informa no final quantas vezes isso ocorreu; as verificações não mudam. Se ainda falhar, rode com a sessão desbloqueada.
+- **Erro 503 ou requisição "pendente" seguida de sucesso no navegador:** a API não produz 503 em nenhum ponto do código. Em desenvolvimento, o React (`StrictMode`) executa cada efeito duas vezes e a primeira requisição é cancelada de propósito; o DevTools mostra "canceled", e algumas ferramentas de automação exibem esse cancelamento como falha. No build de produção (`npm run build` e `npm run preview`) isso não ocorre. Em teste de 420 requisições paralelas com preflight, todas responderam 204/200; o E2E falha se qualquer resposta da API for 5xx.
+- **Requisição para `sessions.bugsnag.com`:** não vem do projeto. Não há Bugsnag no código, nas dependências, nos lockfiles nem no build; navegando nos três perfis com um perfil limpo do navegador, só `localhost:5173` e `localhost:3000` são contatados. A origem provável é uma extensão ou ferramenta do navegador usado.
+- **Problemas conhecidos de demonstração não aparecem:** com `DEMO_MODE=false` (ou em produção) a API esconde dados e incidentes fictícios; habilite as duas opções demo no ambiente local.
 - **429 no login:** aguardar a janela do limite; reiniciar a API apenas no ambiente de demonstração se necessário.
 - **CORS:** conferir origem exata, inclusive porta; preview usa 4173, desenvolvimento usa 5173 por padrão.
 - **Seed demo sem usuários:** executar `npm run seed` no mesmo ambiente antes de `npm run seed:demo`.

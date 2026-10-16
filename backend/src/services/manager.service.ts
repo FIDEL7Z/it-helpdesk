@@ -32,6 +32,28 @@ export function periodRange(period: ManagerFilters['period'], now = new Date(), 
   return { start: new Date(instant), end: now, timezone, bucket: period === 'year' ? 'month' as const : 'day' as const };
 }
 
+/**
+ * Every local day (or month, for the year) from the start of the range to the query instant, with the
+ * same keys as the $dateToString buckets. Days without records stay in the series with zero, so the
+ * chart shows real gaps instead of joining distant points; nothing else is added.
+ */
+export function calendarKeys(range: { start: Date; end: Date; timezone: string; bucket: 'day' | 'month' }): string[] {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: range.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const local = (date: Date) => Object.fromEntries(formatter.formatToParts(date).filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+  const first = local(range.start);
+  const last = local(new Date(Math.max(range.start.getTime(), range.end.getTime() - 1)));
+  const keys: string[] = [];
+  const cursor = new Date(Date.UTC(first.year, first.month - 1, range.bucket === 'month' ? 1 : first.day));
+  const stop = Date.UTC(last.year, last.month - 1, range.bucket === 'month' ? 1 : last.day);
+  while (cursor.getTime() <= stop) {
+    const iso = cursor.toISOString();
+    keys.push(range.bucket === 'month' ? iso.slice(0, 7) : iso.slice(0, 10));
+    if (range.bucket === 'month') cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    else cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return keys;
+}
+
 type Count = { _id: string | number | null; count: number };
 type Load = { _id: Types.ObjectId | null; assigned: number; inProgress: number; pending: number; highPriority: number; lowPriority: number; mediumPriority: number };
 type Requester = { _id: Types.ObjectId; created: number; pending: number; categories: { category: string; count: number }[] };
@@ -144,7 +166,8 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     ratings: ratings.length, averageRating: ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null,
   };
   const periods = new Map<string, { period: string; created: number; resolved: number }>();
-  for (const row of snapshot.trends) periods.set(String(row._id), { period: String(row._id), created: row.count, resolved: 0 });
+  for (const key of calendarKeys(range)) periods.set(key, { period: key, created: 0, resolved: 0 });
+  for (const row of snapshot.trends) { const key = String(row._id); periods.set(key, { period: key, created: row.count, resolved: periods.get(key)?.resolved ?? 0 }); }
   for (const row of events.trends) { const key = String(row._id); const entry = periods.get(key) ?? { period: key, created: 0, resolved: 0 }; entry.resolved = row.count; periods.set(key, entry); }
   return {
     filters, range, asOf: now, demoControlsEnabled: env.DEMO_MODE && process.env.NODE_ENV !== 'production',

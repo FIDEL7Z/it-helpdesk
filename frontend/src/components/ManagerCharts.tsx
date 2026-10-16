@@ -20,7 +20,8 @@ export function PieChart({ title, rows, label }: { title: string; rows: Count[];
 /** Independent series must not be stacked: creation and resolution are different populations. */
 export function TrendLineChart({ rows }: { rows: ManagerDashboard['trends'] }) {
   const id = useId().replace(/:/g, '')
-  if (!rows.length) return null
+  // The API sends every day of the period (zero when nothing happened); a period with no events has no chart.
+  if (!rows.some(row => row.created || row.resolved)) return null
   return <figure className="line-chart"><figcaption>Evolução de criações e resoluções</figcaption>
     <ChartContainer config={{ created: { label: 'Criados', color: 'var(--chart-blue)' }, resolved: { label: 'Resoluções', color: 'var(--chart-teal)' } }} aria-label="Evolução de criações e resoluções">
       <AreaChart accessibilityLayer data={rows} margin={{ left: 0, right: 12, top: 12 }}>

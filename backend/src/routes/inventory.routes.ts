@@ -30,6 +30,9 @@ router.post('/assets', requirePermission('inventory:operate'), inventory.registe
 router.get('/assets/:id', requirePermission('inventory:read'), inventory.getAsset);
 router.post('/assets/:id/:action', requirePermission('inventory:operate'), inventory.changeAsset);
 
+// Management
+router.get('/insights', requirePermission('inventory:insights'), inventory.insights);
+
 // Ledger
 router.get('/movements', requirePermission('inventory:read'), inventory.movements);
 router.get('/movements/:id', requirePermission('inventory:read'), inventory.movement);

@@ -40,6 +40,7 @@ const INVENTORY_ROUTES: [string, string][] = [
   ['POST', `/inventory/products/${ID}/reservations/${ID}/cancel`],
   ['GET', '/inventory/assets'], ['POST', '/inventory/assets'], ['GET', `/inventory/assets/${ID}`], ['POST', `/inventory/assets/${ID}/assign`], ['POST', `/inventory/assets/${ID}/retire`],
   ['GET', '/inventory/movements'], ['GET', `/inventory/movements/${ID}`],
+  ['GET', '/inventory/insights'],
 ];
 
 // Every authenticated route of the API (method, path), with ids where the route needs one.

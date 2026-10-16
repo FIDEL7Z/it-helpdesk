@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { getAuthenticatedUser } from '../middlewares/auth.middleware';
 import { ASSET_STATUSES, INVENTORY_LIMITS, MOVEMENT_TYPES, PRODUCT_TYPES, PRODUCT_UNITS, TRACKING_MODES, type StockMovementDocument } from '../models/inventory.model';
 import { can } from '../auth/permissions';
+import { DATA_ORIGINS } from '../services/data-origin';
+import { inventoryInsights } from '../services/inventory-insights.service';
+import { PERIODS } from '../services/manager.service';
 import * as assets from '../services/asset.service';
 import type { AssetAction } from '../services/asset.service';
 import * as catalog from '../services/catalog.service';
@@ -219,4 +222,12 @@ export async function changeAsset(req: Request, res: Response): Promise<void> {
   const actor = getAuthenticatedUser(req);
   if (action === 'asset_retire' && !can(actor.role, 'inventory:adjust')) throw new HttpError(403, 'You do not have permission to access this resource');
   await respondAsset(res, params.id, await assets.changeAsset(params.id, action, assetAction.parse(req.body), actor));
+}
+
+// ---------- Management insights ----------
+
+const insightsQuery = z.strictObject({ period: z.enum(PERIODS).default('month'), dataOrigin: z.enum(DATA_ORIGINS).optional() });
+
+export async function insights(req: Request, res: Response): Promise<void> {
+  res.json({ insights: await inventoryInsights(insightsQuery.parse(req.query)) });
 }

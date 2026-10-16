@@ -17,6 +17,7 @@
     "seed:articles": "tsx src/scripts/seed-articles.ts",
     "seed:scenarios": "tsx src/scripts/seed-scenarios.ts",
     "seed:manager": "tsx src/scripts/seed-manager.ts",
+    "seed:inventory": "tsx src/scripts/seed-inventory.ts",
     "docs:capture": "tsx scripts/capture-docs.mjs",
     "docs:check": "node scripts/check-docs.mjs"
   },

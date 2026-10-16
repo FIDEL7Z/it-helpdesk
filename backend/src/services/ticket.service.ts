@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { daysAgo, lastOperationalActivity } from './activity';
+import { DEMO_EMAILS } from './data-origin';
 import { Types, type QueryFilter } from 'mongoose';
 import { can } from '../auth/permissions';
 import { HttpError } from '../errors/http-error';
@@ -316,8 +317,7 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Demo identities are explicitly reserved seed accounts; other legacy data stays unknown.
-const DEMO_EMAILS = new Set(['ti@helpdesk.local', 'solicitante@helpdesk.local', 'gestor@helpdesk.local', 'demo.ti2@helpdesk.local', 'demo.solicitante2@helpdesk.local']);
+// Demo identities are explicitly reserved seed accounts (DEMO_EMAILS); other legacy data stays unknown.
 function ticketOrigin(ticket: TicketDocument, users: UserMap): Ticket['dataOrigin'] {
   if (ticket.dataOrigin !== 'legacy') return ticket.dataOrigin;
   return DEMO_EMAILS.has(userFrom(users, ticket.requester)?.email ?? '') || ticket.title.startsWith('[DEMO-EQUIPE]') ? 'demo' : 'legacy';

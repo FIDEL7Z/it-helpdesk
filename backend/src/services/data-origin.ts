@@ -16,6 +16,9 @@ export type DataOrigin = 'operational' | 'demo' | 'legacy';
 
 export const DATA_ORIGINS = ['operational', 'demo', 'legacy'] as const;
 
+/** The reserved fictitious accounts created by the seeds; whatever they create is demonstration data. */
+export const DEMO_EMAILS: ReadonlySet<string> = new Set(['ti@helpdesk.local', 'solicitante@helpdesk.local', 'gestor@helpdesk.local', 'demo.ti2@helpdesk.local', 'demo.solicitante2@helpdesk.local']);
+
 export function demoDataEnabled(): boolean {
   return env.DEMO_MODE && process.env.NODE_ENV !== 'production';
 }

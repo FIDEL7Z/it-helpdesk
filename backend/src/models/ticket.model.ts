@@ -3,7 +3,8 @@ import { Schema, model, type HydratedDocument, type Types } from 'mongoose';
 export const TICKET_CATEGORIES = ['hardware', 'software', 'rede', 'acesso', 'outros'] as const;
 export const TICKET_PRIORITIES = ['baixa', 'media', 'alta'] as const;
 export const TICKET_STATUSES = ['aberto', 'em_andamento', 'resolvido'] as const;
-export const TICKET_EVENT_TYPES = ['created', 'updated', 'status_changed', 'reopened', 'assigned', 'resolved'] as const;
+// resolution_confirmed / resolution_rated: the requester's answer to a resolution, in the same audited history.
+export const TICKET_EVENT_TYPES = ['created', 'updated', 'status_changed', 'reopened', 'assigned', 'resolved', 'resolution_confirmed', 'resolution_rated'] as const;
 
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
@@ -51,6 +52,18 @@ export interface TicketEvent {
   at?: Date;
 }
 
+/**
+ * What the requester answered in the guided form, kept apart from the description they wrote.
+ * category: the subject chosen when asking (the team may correct the ticket category later).
+ * question: the text as it was asked, so old answers stay readable if the catalog changes.
+ */
+export interface TicketIntake {
+  category: TicketCategory;
+  answers: { key: string; question: string; answer: string }[];
+  /** Help article the person read before asking, if they came from "Ainda preciso de ajuda". */
+  article: { id: Types.ObjectId; title: string } | null;
+}
+
 export interface Ticket {
   title: string;
   description: string;
@@ -65,6 +78,8 @@ export interface Ticket {
   resolvedAt: Date | null;
   resolvedBy: Types.ObjectId | null;
   dataOrigin: 'operational' | 'demo' | 'legacy';
+  /** Absent on tickets opened before the guided form or without answers. */
+  intake?: TicketIntake | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -110,6 +125,15 @@ ticketEventSchema.pre('validate', function () {
   if (this.type !== this.audit.eventType) this.invalidate('audit.eventType', 'Event types must agree');
 });
 
+const intakeSchema = new Schema<TicketIntake>({
+  category: { type: String, enum: TICKET_CATEGORIES, required: true },
+  answers: {
+    type: [new Schema({ key: { type: String, required: true }, question: { type: String, required: true }, answer: { type: String, required: true, maxlength: 200 } }, { _id: false })],
+    default: [],
+  },
+  article: { type: new Schema({ id: { type: Schema.Types.ObjectId, ref: 'KnowledgeArticle', required: true }, title: { type: String, required: true } }, { _id: false }), default: null },
+}, { _id: false });
+
 const ticketSchema = new Schema<Ticket>(
   {
     title: {
@@ -138,6 +162,7 @@ const ticketSchema = new Schema<Ticket>(
     resolvedAt: { type: Date, default: null },
     resolvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     dataOrigin: { type: String, enum: ['operational', 'demo', 'legacy'], default: 'legacy' },
+    intake: { type: intakeSchema, default: undefined },
   },
   { timestamps: true },
 );

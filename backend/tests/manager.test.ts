@@ -97,6 +97,15 @@ describe('Manager analytics and authorization', () => {
       assert.equal(row.categories[0].category, 'hardware');
     }
   });
+  it('counts requests by subject created in the period, not the current backlog', async () => {
+    await fixture('2026-06-14T12:00:00Z', { category: 'rede', status: 'resolvido' });
+    await fixture('2026-06-13T12:00:00Z', { category: 'rede' });
+    await fixture('2026-06-12T12:00:00Z', { category: 'acesso' });
+    await fixture('2026-05-20T12:00:00Z', { category: 'software' }); // previous month: outside the period
+    const result = await getManagerDashboard(base, now);
+    assert.deepEqual(result.demand.categories, [{ _id: 'rede', count: 2 }, { _id: 'acesso', count: 1 }]);
+    assert.equal(result.distributions.category.find(row => row._id === 'software')?.count, 1, 'the backlog view still sees it');
+  });
   it('uses real creation hour and ISO weekday in the configured timezone', async () => {
     await fixture('2026-06-15T03:10:00Z'); // Monday, 00h Fortaleza.
     await fixture('2026-06-15T02:59:00Z'); // Sunday, 23h Fortaleza.

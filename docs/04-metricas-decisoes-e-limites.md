@@ -4,7 +4,7 @@
 
 ## Dashboard básico
 
-O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. O frontend seleciona operacional inicialmente; demonstração e legado ficam separados. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
+O solicitante consulta só seus documentos; TI e gestor consultam todos. O resumo aceita filtro de origem (`operational`, `demo`, `legacy`), sem filtro por período. Na página Atendimento, o frontend seleciona operacional inicialmente; demonstração e legado ficam separados. No modo demonstração, se a origem operacional não tem nenhum chamado e a demonstração tem, a página passa uma única vez para Demonstração e diz isso na barra de origem; escolher outra origem desfaz a troca. A página Início do solicitante não tem seletor: fora do modo demonstração conta só dados operacionais, e no modo demonstração conta todas as origens, igual à lista **Meus pedidos**. Valores representam o estado atual dos chamados, não produtividade, qualidade ou desempenho histórico.
 
 | Indicador / pergunta | Definição e campos | Filtros e limitações |
 |---|---|---|
@@ -13,12 +13,25 @@ O solicitante consulta só seus documentos; TI e gestor consultam todos. O resum
 | Pendentes por prioridade: quais pendências exigem atenção? | Agrupamento por `priority` | Apenas `aberto`/`em_andamento`; classificação atual |
 | Pendentes por categoria: onde as pendências se concentram? | Agrupamento por `category` | Apenas `aberto`/`em_andamento`; não é distribuição de todos os chamados |
 | Sem responsável: quantos documentos não estão atribuídos? | `assignee = null` | Todos os status; só no workload TI; pode incluir resolvidos |
-| Em atendimento comigo: quanto está sob minha responsabilidade? | `assignee = usuário atual` e `status = em_andamento` | Só TI; não inclui abertos atribuídos nem identifica quem resolveu |
-| Recentes: quais foram criados por último? | Até 5 documentos por `createdAt desc`, depois `_id desc` | Escopo autorizado; recente significa criado, não atualizado |
+| Em atendimento comigo: quanto está sob minha responsabilidade? | `assignee = usuário atual` e `status = em_andamento` | Só TI; não inclui abertos atribuídos nem identifica quem resolveu. Continua na API; a página Atendimento usa as filas descritas abaixo |
+| Recentes: quais foram criados por último? | Até 5 documentos por `createdAt desc`, depois `_id desc` | Escopo autorizado; recente significa criado, não atualizado. Continua na API; a página Atendimento não exibe mais essa lista |
 
 As contagens usam `$facet` após o filtro de autorização. Lista e dashboard compartilham `buildTicketFilter`, então adotam as mesmas definições de escopo e filtro. Agregação, recentes e contagem da lista são consultas separadas: alterações simultâneas podem produzir diferenças entre momentos de leitura.
 
-Cartões de status abrem a lista com o filtro correspondente. “Sem responsável” abre `assignee=none`; “Em atendimento comigo”, `assignee=me&status=em_andamento`.
+Cartões de status abrem a lista com o filtro correspondente.
+
+### Página Atendimento (TI)
+
+A página é organizada pelo que pede ação, não pelo resumo. Os quatro cartões de **Precisa de ação** são o `pagination.total` da própria fila que abrem, com a origem escolhida, por isso o número e a lista sempre coincidem:
+
+| Cartão | Fila aberta |
+|---|---|
+| Alta prioridade sem responsável | `attention=high_unassigned&pending=true` |
+| Reabertos pelo solicitante | `attention=contested`: em andamento, com o ciclo atual iniciado por contestação do solicitante |
+| Sem movimentação há 3 dias | `attention=inactive&pending=true`, mesma definição da visão gerencial |
+| Sem responsável | `assignee=none&pending=true` |
+
+**Meus atendimentos** (só para quem pode ser responsável) lista até cinco pendências atribuídas à pessoa, e **Sem responsável — mais antigos primeiro** até cinco pendências sem responsável, ambas da mais antiga para a mais recente. Depois vêm os incidentes ativos e, por último, a situação da fila (total, abertos, em andamento, resolvidos) do resumo acima.
 
 Fonte: [dashboard.service.ts](../backend/src/services/dashboard.service.ts).
 
@@ -48,7 +61,10 @@ Solicitante filtra `requester`; categoria, prioridade e status filtram o **estad
 - **Reaberturas por operador:** eventos v2 `reopened`, uma vez por chamado e novo ciclo, executados pelo próprio autor no período. Não atribuem falha/culpa ao resolvedor anterior ou responsável atual.
 - **Solicitantes:** até dez maiores volumes de criação no período, com empate por ID estável. Categorias são agrupadas nos mesmos documentos; a tela mostra as três mais frequentes. Pendências pertencem a esse conjunto criado no período. Usuários TI/gestor também podem abrir solicitações.
 - **Tendências:** criações por `createdAt` e resoluções por data do evento; gráfico de área adaptado do shadcn/ui com Recharts e tabela exibem somente períodos com registros, em ordem temporal. O eixo é categórico: intervalos de calendário ausentes não representam pontos medidos. As duas áreas são independentes, sem soma/empilhamento de criações e resoluções. Um período único aparece como pontos. Zero na outra série representa ausência de registros nesse período, sem preenchimento fictício.
+- **Assuntos mais solicitados no período:** `demand.categories`, criações do período agrupadas pela categoria atual, da maior para a menor, exibidas com o nome do assunto que o solicitante escolhe. Diferente de "Backlog por categoria", que conta só as pendências atuais de qualquer data.
 - **Demanda horária/semanal:** criações no período agrupadas por hora local (0–23) e dia ISO da semana (segunda–domingo), sem extrair horário de mensagens ou `updatedAt`. As 24 horas são retornadas: zero indica nenhuma criação naquela hora no conjunto consultado, sem simulação de dados.
+
+A página segue a ordem das decisões: **Situação atual**, **Precisa de atenção**, **Equipe**, **Incidentes**, **Qualidade** e **Demanda e tendências**. Período e origem ficam numa barra compacta que informa de onde vêm os números; os filtros de equipe, solicitante e classificação ficam em "Mais filtros". Sem o parâmetro de origem, no modo demonstração e sem dados operacionais, a página passa para Demonstração uma vez e avisa. Se a origem escolhida não tem chamados com os filtros atuais, um aviso explica que os zeros indicam ausência de registros, não desempenho da equipe.
 
 Equipe inclui TI, gestores operadores e referências históricas/atribuídas pertinentes. Operadores sem chamados aparecem com zero; removidos usam ID/snapshot disponível, sem inventar identidade. A ordem por pendências auxilia triagem, sem premiar baixo volume de resolução ou penalizar alta carga. Links da equipe consultam a atribuição atual, sem restringir data de criação. Links dos solicitantes e do card de criações preservam `createdFrom` inclusivo e `createdTo` exclusivo, correspondentes ao período consultado.
 
@@ -59,6 +75,7 @@ Equipe inclui TI, gestores operadores e referências históricas/atribuídas per
 - Inatividade: desde o maior `occurredAt` de uma ação operacional v2 consistente (`updated`, `assigned`, `status_changed`, `resolved` ou `reopened`) realizada por TI/gestor. Criação e edição do solicitante não provam atendimento; eventos legados, inválidos, futuros ou com origem divergente não provam movimentação. `updatedAt` nunca substitui esse cálculo.
 - `inactivityDays` padrão 3 (1–90); link `attention=inactive`. Pendências sem ação comprovada ficam em `unknownActivity`, separadas do alerta. Não presumimos inatividade desde a abertura.
 - Carga por prioridade/responsável conta somente pendências atuais, incluindo responsável nulo. Alta/Média/Baixa mantêm cores e ordem. Maior carga atual indica apenas o maior número de pendências na equipe filtrada; empates recebem a mesma indicação, sem ranking de qualidade.
+- **Carga desigual:** aviso exibido quando há mais de um operador e a maior carga atual supera a média de pendências por operador. Nomeia quem tem a maior carga e a média, e abre a fila dessa pessoa (num empate, a fila de pendências). É um sinal operacional para redistribuir, sobre o estado atual; não é avaliação de desempenho e não usa número de resoluções.
 
 Alertas respeitam origem, equipe, solicitante e classificação. Dias não representam SLA, atraso contratual ou duração útil de atendimento. A API da fila reaplica os mesmos predicados e a autorização. Consultas separadas podem divergir durante uma atualização concorrente.
 
@@ -78,6 +95,29 @@ Fontes: [manager.service.ts](../backend/src/services/manager.service.ts), [contr
 
 SLA, tempo médio/corrido/útil de atendimento, duração completa por ciclo e evolução histórica de backlog exigem definições adicionais e cobertura confiável. `updatedAt` não é data de resolução. Não há ranking de qualidade, pontuação de desempenho ou dados artificiais para preencher gráficos.
 
+## Incidentes compartilhados
+
+O bloco **Incidentes compartilhados** da visão gerencial respeita a origem selecionada; a lista **Incidentes ativos** da página Atendimento mostra todas as origens, como a fila, e identifica os de demonstração.
+
+- **Ativos / Encerrados:** incidentes por status atual.
+- **Pessoas afetadas nos ativos:** soma, nos incidentes ativos, das participações do ciclo atual sem saída. Uma pessoa em dois incidentes conta duas vezes.
+- **Novas adesões (30 dias):** participações criadas nos últimos 30 dias, inclusive de quem saiu depois. Sair e voltar no mesmo ciclo não conta de novo.
+- **Mais afetados:** até cinco incidentes ativos, do maior para o menor número de afetados.
+
+Esses números mostram o alcance de um problema. Não medem chamados evitados: não há como saber se a pessoa abriria um chamado sem o incidente. Também não medem tempo de resolução. Fonte: [incident.service.ts](../backend/src/services/incident.service.ts).
+
+## Qualidade do atendimento
+
+Seção da visão gerencial, com os mesmos filtros e período da página.
+
+- **Base (denominador):** resoluções comprovadas no período, as mesmas de "Resoluções no período" (evento v2 de resolução, uma por chamado e ciclo). Com filtro de analista, são as resoluções feitas por essa pessoa, nunca pelo responsável atual.
+- **Confirmadas / Contestadas:** resoluções da base em que o dono do chamado respondeu "sim" ou "o problema continua". Só contam eventos escritos pelo próprio solicitante do chamado.
+- **Sem resposta:** base − confirmadas − contestadas. Não é insatisfação.
+- **Taxa de resposta:** (confirmadas + contestadas) ÷ base; "—" sem base.
+- **Nota média:** média das avaliações de 1 a 5 dessas resoluções, com o número de avaliações ao lado; "—" sem avaliações. A avaliação é opcional e vem só depois de confirmar.
+
+"Reaberturas no período" continua contando só reaberturas feitas pela equipe; contestações aparecem aqui. Os números não identificam analistas individualmente na tela e não devem servir como avaliação de desempenho isolada: a nota reflete a experiência de quem respondeu, não toda a equipe.
+
 ## Decisões presentes no código
 
 As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, sem afirmar quais alternativas o autor considerou pessoalmente.
@@ -94,6 +134,14 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **bcryptjs e node:test:** hash em JavaScript e testes sem biblioteca de testes adicional. Integração exige MongoDB real.
 - **Gráficos shadcn/ui adaptados com Recharts:** contêiner e tooltip usam tokens CSS existentes, sem introduzir Tailwind ou reconstruir o frontend. Gráfico gerencial é carregado sob demanda; barras ordenam categorias e pizza mantém a ordem semântica de prioridades.
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
+- **Paleta corporativa em tokens CSS:** fundo #F5F7FA, superfícies brancas, navegação azul-marinho #17324D, texto #172B3A, texto secundário #526477, bordas #DCE4EA e destaque suave #D9F1EE, definidos uma vez em `:root`, com variante escura equivalente. O primário pedido, #087F8C, mede 4,42:1 como texto sobre o fundo, abaixo do AA; foi escurecido para #067682 (4,99:1 sobre o fundo, 5,36:1 com texto branco). Outros pares medidos: texto 13,56:1, texto secundário 5,67:1, links da navegação 8,51:1; no escuro, texto 14,73:1 e primário 8,03:1. Bordas de campos ficam acima de 3:1 nos dois temas; o E2E confere o contraste dos botões em cada execução. Situação nunca depende só de cor: selos têm texto e o status do incidente tem ponto e rótulo.
+- **Incidentes em coleções próprias:** a revisão do chamado não é usada para participações, então cliques de muitas pessoas não geram 409 no atendimento. O custo é não ter transação entre chamado e incidente, compensado pela reconciliação na leitura.
+- **Respostas do solicitante no histórico do chamado:** confirmar, avaliar e contestar são eventos do próprio chamado, escritos pelo mesmo `saveChanges` das outras ações. Herdam revisão, ciclo, autor e data do servidor, sem uma coleção paralela com regras próprias. Contestar é uma rota específica, não uma permissão geral de status.
+- **Respostas do formulário guiado em campo próprio:** `intake` guarda as respostas com o texto da pergunta, sem misturar com a descrição. Permite exibir para a TI, evoluir para filtros no futuro e manter chamados antigos válidos sem migração.
+- **Catálogo de perguntas no backend:** uma única definição valida a API e alimenta o formulário (`GET /tickets/intake-questions`), evitando duas versões da mesma regra.
+- **Busca de artigos por campo normalizado:** expressão regular escapada sobre título, resumo e corpo sem acentos, todas as palavras obrigatórias. Atende o volume de demonstração sem serviço externo; não ordena por relevância.
+- **Quadro sem arrastar e soltar:** cada mudança é um botão que chama a rota existente. Assim a justificativa obrigatória, a validação de transição, a revisão (409) e o uso por teclado são os mesmos da página do chamado.
+- **Formato público explícito:** o backend monta o objeto público do incidente e o chamado entregue ao solicitante campo a campo, em vez de remover campos privados. Um campo novo no modelo não vaza para o solicitante por esquecimento.
 
 ## Segurança e limites operacionais
 
@@ -105,24 +153,24 @@ CORS restringe origens configuradas; autenticação/autorização continuam resp
 
 MongoDB local roda sem autenticação, publicado somente em loopback. Produção exige configuração própria de banco e segredos. `.env` e variantes são ignorados pelo Git; `.env.example` tem apenas configuração e credenciais demonstrativas.
 
-Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
+Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema; o mesmo vale para a pergunta de confirmação da resolução. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. O tema segue o sistema; não existe seletor manual.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
 
 ## Evidências visuais
 
-Capturas reais em 10/10/2026, com origem **Demonstração — dados fictícios**, mês atual e fuso America/Fortaleza. O conjunto local ampliado tinha cinco usuários e 64 chamados demonstrativos. Os indicadores têm populações diferentes: nem todo chamado foi criado no período e uma reabertura permite mais de uma resolução por chamado. Não use esses números como avaliação operacional.
+Capturas reais em 15/10/2026, com origem **Demonstração — dados fictícios**, mês atual e fuso America/Fortaleza, num [ambiente isolado](05-demonstracao.md#capturas-reproduzíveis) com cinco contas e os nove [cenários de demonstração](05-demonstracao.md#cenários-de-demonstração), criados no momento da captura (por isso as tendências têm um único dia). Os indicadores têm populações diferentes: nem todo chamado foi criado no período e uma reabertura permite mais de uma resolução por chamado. Não use esses números como avaliação operacional.
 
 <details>
 <summary>Visão geral, equipe e carga</summary>
 
-![Visão geral do gestor com origem, período, alertas e indicadores](assets/screenshots/gestor-visao-geral-desktop.png)
+![Visão gerencial com barra de período e origem, situação atual, alertas, carga desigual, equipe, incidentes, qualidade e tendências](assets/screenshots/gestor-visao-geral-desktop.png)
 
-Os alertas levam às filas correspondentes; as contagens distinguem período e situação atual.
+Os alertas levam às filas correspondentes; as contagens distinguem período e situação atual. Carlos tem três pendências e a média da equipe é uma: o aviso de carga desigual aparece, sem julgar desempenho. As cinco resoluções do período tiveram duas confirmações, uma contestação e duas sem resposta.
 
 ![Equipe de suporte com pendências atuais, resoluções por autor e carga por prioridade](assets/screenshots/gestor-equipe-carga-desktop.png)
 
-João e Carlos têm a mesma carga, mas diferentes resoluções comprovadas. A gestora aparece como operadora com zero; a fila sem responsável continua separada.
+Carlos tem quatro resoluções comprovadas, uma delas num chamado atribuído ao João; João tem uma. A gestora aparece como operadora com zero; a fila sem responsável continua separada.
 
 </details>
 

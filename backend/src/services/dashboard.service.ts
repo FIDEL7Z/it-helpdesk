@@ -10,7 +10,7 @@ import {
   type TicketStatus,
 } from '../models/ticket.model';
 import type { PublicUser } from '../models/user.model';
-import { buildTicketFilter, listTickets, type TicketSummary } from './ticket.service';
+import { buildTicketFilter, listTickets, type TicketSummaryView } from './ticket.service';
 
 export const RECENT_TICKETS_LIMIT = 5;
 
@@ -31,7 +31,7 @@ export interface DashboardSummary {
     inProgressAssignedToMe: number;
   };
   /** Same order as the ticket list (newest first). */
-  recent: TicketSummary[];
+  recent: TicketSummaryView[];
 }
 
 type CountRow<K> = { _id: K; count: number };

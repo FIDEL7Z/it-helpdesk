@@ -15,6 +15,8 @@ import {
   type TicketStatus,
 } from '../models/ticket.model';
 import { UserModel, toPublicUser, type PublicUser } from '../models/user.model';
+import { KnowledgeArticleModel } from '../models/article.model';
+import { buildIntakeAnswers, type IntakeAnswerInput } from './intake';
 
 // Labels used in history messages, which are shown to users in Portuguese.
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -62,12 +64,76 @@ export interface TicketSummary {
   resolvedBy: PublicUser | null;
   resolvedById: string | null;
   dataOrigin: Ticket['dataOrigin'];
+  /** The requester said the last resolution did not solve the problem (current cycle). */
+  contested: boolean;
+}
+
+/** Guided-form answers as the team and the requester read them. */
+export interface IntakeView {
+  category: TicketCategory;
+  answers: { key: string; question: string; answer: string }[];
+  article: { id: string; title: string } | null;
+}
+
+/** The requester's answer to the resolution of the current cycle (or the one they contested). */
+export interface ResolutionFeedbackView {
+  cycleId: number;
+  status: 'pending' | 'confirmed' | 'contested';
+  rating: number | null;
+  comment: string | null;
 }
 
 export interface TicketDetail extends TicketSummary {
   description: string;
+  intake: IntakeView | null;
+  resolutionFeedback: ResolutionFeedbackView | null;
   history: TicketEventView[];
 }
+
+/**
+ * What a requester receives about their own request: an explicit allowlist, not the team
+ * shape with fields removed. No audit metadata, justifications, cycles, data origin or other
+ * people's ids and contact data; people appear by name only.
+ */
+export interface PersonName {
+  name: string;
+}
+
+export interface RequesterEventView {
+  type: TicketEventType;
+  message: string;
+  at: Date | null;
+  author: PersonName | null;
+}
+
+export interface RequesterTicketSummary {
+  id: string;
+  title: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  /** The requester's own id, so the client can tell it is their request. */
+  requesterId: string | null;
+  assignee: PersonName | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  /** Needed to edit the text while the request is open. */
+  revision: number;
+  resolvedAt: Date | null;
+  /** Resolved and the requester has not said yet whether it worked. */
+  awaitingConfirmation: boolean;
+}
+
+export interface RequesterTicketDetail extends RequesterTicketSummary {
+  description: string;
+  /** Their own answers, as they gave them. */
+  intake: IntakeView | null;
+  resolutionFeedback: ResolutionFeedbackView | null;
+  history: RequesterEventView[];
+}
+
+export type TicketSummaryView = TicketSummary | RequesterTicketSummary;
+export type TicketDetailView = TicketDetail | RequesterTicketDetail;
 
 export interface Pagination {
   page: number;
@@ -83,6 +149,7 @@ export interface CreateTicketInput {
   description: string;
   category: TicketCategory;
   priority: TicketPriority;
+  intake?: { answers: IntakeAnswerInput[]; articleId?: string };
 }
 
 export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
@@ -90,7 +157,8 @@ export type AssigneeFilter = (typeof ASSIGNEE_FILTERS)[number];
 
 export interface TicketFilters {
   createdFrom?: string; createdTo?: string;
-  attention?: 'high_unassigned' | 'oldest' | 'inactive';
+  /** contested: the requester said the last resolution did not work and the ticket is back in progress. */
+  attention?: 'high_unassigned' | 'oldest' | 'inactive' | 'contested';
   inactivityDays?: number;
   ageDays?: number;
   pending?: boolean;
@@ -103,6 +171,8 @@ export interface TicketFilters {
   search?: string;
   /** "none": no assignee yet; "me": assigned to the authenticated user. */
   assignee?: AssigneeFilter;
+  /** Creation order; oldest first helps pick the next ticket from a queue. */
+  sort?: 'newest' | 'oldest';
 }
 
 export interface ListTicketsQuery extends TicketFilters {
@@ -144,10 +214,63 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
     resolvedBy: userFrom(users, ticket.resolvedBy),
     resolvedById: ticket.resolvedBy?.toString() ?? null,
     dataOrigin: ticket.dataOrigin ?? 'legacy',
+    contested: resolutionFeedbackOf(ticket)?.status === 'contested',
   };
 }
 
-export async function toTicketDetail(ticket: TicketDocument): Promise<TicketDetail> {
+function resolutionFeedbackOf(ticket: TicketDocument): ResolutionFeedbackView | null {
+  const cycle = ticket.activeCycleId ?? 1;
+  const inCycle = (type: TicketEventType) => ticket.history?.find((event) => event.type === type && event.audit?.cycleId === cycle);
+  if (ticket.status === 'resolvido') {
+    const rated = inCycle('resolution_rated')?.audit?.to;
+    return {
+      cycleId: cycle,
+      status: inCycle('resolution_confirmed') ? 'confirmed' : 'pending',
+      rating: typeof rated?.rating === 'number' ? rated.rating : null,
+      comment: typeof rated?.comment === 'string' ? rated.comment : null,
+    };
+  }
+  const contest = ticket.history?.find((event) => event.type === 'reopened' && event.audit?.cycleId === cycle
+    && typeof event.audit.to?.contestedCycle === 'number');
+  return contest ? { cycleId: contest.audit!.to.contestedCycle as number, status: 'contested', rating: null, comment: null } : null;
+}
+
+function toIntakeView(ticket: TicketDocument): IntakeView | null {
+  if (!ticket.intake) return null;
+  return {
+    category: ticket.intake.category,
+    answers: ticket.intake.answers.map(({ key, question, answer }) => ({ key, question, answer })),
+    article: ticket.intake.article ? { id: ticket.intake.article.id.toString(), title: ticket.intake.article.title } : null,
+  };
+}
+
+function nameOf(user: PublicUser | null): PersonName | null {
+  return user ? { name: user.name } : null;
+}
+
+function toRequesterSummary(ticket: TicketDocument, users: UserMap): RequesterTicketSummary {
+  return {
+    id: ticket.id,
+    title: ticket.title,
+    category: ticket.category,
+    priority: ticket.priority,
+    status: ticket.status,
+    requesterId: ticket.requester?.toString() ?? null,
+    assignee: nameOf(userFrom(users, ticket.assignee)),
+    createdAt: ticket.createdAt ?? null,
+    updatedAt: ticket.updatedAt ?? null,
+    revision: ticket.revision ?? 0,
+    resolvedAt: ticket.resolvedAt ?? null,
+    awaitingConfirmation: resolutionFeedbackOf(ticket)?.status === 'pending',
+  };
+}
+
+/** Team shape for operators with tickets:view-audit; the requester allowlist for everyone else. */
+function toSummaryFor(ticket: TicketDocument, users: UserMap, actor: PublicUser): TicketSummaryView {
+  return can(actor.role, 'tickets:view-audit') ? toSummary(ticket, users) : toRequesterSummary(ticket, users);
+}
+
+export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser): Promise<TicketDetailView> {
   const users = await loadUsers([
     ticket.requester,
     ticket.assignee,
@@ -156,9 +279,27 @@ export async function toTicketDetail(ticket: TicketDocument): Promise<TicketDeta
     ...ticket.history.map((event) => event.author),
   ]);
 
+  if (!can(actor.role, 'tickets:view-audit')) {
+    return {
+      ...toRequesterSummary(ticket, users),
+      description: ticket.description,
+      intake: toIntakeView(ticket),
+      resolutionFeedback: resolutionFeedbackOf(ticket),
+      history: ticket.history.map((event) => ({
+        type: event.type,
+        message: event.message,
+        at: event.at ?? null,
+        // The name recorded at the time of the action, when available.
+        author: event.audit?.actorSnapshot ? { name: event.audit.actorSnapshot.name } : nameOf(userFrom(users, event.author)),
+      })),
+    };
+  }
+
   return {
     ...toSummary(ticket, users),
     description: ticket.description,
+    intake: toIntakeView(ticket),
+    resolutionFeedback: resolutionFeedbackOf(ticket),
     history: ticket.history.map((event) => ({
       authorId: event.author?.toString() ?? null,
       audit: event.audit,
@@ -255,6 +396,15 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
       { $ne: [lastOperationalActivity(now), null] },
       { $lte: [lastOperationalActivity(now), daysAgo(filters.inactivityDays ?? 3, now)] },
     ] } });
+    // Same definition as the "Reaberto pelo solicitante" marker: a contest reopened the current cycle.
+    if (filters.attention === 'contested') filter.$and.push({ status: 'em_andamento', $expr: { $gt: [{ $size: { $filter: {
+      input: { $ifNull: ['$history', []] }, as: 'event',
+      cond: { $and: [
+        { $eq: ['$$event.type', 'reopened'] },
+        { $eq: ['$$event.audit.cycleId', { $ifNull: ['$activeCycleId', 1] }] },
+        { $isNumber: '$$event.audit.to.contestedCycle' },
+      ] },
+    } } }, 0] } });
   }
   // User input is escaped so it is matched literally, not as a regular expression.
   if (filters.search) filter.title = { $regex: escapeRegex(filters.search), $options: 'i' };
@@ -264,49 +414,66 @@ export function buildTicketFilter(filters: TicketFilters, actor: PublicUser): Qu
 
 // ---------- Use cases ----------
 
-export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetail> {
+/** Validated guided answers and the article read before asking. Nothing is stored when both are empty. */
+async function buildIntake(input: CreateTicketInput): Promise<Ticket['intake']> {
+  if (!input.intake) return undefined;
+  const answers = buildIntakeAnswers(input.category, input.intake.answers);
+  let article = null;
+  if (input.intake.articleId) {
+    const found = await KnowledgeArticleModel.findOne({ _id: input.intake.articleId, status: 'published' }).select('title');
+    if (!found) throw new HttpError(400, 'The referenced help article is not available');
+    article = { id: found._id, title: found.title };
+  }
+  return answers.length === 0 && !article ? undefined : { category: input.category, answers, article };
+}
+
+export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetailView> {
   // The requester always comes from the authenticated user, never from the request body.
   const at = new Date();
+  const { intake: _guided, ...fields } = input;
+  const intake = await buildIntake(input);
   const origin = DEMO_EMAILS.has(actor.email) ? 'demo' : 'operational';
   const ticket = await TicketModel.create({
-    ...input,
+    ...fields,
+    ...(intake && { intake }),
     dataOrigin: origin,
     createdAt: at,
     updatedAt: at,
     requester: actor.id,
     history: [{ type: 'created', author: actor.id, message: 'Chamado aberto', at,
-      audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...input }, null, origin, randomUUID(), 0) }],
+      audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...fields }, null, origin, randomUUID(), 0) }],
   });
 
-  return toTicketDetail(ticket);
+  return toTicketDetail(ticket, actor);
 }
 
 export async function listTickets(
   query: ListTicketsQuery,
   actor: PublicUser,
-): Promise<{ tickets: TicketSummary[]; pagination: Pagination }> {
+): Promise<{ tickets: TicketSummaryView[]; pagination: Pagination }> {
   const filter = buildTicketFilter(query, actor);
   const { page, limit } = query;
 
   const [total, tickets] = await Promise.all([
     TicketModel.countDocuments(filter),
     TicketModel.find(filter)
-      .sort(query.attention === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
+      .sort(query.attention === 'oldest' || query.sort === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .select('-description -history'),
+      // History stays (without messages) to tell whether the requester contested the resolution.
+      .select('-description -history.message'),
   ]);
 
   const users = await loadUsers(tickets.flatMap((ticket) => [ticket.requester, ticket.assignee, ticket.resolvedBy]));
 
   return {
-    tickets: tickets.map((ticket) => toSummary(ticket, users)),
+    tickets: tickets.map((ticket) => toSummaryFor(ticket, users, actor)),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
 
-export async function getTicket(id: string, actor: PublicUser): Promise<TicketDetail> {
-  return toTicketDetail(await findAccessibleTicket(id, actor));
+export async function getTicket(id: string, actor: PublicUser): Promise<TicketDetailView> {
+  return toTicketDetail(await findAccessibleTicket(id, actor), actor);
 }
 
 // ---------- Updates ----------
@@ -340,7 +507,7 @@ async function saveChanges(
   events: NewEvent[],
   actor: PublicUser,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const at = new Date();
   if ((ticket.updatedAt && at < ticket.updatedAt) || ticket.history.some(event => event.at && event.at > at)) {
     throw new HttpError(409, 'Ticket contains future dates. Review data integrity before updating');
@@ -370,7 +537,7 @@ async function saveChanges(
     throw new HttpError(409, 'Ticket was changed by someone else. Reload and try again');
   }
 
-  return toTicketDetail(updated);
+  return toTicketDetail(updated, actor);
 }
 
 /**
@@ -384,7 +551,7 @@ export async function updateTicket(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
 
@@ -432,7 +599,7 @@ export async function updateTicket(
   }
 
   // Same values as before: nothing to save, no history event.
-  if (messages.length === 0) return toTicketDetail(ticket);
+  if (messages.length === 0) return toTicketDetail(ticket, actor);
 
   return saveChanges(ticket, changes, [{ type: 'updated', message: messages.join('; '),
     from: Object.fromEntries(Object.keys(changes).map(key => [key, ticket.get(key)])), to: { ...changes } }], actor, reason);
@@ -445,7 +612,7 @@ export async function changeStatus(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
   const from = ticket.status;
@@ -494,7 +661,7 @@ export async function assignTicket(
   actor: PublicUser,
   expectedRevision: number,
   reason?: string,
-): Promise<TicketDetail> {
+): Promise<TicketDetailView> {
   const ticket = await findAccessibleTicket(id, actor);
   assertRevision(ticket, expectedRevision);
 
@@ -507,7 +674,7 @@ export async function assignTicket(
     throw new HttpError(400, 'Assignee must be an IT team member');
   }
 
-  if (ticket.assignee?.equals(assignee._id)) return toTicketDetail(ticket);
+  if (ticket.assignee?.equals(assignee._id)) return toTicketDetail(ticket, actor);
 
   if (ticket.status === 'em_andamento' && ticket.assignee && !reason) throw new HttpError(400, 'A reason is required to reassign during work');
   const previous = ticket.assignee ? await UserModel.findById(ticket.assignee) : null;
@@ -517,4 +684,57 @@ export async function assignTicket(
 
   return saveChanges(ticket, { assignee: assignee._id }, [{ type: 'assigned', message,
     from: { assigneeId: ticket.assignee?.toString() ?? null }, to: { assigneeId: assignee.id } }], actor, reason);
+}
+
+// ---------- Requester answer to a resolution ----------
+
+export const RATING_COMMENT_MAX = 500;
+
+/**
+ * Only the requester answers, for the resolution of the current cycle. The cycle sent by the
+ * client names the resolution being answered: an older cycle, or a ticket the team already
+ * reopened, gets 409 instead of acting on a different resolution.
+ */
+async function findAnswerableResolution(id: string, actor: PublicUser, cycleId: number): Promise<TicketDocument> {
+  const ticket = await findAccessibleTicket(id, actor);
+  if (!isRequester(ticket, actor)) throw new HttpError(403, 'Only the requester can answer about the resolution');
+  if (ticket.status !== 'resolvido' || (ticket.activeCycleId ?? 1) !== cycleId) {
+    throw new HttpError(409, 'This resolution is no longer current. Reload the ticket');
+  }
+  return ticket;
+}
+
+function cycleEvent(ticket: TicketDocument, type: TicketEventType, cycleId: number) {
+  return ticket.history.find((event) => event.type === type && event.audit?.cycleId === cycleId);
+}
+
+/** "Sim, foi resolvido." Repeating it (double click, retry) changes nothing. */
+export async function confirmResolution(id: string, cycleId: number, actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (cycleEvent(ticket, 'resolution_confirmed', cycleId)) return toTicketDetail(ticket, actor);
+  return saveChanges(ticket, {}, [{ type: 'resolution_confirmed', message: 'Solicitante confirmou que o problema foi resolvido',
+    from: { status: 'resolvido' }, to: { confirmedCycle: cycleId } }], actor);
+}
+
+/**
+ * "Não, o problema continua." Reopens into a new cycle with the requester as the audited author
+ * and the reason; the previous resolution and its author stay in the history. It does not give the
+ * requester any general status permission. A second request for the same cycle gets 409.
+ */
+export async function contestResolution(id: string, cycleId: number, reason: string, actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (cycleEvent(ticket, 'resolution_confirmed', cycleId)) throw new HttpError(409, 'This resolution was already confirmed');
+  return saveChanges(ticket, { status: 'em_andamento', resolvedAt: null, resolvedBy: null, activeCycleId: cycleId + 1 },
+    [{ type: 'reopened', message: 'Solicitante informou que o problema continua',
+      from: { status: 'resolvido', cycleId }, to: { status: 'em_andamento', contestedCycle: cycleId } }], actor, reason);
+}
+
+/** Optional 1-5 rating after confirming. One per resolution; not having one means nothing. */
+export async function rateResolution(id: string, cycleId: number, rating: number, comment: string | undefined,
+  actor: PublicUser): Promise<TicketDetailView> {
+  const ticket = await findAnswerableResolution(id, actor, cycleId);
+  if (!cycleEvent(ticket, 'resolution_confirmed', cycleId)) throw new HttpError(409, 'Confirm the resolution before rating it');
+  if (cycleEvent(ticket, 'resolution_rated', cycleId)) throw new HttpError(409, 'This resolution was already rated');
+  return saveChanges(ticket, {}, [{ type: 'resolution_rated', message: 'Solicitante avaliou o atendimento',
+    from: {}, to: { rating, ratedCycle: cycleId, ...(comment ? { comment } : {}) } }], actor);
 }

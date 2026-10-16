@@ -24,7 +24,7 @@ flowchart LR
 - `backend/src/server.ts` conecta ao MongoDB antes de aceitar requisições.
 - `routes/` associa endpoints a autenticação e permissões. Login e health são públicos.
 - `controllers/` valida entradas com Zod e monta as respostas HTTP.
-- `services/` aplica as regras e consulta os models. `buildTicketFilter` compartilha escopo entre lista e dashboard.
+- `services/` aplica as regras e consulta os models. `buildTicketFilter` compartilha escopo entre lista e dashboard. `demo-scenarios.ts` e `demo-articles.ts` guardam os dados fictícios usados pelos seeds e pela captura isolada da documentação.
 - `middlewares/` trata JWT/usuário atual, permissões, rate limit e erros.
 - `frontend/src/auth/` restaura a sessão usando `/auth/me`; `components/ProtectedRoute.tsx` protege a navegação. A proteção definitiva continua no backend.
 
@@ -42,6 +42,12 @@ erDiagram
   USERS o|--o{ TICKETS : assignee
   TICKETS ||--o{ HISTORY_EMBEDDED : "history[] embutido"
   USERS o|--o{ HISTORY_EMBEDDED : author
+  TICKETS ||--o| SHARED_INCIDENTS : "chamado principal"
+  SHARED_INCIDENTS ||--o{ INCIDENT_PARTICIPATIONS : incident
+  USERS ||--o{ INCIDENT_PARTICIPATIONS : user
+  USERS ||--o{ KNOWLEDGE_ARTICLES : "autor / último editor"
+  KNOWLEDGE_ARTICLES ||--o{ ARTICLE_FEEDBACKS : article
+  USERS ||--o{ ARTICLE_FEEDBACKS : user
   USERS {
     ObjectId _id
     String name
@@ -77,6 +83,42 @@ erDiagram
     ObjectId author "ausente em legado incompleto"
     Object audit "v2 opcional no legado"
   }
+  SHARED_INCIDENTS {
+    ObjectId _id
+    ObjectId ticket "único"
+    String title
+    String publicMessage
+    String status "active ou closed"
+    Number cycle
+    Number revision
+    String closeReason "nullable"
+    Array history "eventos embutidos"
+    String dataOrigin
+  }
+  INCIDENT_PARTICIPATIONS {
+    ObjectId _id
+    ObjectId incident
+    Number cycle
+    ObjectId user
+    Date joinedAt
+    Date leftAt "nullable"
+  }
+  KNOWLEDGE_ARTICLES {
+    ObjectId _id
+    String title
+    String summary
+    String category
+    String body
+    String status "draft, published ou archived"
+    String searchText "sem acentos"
+    Number revision
+  }
+  ARTICLE_FEEDBACKS {
+    ObjectId _id
+    ObjectId article
+    ObjectId user
+    Boolean helpful
+  }
 ```
 
 `HISTORY_EMBEDDED` representa subdocumentos dentro de `tickets`, **não uma terceira coleção**. O diagrama mostra cardinalidades da aplicação, não foreign keys impostas pelo MongoDB. Um usuário pode abrir vários chamados, ser responsável por vários ou ser autor de vários eventos. Cada chamado referencia um solicitante e, opcionalmente, um responsável.
@@ -91,11 +133,21 @@ Os schemas incluem ainda campos internos gerenciados pelo Mongoose, como `__v`; 
 
 Título, descrição, categoria e solicitante são obrigatórios. Prioridade tem default `media`; status, `aberto`; responsável, null; histórico, array vazio. O service de criação acrescenta o primeiro evento. Os enums e limites estão em [ticket.model.ts](../backend/src/models/ticket.model.ts).
 
-Eventos mantêm `type`, `message`, `author` e `at` para compatibilidade. Novos eventos possuem `audit` estruturado, com `eventId`, `operationId`, autor/snapshot, responsável/snapshot, `from`, `to`, revisão, ordem, ciclo e origem. Tipos: `created`, `updated`, `status_changed`, `assigned`, `reopened`, `resolved`.
+Eventos mantêm `type`, `message`, `author` e `at` para compatibilidade. Novos eventos possuem `audit` estruturado, com `eventId`, `operationId`, autor/snapshot, responsável/snapshot, `from`, `to`, revisão, ordem, ciclo e origem. Tipos: `created`, `updated`, `status_changed`, `assigned`, `reopened`, `resolved`, `resolution_confirmed` e `resolution_rated`. Os dois últimos, e a reabertura por contestação (`reopened` com `to.contestedCycle`), são escritos pelo solicitante dono do chamado; ficam no mesmo histórico para herdar a escrita atômica, a revisão e o ciclo.
 
-O chamado possui `revision`, `activeCycleId`, `resolvedAt`, `resolvedBy` e `dataOrigin`. Documentos legados sem revisão são tratados como revisão zero na primeira escrita, sem regravar eventos antigos. Autores e datas legados ausentes retornam null. Não existem `impact`, `startedAt`, SLA ou coleção de equipe.
+O chamado possui `revision`, `activeCycleId`, `resolvedAt`, `resolvedBy`, `dataOrigin` e, quando aberto pelo formulário guiado, `intake`: assunto escolhido, respostas (`key`, texto da pergunta, resposta) e o artigo consultado (`id`, título). É um subdocumento opcional: chamados antigos simplesmente não o têm, e a descrição continua sendo só o texto da pessoa. Documentos legados sem revisão são tratados como revisão zero na primeira escrita, sem regravar eventos antigos. Autores e datas legados ausentes retornam null. Não existem `impact`, `startedAt`, SLA ou coleção de equipe.
 
 Detalhes do contrato e limites: [integridade e auditoria](06-integridade-e-auditoria.md).
+
+### Incidentes e participações
+
+Os incidentes compartilhados ficam fora do documento do chamado. Assim, a revisão do chamado continua protegendo só o atendimento: publicar, editar ou participar de um incidente não gera conflito 409 para quem está atendendo.
+
+`sharedincidents` guarda o texto público, o status, quem publicou/encerrou, o motivo do encerramento (`ticket_resolved` ou `manual`), a revisão própria e o histórico de eventos (`published`, `updated`, `closed`, `republished`). `dataOrigin` é herdado do chamado principal. `cycle` começa em 1 e aumenta a cada republicação.
+
+`incidentparticipations` tem um documento por incidente, ciclo e usuário. Sair preenche `leftAt`; voltar limpa o campo no mesmo documento. Afetados = participações do ciclo atual com `leftAt` nulo, contadas por agregação. Um contador salvo no incidente poderia divergir após cliques simultâneos.
+
+O MongoDB do Compose roda sem réplica, portanto sem transações entre coleções. Resolver o chamado e encerrar o incidente são duas escritas. Se a segunda falhar, a leitura seguinte de qualquer tela de incidentes encontra a resolução (pelo status atual ou por um evento de resolução posterior à publicação, caso o chamado já tenha sido reaberto) e conclui o encerramento. Se esse reparo também falhar, a resposta mostra o incidente como encerrado sem gravar nada, e a leitura seguinte tenta de novo. Publicação, republicação e participação reconciliam o resultado logo após gravar, o que cobre uma resolução que chegue entre a verificação e a escrita. Regras completas em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
 
 ### Índices explícitos
 
@@ -104,9 +156,19 @@ Detalhes do contrato e limites: [integridade e auditoria](06-integridade-e-audit
 - `tickets`: `{ status: 1, createdAt: -1 }` para consulta por status.
 - `tickets`: `{ dataOrigin: 1, createdAt: -1 }` para consultas gerenciais por origem e criação.
 - `tickets`: `{ dataOrigin: 1, assignee: 1, status: 1 }` para carga atual por origem/operador.
+- `sharedincidents`: `{ ticket: 1 }`, único (um incidente por chamado, inclusive com duas publicações simultâneas); `{ status: 1, publishedAt: -1 }` para a lista de ativos.
+- `incidentparticipations`: `{ incident: 1, cycle: 1, user: 1 }`, único (participação idempotente); `{ user: 1, leftAt: 1 }` para "problemas que você acompanhou".
+- `knowledgearticles`: `{ status: 1, category: 1, updatedAt: -1 }` para a lista pública por assunto; `{ demoKey: 1 }`, único e parcial, para o seed idempotente.
+- `articlefeedbacks`: `{ article: 1, user: 1 }`, único (um voto por pessoa e artigo).
 - Cada coleção possui também o índice padrão de `_id`.
 
 Por padrão, a lista ordena por `createdAt` e `_id`, ambos descendentes. O alerta `attention=oldest` usa ordem crescente para trazer as pendências mais antigas primeiro. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.
+
+### Base de conhecimento
+
+`knowledgearticles` guarda os artigos com autor (`createdBy`), último editor (`updatedBy`), `publishedAt` da primeira publicação e revisão própria. `searchText` é título, resumo e corpo em minúsculas e sem acentos, recalculado a cada edição. A busca exige cada palavra digitada nesse campo com uma expressão regular escapada; o filtro inicial usa o índice de status e categoria. É simples e suficiente para dezenas de artigos; não ordena por relevância e, com milhares de artigos, um índice de texto ou mecanismo de busca seria mais adequado.
+
+`articlefeedbacks` tem um documento por pessoa e artigo (`upsert`), o que torna o voto substituível e impede inflar a contagem. Os totais são calculados por agregação. Artigos de demonstração têm `dataOrigin: demo` e `demoKey`.
 
 ## Agregações gerenciais
 
@@ -116,10 +178,10 @@ Uma agregação com `$facet` calcula estado atual, carga, criações, solicitant
 
 O ranking agrupa por solicitante/categoria antes de limitar aos dez maiores volumes, evitando transportar todos os documentos à interface. Históricos continuam embutidos: sua análise exige percorrer os eventos dos documentos filtrados por origem/classificação. Os índices ajudam o filtro inicial; não tornam toda agregação coberta por índice. Em volumes elevados, medir `explain` e avaliar projeções ou coleção de eventos separada.
 
-As consultas compartilham um instante de corte para períodos, mas não uma transação de leitura entre estado, eventos e usuários. Não se promete snapshot único durante alterações concorrentes. Definições e filtros: [métricas](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva). Os quatro diagramas permanecem válidos: não houve nova coleção ou mudança no fluxo de escrita.
+As consultas compartilham um instante de corte para períodos, mas não uma transação de leitura entre estado, eventos e usuários. Não se promete snapshot único durante alterações concorrentes. Definições e filtros: [métricas](04-metricas-decisoes-e-limites.md#visão-gerencial-exclusiva).
 
 ## Persistência e ambiente
 
 O Compose publica MongoDB 7 em `127.0.0.1:27017` e usa o volume nomeado `mongo-data`. `docker compose down` preserva esse volume. O ambiente local não utiliza autenticação no banco; produção precisa de configuração própria, credenciais e gestão de segredos.
 
-Os testes usam bancos separados `it-helpdesk-test*`, apagados ao final. O E2E cria um banco exclusivo por execução e processos locais em portas livres. Os seeds de demonstração usam datas e histórico de exemplo: esses dados não representam uma operação real.
+Os testes usam bancos separados `it-helpdesk-test*`, apagados ao final. O E2E e a captura da documentação criam cada um um banco exclusivo por execução (`it-helpdesk-test-e2e-*`, `it-helpdesk-docs-*`) e processos locais em portas livres. Os seeds de demonstração usam datas e histórico de exemplo, exceto `seed:scenarios`, que percorre o fluxo real no momento da execução: nenhum desses dados representa uma operação real.

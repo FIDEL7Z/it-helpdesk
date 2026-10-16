@@ -6,9 +6,14 @@ import type { UserRole } from '../services/auth'
  */
 const PERMISSIONS = {
   'tickets:view-all': ['ti', 'gestor'],
+  'tickets:view-audit': ['ti', 'gestor'],
   'tickets:operate': ['ti', 'gestor'],
   'tickets:be-assigned': ['ti', 'gestor'],
   'users:list-it-staff': ['ti', 'gestor'],
+  'incidents:manage': ['ti', 'gestor'],
+  'incidents:follow': ['solicitante', 'ti', 'gestor'],
+  'kb:read': ['solicitante', 'ti', 'gestor'],
+  'kb:manage': ['ti', 'gestor'],
 } as const satisfies Record<string, readonly UserRole[]>
 
 export type Permission = keyof typeof PERMISSIONS

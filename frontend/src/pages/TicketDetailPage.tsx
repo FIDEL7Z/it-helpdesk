@@ -4,10 +4,13 @@ import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
+import { IncidentPanel } from '../components/IncidentPanel'
+import { ResolutionAnswer } from '../components/ResolutionAnswer'
 import { ApiError } from '../services/api'
 import type { User } from '../services/auth'
 import {
   CATEGORY_LABELS,
+  SUBJECT_LABELS,
   PRIORITY_LABELS,
   TICKET_CATEGORIES,
   TICKET_LIMITS,
@@ -55,7 +58,10 @@ export function TicketDetailPage() {
   useDocumentTitle(state.ticket?.title ?? 'Chamado')
 
   const [busy, setBusy] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // Coming from "Solicitar suporte": confirm the request and keep the person on its page.
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    location.state?.created === true ? { type: 'success', text: 'Pedido enviado. Você pode acompanhar o atendimento por esta página.' } : null,
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -91,12 +97,14 @@ export function TicketDetailPage() {
   }
 
   const { ticket } = state
+  // Requesters read "pedidos"; the team keeps "chamados".
+  const queueName = can(user?.role, 'tickets:view-all') ? 'chamados' : 'meus pedidos'
 
   if (!ticket) {
     return (
       <section className="page">
         <Link to={returnTo} className="back-link">
-          ← Voltar para chamados
+          ← Voltar para {queueName}
         </Link>
         {loading ? (
           <div className="card card--empty" role="status">
@@ -107,7 +115,7 @@ export function TicketDetailPage() {
           <div className="card card--empty">
             <p>{state.error}</p>
             <Link to={returnTo} className="button button--secondary">
-              Ver meus chamados
+              Ver {queueName}
             </Link>
           </div>
         )}
@@ -116,7 +124,9 @@ export function TicketDetailPage() {
   }
 
   const canOperate = can(user?.role, 'tickets:operate')
-  const isSupervisor = can(user?.role, 'tickets:view-all') && !canOperate
+  // The team sees audit details (cycles, origin, assignee at each event); requesters see a plain timeline.
+  const teamView = can(user?.role, 'tickets:view-audit')
+  const isSupervisor = teamView && !canOperate
   const isOwner = ticket.requesterId === user?.id
   const canEditText = isOwner && ticket.status === 'aberto'
   const isResolved = ticket.status === 'resolvido'
@@ -125,14 +135,14 @@ export function TicketDetailPage() {
     <section className="page">
       <header className="page__header">
         <Link to={returnTo} className="back-link">
-          ← Voltar para chamados
+          ← Voltar para {queueName}
         </Link>
         <div className="ticket-heading">
           <h1 className="page__title">{ticket.title}</h1>
-          <StatusBadge status={ticket.status} />
+          <StatusBadge status={ticket.status} audience={teamView ? 'team' : 'requester'} />
         </div>
         <p className="page__subtitle">
-          Aberto por {ticket.requester?.name ?? 'usuário removido'} em {formatDateTime(ticket.createdAt)}
+          {teamView ? `Aberto por ${ticket.requester?.name ?? 'usuário removido'}` : 'Seu pedido foi aberto'} em {formatDateTime(ticket.createdAt)}
         </p>
       </header>
 
@@ -144,6 +154,8 @@ export function TicketDetailPage() {
           {feedback.text}
         </div>
       )}
+
+      {isOwner && <ResolutionAnswer ticket={ticket} busy={busy} run={runAction} />}
 
       <div className={`ticket-layout${loading ? ' is-loading' : ''}`} aria-busy={loading}>
         <div className="ticket-layout__main">
@@ -161,6 +173,34 @@ export function TicketDetailPage() {
             )}
           </div>
 
+          {ticket.intake && (
+            <section className="card intake-card" aria-labelledby="intake-title">
+              <h2 id="intake-title" className="card__title">Informações do pedido</h2>
+              <p className="intake-card__subject">
+                Assunto escolhido: <strong>{SUBJECT_LABELS[ticket.intake.category]}</strong>
+                {teamView && ticket.intake.category !== ticket.category && <> · categoria corrigida para {CATEGORY_LABELS[ticket.category]}</>}
+              </p>
+              {ticket.intake.answers.length > 0 && (
+                <dl className="intake-card__answers">
+                  {ticket.intake.answers.map((item) => (
+                    <div key={item.key} className="intake-card__row">
+                      <dt>{item.question}</dt>
+                      <dd>{item.answer}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {ticket.intake.article && (
+                <p className="intake-card__article">
+                  Orientação consultada antes do pedido: <Link to={`/help/${ticket.intake.article.id}`}>{ticket.intake.article.title}</Link>
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* Next to the description: what the team tells users about this same problem. */}
+          {can(user?.role, 'incidents:manage') && <IncidentPanel ticket={ticket} />}
+
           <div className="card">
             <h2 className="card__title">Histórico</h2>
             <ol className="timeline">
@@ -171,12 +211,12 @@ export function TicketDetailPage() {
                     <p className="timeline__message">
                       {event.type === 'resolved' ? `Resolvido por ${event.audit?.actorSnapshot.name ?? event.author?.name ?? 'autor indisponível'}` : event.message}
                     </p>
-                    {event.audit && <>
+                    {teamView && event.audit && <>
                       <p>Responsável no momento: {event.audit.assigneeSnapshot?.name ?? event.assigneeAtEvent?.name ?? (event.audit.assigneeAtEvent ? `Usuário indisponível (${event.audit.assigneeAtEvent})` : 'Não atribuído')} · Ciclo {event.audit.cycleId}</p>
                       {event.audit.reason && <p>Justificativa: {event.audit.reason}</p>}
                       {typeof event.audit.from.status === 'string' && typeof event.audit.to.status === 'string' && <p>{event.audit.from.status} → {event.audit.to.status}</p>}
                     </>}
-                    {!event.audit && <p className="field__hint">Registro legado: contexto estruturado indisponível.</p>}
+                    {teamView && !event.audit && <p className="field__hint">Registro legado: contexto estruturado indisponível.</p>}
                     <p className="timeline__meta">
                       {event.audit?.actorSnapshot.name ?? event.author?.name ?? (event.authorId ? `Usuário indisponível (${event.authorId})` : 'Autor não registrado')} ·{' '}
                       {event.at ? <time dateTime={event.at}>{formatDateTime(event.at)}</time> : 'Data não registrada'}
@@ -195,7 +235,7 @@ export function TicketDetailPage() {
               <div className="details__row">
                 <dt>Status</dt>
                 <dd>
-                  <StatusBadge status={ticket.status} />
+                  <StatusBadge status={ticket.status} audience={teamView ? 'team' : 'requester'} />
                 </dd>
               </div>
               <div className="details__row">
@@ -208,28 +248,45 @@ export function TicketDetailPage() {
                 <dt>Categoria</dt>
                 <dd>{CATEGORY_LABELS[ticket.category]}</dd>
               </div>
+              {teamView ? (
+                <>
+                  <div className="details__row">
+                    <dt>Solicitante</dt>
+                    <dd>{ticket.requester?.name ?? 'Usuário removido'}</dd>
+                  </div>
+                  <div className="details__row">
+                    <dt>Responsável atribuído</dt>
+                    <dd className={ticket.assignee ? undefined : 'text-muted'}>
+                      {ticket.assignee?.name ?? (ticket.assigneeId ? `Usuário indisponível (${ticket.assigneeId})` : 'Não atribuído')}
+                    </dd>
+                  </div>
+                  <div className="details__row">
+                    <dt>Resolvido por</dt>
+                    <dd>{ticket.status === 'resolvido' ? ticket.resolvedBy?.name ?? (ticket.resolvedById ? `Usuário indisponível (${ticket.resolvedById})` : 'Sem autoria estruturada; consulte o histórico') : 'Sem resolução no ciclo atual'}</dd>
+                  </div>
+                  <div className="details__row">
+                    <dt>Resolvido em</dt>
+                    <dd>{ticket.resolvedAt ? formatDateTime(ticket.resolvedAt) : 'Não registrado no ciclo atual'}</dd>
+                  </div>
+                  {ticket.resolutionFeedback && (
+                    <div className="details__row">
+                      <dt>Resposta do solicitante</dt>
+                      <dd>{ticket.resolutionFeedback.status === 'pending' ? 'Aguardando confirmação'
+                        : ticket.resolutionFeedback.status === 'contested' ? `Problema continua (resolução do ciclo ${ticket.resolutionFeedback.cycleId} contestada)`
+                          : `Resolução confirmada${ticket.resolutionFeedback.rating ? ` · nota ${ticket.resolutionFeedback.rating} de 5` : ''}${ticket.resolutionFeedback.comment ? ` · “${ticket.resolutionFeedback.comment}”` : ''}`}</dd>
+                    </div>
+                  )}
+                  <div className="details__row"><dt>Ciclo atual</dt><dd>{ticket.activeCycleId}</dd></div>
+                  <div className="details__row"><dt>Origem</dt><dd>{ticket.dataOrigin === 'demo' ? 'Demonstração — não usar como produtividade real' : ticket.dataOrigin === 'legacy' ? 'Legado — origem não comprovada' : 'Operacional'}</dd></div>
+                </>
+              ) : (
+                <div className="details__row">
+                  <dt>Atendido por</dt>
+                  <dd className={ticket.assignee ? undefined : 'text-muted'}>{ticket.assignee?.name ?? 'Aguardando a equipe de TI'}</dd>
+                </div>
+              )}
               <div className="details__row">
-                <dt>Solicitante</dt>
-                <dd>{ticket.requester?.name ?? 'Usuário removido'}</dd>
-              </div>
-              <div className="details__row">
-                <dt>Responsável atribuído</dt>
-                <dd className={ticket.assignee ? undefined : 'text-muted'}>
-                  {ticket.assignee?.name ?? (ticket.assigneeId ? `Usuário indisponível (${ticket.assigneeId})` : 'Não atribuído')}
-                </dd>
-              </div>
-              <div className="details__row">
-                <dt>Resolvido por</dt>
-                <dd>{ticket.status === 'resolvido' ? ticket.resolvedBy?.name ?? (ticket.resolvedById ? `Usuário indisponível (${ticket.resolvedById})` : 'Sem autoria estruturada; consulte o histórico') : 'Sem resolução no ciclo atual'}</dd>
-              </div>
-              <div className="details__row">
-                <dt>Resolvido em</dt>
-                <dd>{ticket.resolvedAt ? formatDateTime(ticket.resolvedAt) : 'Não registrado no ciclo atual'}</dd>
-              </div>
-              <div className="details__row"><dt>Ciclo atual</dt><dd>{ticket.activeCycleId}</dd></div>
-              <div className="details__row"><dt>Origem</dt><dd>{ticket.dataOrigin === 'demo' ? 'Demonstração — não usar como produtividade real' : ticket.dataOrigin === 'legacy' ? 'Legado — origem não comprovada' : 'Operacional'}</dd></div>
-              <div className="details__row">
-                <dt>Atualizado</dt>
+                <dt>{teamView ? 'Atualizado' : 'Última atualização'}</dt>
                 <dd>{formatDateTime(ticket.updatedAt)}</dd>
               </div>
             </dl>
@@ -277,11 +334,12 @@ export function TicketDetailPage() {
             </p>
           )}
 
-          {!canOperate && isOwner && !canEditText && (
+          {/* While the "was it solved?" question is open, it is the only instruction shown. */}
+          {!canOperate && isOwner && !canEditText && ticket.resolutionFeedback?.status !== 'pending' && (
             <p className="side-note">
               {isResolved
-                ? 'Este chamado foi resolvido. Se o problema voltar, fale com a equipe de TI para reabri-lo.'
-                : 'O chamado está em atendimento pela equipe de TI e não pode mais ser editado.'}
+                ? 'Se o problema voltar mais tarde, abra um novo pedido e mencione este.'
+                : 'O pedido está em atendimento pela equipe de TI e não pode mais ser editado.'}
             </p>
           )}
         </aside>

@@ -13,8 +13,11 @@
     "test:typecheck": "tsc -p tsconfig.tests.json",
     "test:e2e": "tsx tests/e2e.mjs",
     "seed:demo": "tsx src/scripts/seed-demo.ts",
+    "seed:incidents": "tsx src/scripts/seed-incidents.ts",
+    "seed:articles": "tsx src/scripts/seed-articles.ts",
+    "seed:scenarios": "tsx src/scripts/seed-scenarios.ts",
     "seed:manager": "tsx src/scripts/seed-manager.ts",
-    "docs:capture": "node scripts/capture-docs.mjs",
+    "docs:capture": "tsx scripts/capture-docs.mjs",
     "docs:check": "node scripts/check-docs.mjs"
   },
   "engines": {

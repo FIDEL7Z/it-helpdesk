@@ -14,6 +14,7 @@ export type DashboardSummary = {
   recent: TicketSummary[]
 }
 
-export function getDashboardSummary(signal?: AbortSignal, dataOrigin: 'operational' | 'demo' | 'legacy' = 'operational'): Promise<{ summary: DashboardSummary }> {
-  return apiRequest(`/dashboard/summary?dataOrigin=${dataOrigin}`, { signal })
+/** Without dataOrigin the API counts every origin (same rule as the ticket list in demo mode). */
+export function getDashboardSummary(signal?: AbortSignal, dataOrigin?: 'operational' | 'demo' | 'legacy'): Promise<{ summary: DashboardSummary }> {
+  return apiRequest(`/dashboard/summary${dataOrigin ? `?dataOrigin=${dataOrigin}` : ''}`, { signal })
 }

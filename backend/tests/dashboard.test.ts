@@ -155,7 +155,7 @@ describe('GET /api/dashboard/summary', () => {
     assert.deepEqual(summary.pendingByPriority, { baixa: 0, media: 1, alta: 2 });
     assert.equal(summary.pendingByCategory.rede, 0, 'Wi-Fi belongs to another requester');
     assert.equal('workload' in summary, false);
-    assert.ok(summary.recent.every((t: any) => t.requester.id === requester.id));
+    assert.ok(summary.recent.every((t: any) => t.requesterId === requester.id));
   });
 
   it('returns zeros (not missing keys) when there is nothing to count', async () => {

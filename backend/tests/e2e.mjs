@@ -20,6 +20,8 @@ let checks = 0;
 let apiServer, vite, browserProcess, profile, socket, evaluate, command;
 let databaseConnected = false;
 let browserFailure;
+let keepVisible;
+let visibilityRecoveries = 0;
 
 function check(condition, label) {
   assert.ok(condition, label);
@@ -150,6 +152,9 @@ async function run() {
   profile = await mkdtemp(join(tmpdir(), 'it-helpdesk-e2e-'));
   browserProcess = spawn(executable, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    // Keep rendering when Windows reports the window as occluded (locked or sleeping screen);
+    // otherwise frames, requestAnimationFrame and captures can stop mid-run.
+    '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
     `--user-data-dir=${profile}`, 'about:blank',
   ], { windowsHide: true, stdio: 'ignore' });
@@ -167,6 +172,19 @@ async function run() {
   await command('Page.enable');
   await command('Runtime.enable');
   await command('Network.enable');
+  // Windows can mark the headless page hidden (seen with a locked or sleeping screen); a hidden page
+  // stops rendering and throttles timers, which looks like a slow or frozen app. That is the
+  // environment, not the product: keep the page in front and report every recovery.
+  keepVisible = setInterval(() => {
+    command('Runtime.evaluate', { expression: 'document.visibilityState', returnByValue: true })
+      .then((result) => {
+        if (result.result.value === 'visible') return;
+        visibilityRecoveries += 1;
+        console.log(`RECOVER page was ${result.result.value}; bringing it to the front`);
+        return command('Page.bringToFront');
+      })
+      .catch(() => {});
+  }, 500);
   evaluate = async (expression) => {
     const result = await command('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
@@ -201,12 +219,41 @@ async function run() {
     return { status: response.status, body: await response.json() };
   })()`);
   };
+  // Evidence images only (assertions come before them). On Windows, headless Edge sometimes marks the
+  // page as hidden after a viewport change (seen with a locked or sleeping screen) and stops rendering, so
+  // a capture never answers. The page is brought back to the front first; every recovery is printed and
+  // three failed attempts still fail the run.
+  const ensureVisible = async (file) => {
+    const state = await evaluate('document.visibilityState');
+    if (state === 'visible') return;
+    console.log(`RECOVER page was ${state} before ${basename(file)}; bringing it to the front`);
+    diagnostics.push({ event: 'page-hidden-before-screenshot', file: basename(file) });
+    await command('Page.bringToFront');
+    await command('Emulation.setFocusEmulationEnabled', { enabled: true });
+  };
+  const snap = async (file) => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await ensureVisible(file);
+        await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))');
+        const { data } = await command('Page.captureScreenshot', { format: 'png' });
+        await writeFile(file, Buffer.from(data, 'base64'));
+        return;
+      } catch (error) {
+        if (attempt >= 3 || !String(error.message).includes('timed out')) throw error;
+        console.log(`RETRY screenshot ${basename(file)} after: ${error.message}`);
+        diagnostics.push({ event: 'screenshot-retry', file: basename(file), attempt });
+        await command('Page.bringToFront').catch(() => {});
+      }
+    }
+  };
   const dashboard = async (expected, role) => {
     await waitDom(`${role} dashboard data`, 'document.querySelectorAll(".stat-card__value").length >= 4');
     const values = await evaluate('Array.from(document.querySelectorAll(".stat-card__value")).slice(0,4).map(el => Number(el.textContent))');
     check(JSON.stringify(values) === JSON.stringify(expected), `${role}: dashboard counts match persisted fixtures`);
-    const workload = await evaluate('document.querySelectorAll(".stats--workload .stat-card").length');
-    check(workload === (role === 'ti' ? 2 : 0), `${role}: personal workload visibility`);
+    // The personal queue ("Meus atendimentos") is for people who can be assigned: TI and managers.
+    const personalQueue = await evaluate('document.querySelectorAll(".my-queue").length');
+    check(personalQueue === (role === 'solicitante' ? 0 : 1), `${role}: personal queue visibility`);
   };
 
   await go('/dashboard');
@@ -342,10 +389,10 @@ async function run() {
         check(filtered.filters.period === period && filtered.period.created === 4, `Manager ${period} filter reaches backend`);
       }
       await select('manager-dataOrigin', 'demo');
-      await waitDom('demonstration indicators', 'document.querySelector(".manager-source--demo") && document.querySelector(".manager-page .stat-card__value")?.textContent === "1"');
+      await waitDom('demonstration indicators', 'document.querySelector(".manager-source--demo") && Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent === "1"');
       check((await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard.current.total === 1, 'Demonstration indicators remain separate and visibly identified');
       await select('manager-dataOrigin', 'operational');
-      await waitDom('operational indicators restored', 'document.querySelector(".manager-page .stat-card__value")?.textContent === "4"');
+      await waitDom('operational indicators restored', 'Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent === "4"');
       await evaluate('document.querySelector(".manager-filters__advanced").open = true');
       await select('manager-analystId', secondAnalyst.id);
       await waitDom('analyst filter', `location.search.includes('analystId=${secondAnalyst.id}') && document.querySelectorAll('.manager-page .stat-card__value').length === 6`);
@@ -368,7 +415,7 @@ async function run() {
       const oldDate = new Date(Date.now() - 10 * 86400000);
       await TicketModel.create({ dataOrigin: 'demo', title: '[DEMO] Aging and inactivity fixture', description: 'Explicitly fictitious isolated E2E fixture for alerts.', category: 'hardware', priority: 'alta', status: 'em_andamento', requester: other._id, assignee: secondAnalyst._id, createdAt: oldDate, updatedAt: new Date(), revision: 1, activeCycleId: 1, history: [{ type: 'assigned', author: users.gestor._id, at: oldDate, message: 'Fictitious assignment', audit: { schemaVersion: 2, eventId: randomUUID(), operationId: randomUUID(), actorId: users.gestor._id, actorSnapshot: { name: users.gestor.name, role: 'gestor' }, eventType: 'assigned', occurredAt: oldDate, revision: 1, eventIndex: 0, cycleId: 1, from: { assignee: null }, to: { assignee: secondAnalyst._id }, assigneeAtEvent: secondAnalyst._id, dataOrigin: 'demo' } }] });
       await select('manager-dataOrigin', 'demo');
-      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && document.querySelector(".manager-page .stat-card__value")?.textContent !== "4"');
+      await waitDom('rich demonstration dashboard', 'document.querySelector(".manager-source--demo") && document.querySelectorAll(".alert-card").length === 3 && Array.from(document.querySelectorAll(".manager-page .stat-card")).find(el => el.querySelector(".stat-card__label")?.textContent === "Criados no período")?.querySelector(".stat-card__value")?.textContent !== "4"');
       const demoReport = (await browserApi('GET', '/dashboard/manager?dataOrigin=demo')).body.dashboard;
       check(demoReport.current.total === 26 && demoReport.period.resolutions === 14 && demoReport.period.reopenings === 4, 'Demo aggregates reflect actual structured cycles and remain separate from four operational tickets');
       for (const attention of ['high_unassigned', 'oldest', 'inactive']) {
@@ -409,7 +456,7 @@ async function run() {
       await waitDom('demo queue for mobile', '!!document.querySelector(".ticket-table tbody tr")');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       check(await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth && Array.from(document.querySelectorAll('select')).every(el => !!document.querySelector('label[for="' + el.id + '"]'))`), 'Real queue fits mobile and associates every selector with its label');
-      await writeFile(resolve(root, 'backend/e2e-results/tickets-mobile.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(resolve(root, 'backend/e2e-results/tickets-mobile.png'));
       await command('Emulation.clearDeviceMetricsOverride');
       await evaluate(`window.__e2eRealFetch = window.fetch; window.fetch = (input, options) => String(input).includes('/api/dashboard/manager?') ? new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ message: 'Controlled E2E manager failure' }), { status: 503, headers: { 'Content-Type': 'application/json' } })), 700)) : window.__e2eRealFetch(input, options)`);
       await evaluate(`document.querySelector('.app-nav a[href="/manager"]').click()`);
@@ -433,25 +480,25 @@ async function run() {
         return Array.from(document.querySelectorAll('.button--primary, .button--secondary')).every(el => { const s = getComputedStyle(el); const a = luminance(s.color), b = luminance(s.backgroundColor); return (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 4.5; });
       })()`);
       check(await contrast(), 'Light theme action buttons meet 4.5:1 text contrast');
-      await writeFile(join(output, 'manager-desktop-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-desktop-light.png'));
       await evaluate('document.getElementById("manager-team").scrollIntoView({ block: "start" })');
-      await writeFile(join(output, 'manager-team-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-team-desktop.png'));
       await evaluate('document.getElementById("manager-trends").scrollIntoView({ block: "start" })');
       await waitDom('populated area chart for visual review', 'document.querySelectorAll(".line-chart .recharts-area-curve").length === 2');
       check(await evaluate('Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100 && el.getBoundingClientRect().height > 100) && Array.from(document.querySelectorAll(".line-chart .recharts-area-curve")).every(el => el.getAttribute("d")?.length > 20)'), 'Rich area chart renders actual paths after navigation and resizing');
       await evaluate('(async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
       await writeFile(join(output, 'manager-chart-diagnostics.json'), JSON.stringify(await evaluate('Array.from(document.querySelectorAll(".chart-container")).map(el => ({ label: el.getAttribute("aria-label"), width: el.clientWidth, height: el.clientHeight, svgs: el.querySelectorAll("svg").length, paths: el.querySelectorAll("path").length }))'), null, 2));
-      await writeFile(join(output, 'manager-lines-desktop.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-lines-desktop.png'));
       await evaluate('window.scrollTo(0,0)');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Manager dashboard fits desktop without page overflow');
       await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
-      await writeFile(join(output, 'manager-mobile-light.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-mobile-light.png'));
       await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
-      await writeFile(join(output, 'manager-mobile-dark.png'), Buffer.from((await command('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+      await snap(join(output, 'manager-mobile-dark.png'));
       check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark"'), 'Manager dark theme uses the shared system palette');
       await command('Emulation.clearDeviceMetricsOverride');
       await command('Emulation.setEmulatedMedia', { features: [] });
@@ -460,8 +507,222 @@ async function run() {
     await waitDom(`${role} logout`, 'location.pathname === "/login" && !!document.getElementById("email")');
     check(await evaluate('localStorage.getItem("it-helpdesk:token") === null'), `${role}: logout clears session`);
   }
+
+  // Shared incidents, after the per-role counts above: its own ticket, so no earlier expectation changes.
+  const { SharedIncidentModel, IncidentParticipationModel } = await import('../src/models/incident.model.ts');
+  await Promise.all([SharedIncidentModel.syncIndexes(), IncidentParticipationModel.syncIndexes()]);
+  const outage = await ticket('Rede do terceiro andar fora do ar', other, 'em_andamento', users.ti);
+  const boardOpen = await ticket('Quadro: monitor piscando', other);
+  const boardOther = await ticket('Quadro: atribuído ao Carlos', other, 'em_andamento', secondAnalyst);
+  const login = async (role) => {
+    await go(`/login?incidents=${role}`);
+    await waitDom(`${role} incident login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
+    await fill('email', users[role].email);
+    await fill('password', password);
+    await submit();
+    await waitDom(`${role} incident login`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
+  };
+  const logout = async (role) => {
+    await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent === "Sair").click()');
+    await waitDom(`${role} incident logout`, 'location.pathname === "/login"');
+  };
+  // Waits for the button: panels and forms render after their data loads.
+  const clickButton = async (text) => {
+    const find = `Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === ${JSON.stringify(text)} && !el.disabled)`;
+    await waitDom(`button ${text}`, `!!${find}`);
+    await evaluate(`${find}.click()`);
+  };
+  const cardCount = '(document.querySelector(".incident-card .incident-card__count")?.textContent ?? "")';
+
+  await login('ti');
+  await go(`/tickets/${outage.id}`);
+  await waitDom('incident panel', '!!document.querySelector(".incident-panel")');
+  await clickButton('Publicar como incidente');
+  await waitDom('incident publish form', '!!document.getElementById("incident-title")');
+  await fill('incident-title', 'Rede do terceiro andar indisponível');
+  await fill('incident-message', 'A rede cabeada do terceiro andar está fora do ar. A equipe já está atuando.');
+  await evaluate('document.getElementById("incident-title").closest("form").requestSubmit()');
+  await waitDom('incident published', 'document.querySelector(".incident-panel .incident-status")?.textContent === "Publicado"');
+  check((await browserApi('GET', `/tickets/${outage.id}`)).body.ticket.revision === outage.revision, 'Publishing an incident does not change the ticket revision');
+  await go('/tickets?search=terceiro');
+  await waitDom('incident tag in queue', '!!document.querySelector(".ticket-table .incident-tag")');
+  check(await evaluate('document.querySelector(".ticket-table .incident-tag").textContent.includes("0 pessoas afetadas")'), 'TI queue marks the ticket as a shared incident');
+
+  // Knowledge base, in the same TI session: an article whose text contains markup, and a draft.
+  const { KnowledgeArticleModel, ArticleFeedbackModel } = await import('../src/models/article.model.ts');
+  await Promise.all([KnowledgeArticleModel.syncIndexes(), ArticleFeedbackModel.syncIndexes()]);
+  const choose = (id, value) => evaluate(`(() => { const el = document.getElementById(${JSON.stringify(id)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await go('/help/manage/new');
+  await waitDom('article editor', '!!document.getElementById("article-title")');
+  await fill('article-title', 'Teclado sem resposta no notebook');
+  await fill('article-summary', 'O que verificar quando o teclado para de responder.');
+  await choose('article-category', 'hardware');
+  await choose('article-status', 'published');
+  await fill('article-body', 'Verifique se o teclado está conectado.\n\n- Reinicie o computador.\n- <script>window.__kbInjected = true</script><img src=x onerror="window.__kbInjected = true"> continua como texto.');
+  await evaluate('document.getElementById("article-title").closest("form").requestSubmit()');
+  await waitDom('article saved and published', 'location.pathname.startsWith("/help/manage/") && !location.pathname.endsWith("/new") && document.querySelector(".page__subtitle")?.textContent.startsWith("Publicado")');
+  check(true, 'TI writes and publishes a help article through the editor');
+  const draft = await browserApi('POST', '/articles', { title: 'Rascunho interno de VPN', summary: 'Texto ainda em revisão pela equipe.', category: 'rede', body: 'Rascunho que os solicitantes não podem ler nem encontrar.', status: 'draft' });
+  check(draft.status === 201, 'TI saves a draft article');
+  // Kanban (Quadro), same TI session: same data and rules as the list, explicit actions only.
+  const cardOf = (title) => `Array.from(document.querySelectorAll('.board-card')).find(card => card.querySelector('.board-card__title').textContent === ${JSON.stringify(title)})`;
+  const columnOf = (title) => `(${cardOf(title)}?.closest('.board-column')?.className ?? '')`;
+  const cardButton = (title, text) => `Array.from(${cardOf(title)}?.querySelectorAll('button') ?? []).find(el => el.textContent.trim() === ${JSON.stringify(text)})`;
+  await go('/tickets?view=board&search=Quadro');
+  await waitDom('board loaded', `${columnOf('Quadro: monitor piscando')}.includes('board-column--aberto') && ${columnOf('Quadro: atribuído ao Carlos')}.includes('board-column--em_andamento')`);
+  const openTotal = (await browserApi('GET', '/tickets?search=Quadro&status=aberto')).body.pagination.total;
+  check(await evaluate(`document.querySelector('.board-column--aberto .board-column__count').textContent === '${openTotal}' && document.querySelectorAll('.board-column').length === 3`), 'Board columns show the same tickets and totals as the list API');
+  await clickButton('Lista');
+  await waitDom('list keeps filters', 'location.search.includes("search=Quadro") && !location.search.includes("view=") && document.querySelectorAll(".ticket-table tbody tr").length === 2');
+  await clickButton('Quadro');
+  await waitDom('board keeps filters', `location.search.includes("view=board") && location.search.includes("search=Quadro") && !!${cardOf('Quadro: monitor piscando')}`);
+  check(true, 'Switching between list and board keeps the filters in the URL');
+  // Keyboard only: focus the card action and press Enter.
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Iniciar atendimento')}.focus()`);
+  for (const type of ['keyDown', 'keyUp']) await command('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, ...(type === 'keyDown' && { text: '\r' }) });
+  await waitDom('card moved to in progress', `${columnOf('Quadro: monitor piscando')}.includes('board-column--em_andamento')`);
+  const started = (await browserApi('GET', `/tickets/${boardOpen.id}`)).body.ticket;
+  check(started.status === 'em_andamento' && started.assignee.id === users.ti.id && started.history.at(-1).audit.actorId === users.ti.id, 'Starting work from a card, by keyboard, is audited and assigns the operator');
+  await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Resolver')}.click()`);
+  await waitDom('justification on card', `!!${cardOf('Quadro: atribuído ao Carlos')}.querySelector('textarea')`);
+  check(await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Confirmar resolução')}.disabled`), 'Resolving someone else\'s ticket from the board requires a justification');
+  await fill(`resolve-${boardOther.id}`, 'Cabo de vídeo trocado durante a visita ao setor.');
+  await evaluate(`${cardButton('Quadro: atribuído ao Carlos', 'Confirmar resolução')}.click()`);
+  await waitDom('card moved to resolved', `${columnOf('Quadro: atribuído ao Carlos')}.includes('board-column--resolvido')`);
+  const resolvedOnBoard = (await browserApi('GET', `/tickets/${boardOther.id}`)).body.ticket;
+  check(resolvedOnBoard.resolvedBy.id === users.ti.id && resolvedOnBoard.assignee.id === secondAnalyst.id && resolvedOnBoard.history.at(-1).audit.reason.startsWith('Cabo'), 'Board resolution keeps the assignee, records the resolver and the justification');
+  // A change made elsewhere after the board loaded: the card action gets 409 and the board reloads.
+  check((await browserApi('PATCH', `/tickets/${boardOpen.id}`, { category: 'rede' })).status === 200, 'Concurrent change after the board loaded');
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Resolver')}.click()`);
+  await evaluate(`${cardButton('Quadro: monitor piscando', 'Confirmar resolução')}.click()`);
+  await waitDom('stale card rejected', 'document.querySelector(".board-wrapper [role=alert]")?.textContent.includes("alterado por outra pessoa")');
+  check((await browserApi('GET', `/tickets/${boardOpen.id}`)).body.ticket.status === 'em_andamento', 'A stale card cannot resolve: 409 and nothing is written');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await waitDom('board on mobile', `!!${cardOf('Quadro: monitor piscando')}`);
+  check(await evaluate('document.documentElement.scrollWidth <= 390 && !!document.querySelector(".board-jump")'), 'Board fits 390px with links to each column');
+  check(await evaluate('getComputedStyle(document.getElementById("ticket-filters")).display === "none" && document.querySelector(".toolbar__toggle")?.getAttribute("aria-expanded") === "false"'), 'On a phone the filters start collapsed, so the queue comes first');
+  await evaluate('document.querySelector(".toolbar__toggle").click()');
+  await waitDom('filters expanded', 'getComputedStyle(document.getElementById("ticket-filters")).display !== "none" && !!document.getElementById("filter-status")?.offsetParent');
+  check(await evaluate('document.documentElement.scrollWidth <= 390'), 'Expanded filters still fit 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
+  check(await evaluate('getComputedStyle(document.querySelector(".toolbar__toggle")).display === "none" && getComputedStyle(document.getElementById("ticket-filters")).display !== "none"'), 'Larger screens always show the filters, without the toggle');
+  await logout('ti');
+
+  await login('solicitante');
+  await go('/dashboard');
+  await waitDom('requester known problems', '!!document.querySelector(".incident-card")');
+  const publicView = (await browserApi('GET', '/incidents')).body.incidents[0];
+  check(!('ticketId' in publicView) && !('history' in publicView) && !JSON.stringify(publicView).includes('Problema de teste'), 'Requester receives only the public incident fields');
+  await clickButton('Também estou com esse problema');
+  await waitDom('requester follows', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "true" && ${cardCount} === "1 pessoa afetada"`);
+  const again = await browserApi('PUT', `/incidents/${publicView.id}/participation`, {});
+  check(again.status === 200 && again.body.incident.affectedCount === 1, 'Following twice keeps one participation');
+  await command('Page.reload', { ignoreCache: true });
+  await waitDom('follow survives reload', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "true" && ${cardCount} === "1 pessoa afetada"`);
+  await clickButton('Não estou mais com esse problema');
+  await waitDom('requester leaves', `document.querySelector(".incident-card button")?.getAttribute("aria-pressed") === "false" && ${cardCount} === "0 pessoas afetadas"`);
+  await clickButton('Também estou com esse problema');
+  await waitDom('requester follows again', `${cardCount} === "1 pessoa afetada"`);
+  check(true, 'Requester follows, leaves and follows again with the count kept exact');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Requester home with known problems fits 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
+
+  await go('/help?q=teclado');
+  await waitDom('help search results', 'document.querySelectorAll(".article-card").length === 1');
+  check(await evaluate('!document.body.textContent.includes("Rascunho interno")'), 'Drafts are not listed for requesters');
+  await evaluate('document.querySelector(".article-card__title").click()');
+  await waitDom('article page', '!!document.querySelector(".article-body")');
+  check(await evaluate('!window.__kbInjected && !document.querySelector(".article-body script, .article-body img") && document.querySelector(".article-body").textContent.includes("<script>")'), 'Article markup is shown as text and never executed');
+  await clickButton('Isso resolveu meu problema.');
+  await waitDom('article feedback saved', '!!document.querySelector(".article-feedback__thanks")');
+  check(true, 'Requester tells that the article helped');
+  await go(`/help/${draft.body.article.id}`);
+  await waitDom('draft hidden', 'document.querySelector("[role=alert]")?.textContent.includes("não está disponível")');
+  check(true, 'A draft article answers as unavailable to requesters');
+
+  // Guided request: "still need help" brings the subject and the article; answers survive a subject change.
+  const keyboardArticle = (await browserApi('GET', '/articles?q=teclado')).body.articles[0];
+  await go(`/help/${keyboardArticle.id}`);
+  await waitDom('article page again', '!!document.querySelector(".article-feedback")');
+  await clickButton('Ainda preciso de ajuda.');
+  await waitDom('guided form from article', 'location.pathname === "/tickets/new" && document.querySelector("input[name=subject][value=hardware]")?.checked && !!document.querySelector(".context-chip") && !!document.querySelector(".guided-questions")');
+  check(true, 'Still needing help opens the request form with the subject and the article as context');
+  const pick = (name, value) => evaluate(`document.querySelector('input[name=${JSON.stringify(name)}][value=${JSON.stringify(value)}]').click()`);
+  await pick('question-equipment', 'Notebook');
+  await pick('question-powersOn', 'Sim');
+  await pick('subject', 'rede');
+  await waitDom('network questions', '!!document.querySelector("input[name=question-connection]")');
+  await pick('subject', 'hardware');
+  await waitDom('hardware answers kept', 'document.querySelector("input[name=question-equipment][value=Notebook]")?.checked === true');
+  check(true, 'Answers are kept when the subject is changed and changed back');
+  await fill('title', 'Teclado do notebook parou');
+  await fill('description', 'O teclado do notebook parou de responder depois da atualização.');
+  await submit();
+  await waitDom('guided ticket created', 'location.pathname.startsWith("/tickets/") && !!document.querySelector(".intake-card")');
+  const guidedId = await evaluate('location.pathname.split("/").pop()');
+  const guided = (await browserApi('GET', `/tickets/${guidedId}`)).body.ticket;
+  check(guided.category === 'hardware' && guided.priority === 'media' && guided.description === 'O teclado do notebook parou de responder depois da atualização.'
+    && JSON.stringify(guided.intake.answers.map((item) => item.answer)) === JSON.stringify(['Notebook', 'Sim']) && guided.intake.article.id === keyboardArticle.id,
+  'Guided request keeps the description, the answers of the final subject and the article read');
+  check(await evaluate('document.querySelector(".intake-card").textContent.includes("Qual equipamento está com problema?")'), 'The request page shows the guided answers');
+
+  // "Seu problema foi resolvido?" on the ticket TI resolved earlier: the requester says it continues.
+  await go(`/tickets/${own.id}`);
+  await waitDom('resolution question', 'document.querySelector(".resolution-answer")?.textContent.includes("Seu problema foi resolvido?")');
+  await clickButton('Não, o problema continua.');
+  await waitDom('contest form', '!!document.getElementById("contest-reason")');
+  check(await evaluate('Array.from(document.querySelectorAll("button")).find(el => el.textContent.trim() === "Reabrir pedido").disabled'), 'Contesting requires a reason');
+  await fill('contest-reason', 'O programa voltou a fechar sozinho hoje.');
+  await evaluate('document.getElementById("contest-reason").closest("form").requestSubmit()');
+  await waitDom('contested', '!!document.querySelector(".resolution-answer--contested")');
+  const contested = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+  check(contested.status === 'em_andamento' && contested.resolutionFeedback.status === 'contested' && contested.history.at(-1).type === 'reopened', 'Requester contests the resolution and the request goes back to the team');
+  check((await browserApi('POST', `/tickets/${own.id}/resolution/contest`, { cycleId: contested.resolutionFeedback.cycleId, reason: 'Repetindo a contestação.' })).status === 409, 'A repeated contest does not reopen again');
+  await logout('solicitante');
+
+  await login('gestor');
+  const overview = '(document.querySelector(".incidents-overview dl")?.textContent ?? "")';
+  await waitDom('manager incident block', `${overview}.includes("Ativos1") && ${overview}.includes("Pessoas afetadas nos ativos1")`);
+  check(true, 'Manager sees active incidents and affected people');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  check(await evaluate('document.querySelector(".incidents-overview .table-scroll") && document.documentElement.scrollWidth <= 390'), 'Manager page with an incident table fits 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
+  const closed = await browserApi('PATCH', `/tickets/${outage.id}/status`, { status: 'resolvido', reason: 'Switch substituído; rede normalizada.' });
+  check(closed.status === 200, 'Manager resolves the main ticket');
+  await go('/manager');
+  await waitDom('manager sees closed incident', `${overview}.includes("Ativos0") && ${overview}.includes("Encerrados1")`);
+  const managed = (await browserApi('GET', '/incidents/manage')).body.incidents[0];
+  check(managed.status === 'closed' && managed.closeReason === 'ticket_resolved' && managed.closedBy.id === users.gestor.id, 'Resolving the ticket closes the incident, attributed to the resolver');
+  await waitDom('manager quality section', 'document.querySelector(".quality-overview")?.textContent.includes("Qualidade do atendimento")');
+  check(true, 'Manager sees the service quality section');
+  await go('/tickets?status=em_andamento&search=Requester%20open');
+  await waitDom('contested tag in queue', 'document.querySelector(".ticket-table .attention-tag")?.textContent === "Reaberto pelo solicitante"');
+  check(true, 'The queue shows the reopening by the requester');
+  const reResolved = await browserApi('PATCH', `/tickets/${own.id}/status`, { status: 'resolvido', reason: 'Atualização do programa reaplicada e validada.' });
+  check(reResolved.status === 200 && reResolved.body.ticket.activeCycleId === 2, 'The team resolves the contested request in a new cycle');
+  await logout('gestor');
+
+  await login('solicitante');
+  await go('/dashboard');
+  await waitDom('requester sees result', '!!document.getElementById("followed-incidents")');
+  check(await evaluate('!document.getElementById("known-incidents") && document.querySelector(".incident-card--closed .incident-status")?.textContent === "Resolvido"'), 'Requester sees the closed problem as resolved and no longer as active');
+  check(await evaluate('Array.from(document.querySelectorAll(".attention-tag")).some(el => el.textContent === "Confirme se resolveu")'), 'The requester home points to the resolution waiting for an answer');
+  await go(`/tickets/${own.id}`);
+  await waitDom('resolution question again', 'document.querySelector(".resolution-answer")?.textContent.includes("Seu problema foi resolvido?")');
+  await clickButton('Sim, foi resolvido.');
+  await waitDom('rating form', '!!document.querySelector(".resolution-rating")');
+  await pick('rating', '4');
+  await fill('rating-comment', 'Resolveram rápido na segunda vez.');
+  await evaluate('document.querySelector(".resolution-rating").requestSubmit()');
+  await waitDom('rated', 'document.querySelector(".resolution-answer")?.textContent.includes("4 de 5")');
+  const answered = (await browserApi('GET', `/tickets/${own.id}`)).body.ticket;
+  check(answered.resolutionFeedback.status === 'confirmed' && answered.resolutionFeedback.rating === 4 && answered.history.filter((event) => event.type === 'resolution_confirmed').length === 1, 'Requester confirms the resolution and rates it once');
+  await logout('solicitante');
+
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);
+  if (visibilityRecoveries) console.log(`The browser page was brought back to the front ${visibilityRecoveries} time(s) (hidden by the OS).`);
   console.log(`Longest observed wait: ${Math.max(...timings.map((item) => item.ms))} ms.`);
 }
 
@@ -481,6 +742,7 @@ try {
   }
   console.error('Diagnostics: backend/e2e-results/diagnostics.json (and failure.png when available).');
 } finally {
+  clearInterval(keepVisible);
   socket?.close();
   if (browserProcess && browserProcess.exitCode === null && !browserProcess.killed) {
     const exited = once(browserProcess, 'exit').catch(() => {});

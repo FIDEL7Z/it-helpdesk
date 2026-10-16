@@ -98,21 +98,36 @@ describe('permission map (can)', () => {
   const expected: Record<UserRole, Record<Permission, boolean>> = {
     solicitante: {
       'tickets:view-all': false,
+      'tickets:view-audit': false,
       'tickets:operate': false,
       'tickets:be-assigned': false,
       'users:list-it-staff': false,
+      'incidents:manage': false,
+      'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': false,
     },
     ti: {
       'tickets:view-all': true,
+      'tickets:view-audit': true,
       'tickets:operate': true,
       'tickets:be-assigned': true,
       'users:list-it-staff': true,
+      'incidents:manage': true,
+      'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': true,
     },
     gestor: {
       'tickets:view-all': true,
+      'tickets:view-audit': true,
       'tickets:operate': true,
       'tickets:be-assigned': true,
       'users:list-it-staff': true,
+      'incidents:manage': true,
+      'incidents:follow': true,
+      'kb:read': true,
+      'kb:manage': true,
     },
   };
 
@@ -157,7 +172,7 @@ describe('route matrix: requester / IT / manager', () => {
     for (const user of [requester, tech, manager]) {
       const id = await createTicket(user, 'Aberto por qualquer papel');
       const { body } = await api('GET', `/tickets/${id}`, user);
-      assert.equal(body.ticket.requester.id, user.id);
+      assert.equal(body.ticket.requesterId, user.id);
     }
   });
 

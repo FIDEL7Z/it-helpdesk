@@ -1,5 +1,6 @@
 import { apiRequest } from './api'
 import type { User } from './auth'
+import type { IncidentBadge } from './incidents'
 
 export const TICKET_CATEGORIES = ['hardware', 'software', 'rede', 'acesso', 'outros'] as const
 export const TICKET_PRIORITIES = ['baixa', 'media', 'alta'] as const
@@ -29,6 +30,34 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   resolvido: 'Resolvido',
 }
 
+/** How the person who asked for help names each category ("Com o que você precisa de ajuda?"). */
+export const SUBJECT_LABELS: Record<TicketCategory, string> = {
+  hardware: 'Computador ou equipamento',
+  rede: 'Internet e conexão',
+  software: 'Programas e aplicativos',
+  acesso: 'Contas e permissões',
+  outros: 'Outro problema',
+}
+
+/** One line under each subject: what kind of problem belongs there. */
+export const SUBJECT_DESCRIPTIONS: Record<TicketCategory, string> = {
+  hardware: 'Computador, notebook, monitor, impressora ou periféricos.',
+  rede: 'Wi-Fi, cabo de rede ou internet lenta.',
+  software: 'Programas que não abrem, travam ou mostram erro.',
+  acesso: 'Login, senha expirada ou falta de permissão.',
+  outros: 'Algo que não se encaixa nas opções acima.',
+}
+
+/** Order shown to requesters. */
+export const SUBJECT_ORDER: TicketCategory[] = ['hardware', 'rede', 'software', 'acesso', 'outros']
+
+/** How the person who asked for help reads the same status. */
+export const REQUESTER_STATUS_LABELS: Record<TicketStatus, string> = {
+  aberto: 'Aguardando atendimento',
+  em_andamento: 'Em atendimento',
+  resolvido: 'Resolvido',
+}
+
 /** Same limits as the backend; the API is still the one that enforces them. */
 export const TICKET_LIMITS = {
   titleMin: 3,
@@ -39,13 +68,19 @@ export const TICKET_LIMITS = {
 
 export const PAGE_SIZE = 10
 
+/**
+ * Requesters receive people by name only; the team (tickets:view-audit) receives the public user.
+ * Fields marked optional below are sent only to the team.
+ */
+export type Person = Pick<User, 'name'> & Partial<Omit<User, 'name'>>
+
 export type TicketEvent = {
-  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved'
+  type: 'created' | 'updated' | 'status_changed' | 'reopened' | 'assigned' | 'resolved' | 'resolution_confirmed' | 'resolution_rated'
   message: string
   at: string | null
-  author: User | null
-  authorId: string | null
-  assigneeAtEvent: User | null
+  author: Person | null
+  authorId?: string | null
+  assigneeAtEvent?: Person | null
   audit?: {
     eventId: string
     actorId: string
@@ -70,22 +105,38 @@ export type TicketSummary = {
   category: TicketCategory
   priority: TicketPriority
   status: TicketStatus
-  requester: User | null
-  assignee: User | null
-  assigneeId: string | null
+  requester?: Person | null
+  assignee: Person | null
+  assigneeId?: string | null
   requesterId: string | null
   createdAt: string | null
   updatedAt: string | null
   revision: number
-  activeCycleId: number
+  activeCycleId?: number
   resolvedAt: string | null
-  resolvedBy: User | null
-  resolvedById: string | null
-  dataOrigin: 'operational' | 'demo' | 'legacy'
+  resolvedBy?: Person | null
+  resolvedById?: string | null
+  dataOrigin?: 'operational' | 'demo' | 'legacy'
+  /** Team: the requester said the last resolution did not solve the problem. */
+  contested?: boolean
+  /** Requester: resolved and waiting for their "was it solved?" answer. */
+  awaitingConfirmation?: boolean
+  /** Only in the team's list: this ticket is the main ticket of a shared incident. */
+  incident?: IncidentBadge | null
+}
+
+/** The requester's answer to the resolution of the current cycle (or the one they contested). */
+export type ResolutionFeedback = {
+  cycleId: number
+  status: 'pending' | 'confirmed' | 'contested'
+  rating: number | null
+  comment: string | null
 }
 
 export type TicketDetail = TicketSummary & {
   description: string
+  intake: TicketIntake | null
+  resolutionFeedback: ResolutionFeedback | null
   history: TicketEvent[]
 }
 
@@ -107,7 +158,9 @@ export const ASSIGNEE_FILTER_LABELS: Record<AssigneeFilter, string> = {
 export type TicketFilters = {
   createdFrom?: string
   createdTo?: string
-  attention?: 'high_unassigned' | 'oldest' | 'inactive'
+  attention?: 'high_unassigned' | 'oldest' | 'inactive' | 'contested'
+  /** Creation order; 'oldest' puts the next ticket to pick first. */
+  sort?: 'newest' | 'oldest'
   ageDays?: number
   inactivityDays?: number
   pending?: boolean
@@ -120,6 +173,25 @@ export type TicketFilters = {
   assignee?: AssigneeFilter
   search?: string
   page?: number
+  /** Defaults to PAGE_SIZE. */
+  limit?: number
+}
+
+/** A guided-form question, from the catalog the API validates against. */
+export type IntakeQuestion = {
+  key: string
+  label: string
+  type: 'choice' | 'text'
+  options?: string[]
+  maxLength?: number
+  hint?: string
+}
+
+/** Answers given when the ticket was opened, apart from the description. */
+export type TicketIntake = {
+  category: TicketCategory
+  answers: { key: string; question: string; answer: string }[]
+  article: { id: string; title: string } | null
 }
 
 export type CreateTicketInput = {
@@ -127,9 +199,14 @@ export type CreateTicketInput = {
   description: string
   category: TicketCategory
   priority: TicketPriority
+  intake?: { answers: { key: string; answer: string }[]; articleId?: string }
 }
 
-export type UpdateTicketInput = Partial<CreateTicketInput> & { reason?: string }
+export type UpdateTicketInput = Partial<Omit<CreateTicketInput, 'intake'>> & { reason?: string }
+
+export function getIntakeQuestions(signal?: AbortSignal): Promise<{ questions: Record<TicketCategory, IntakeQuestion[]> }> {
+  return apiRequest('/tickets/intake-questions', { signal })
+}
 
 export function listTickets(
   filters: TicketFilters,
@@ -183,4 +260,16 @@ export function isTicketCategory(value: string | null): value is TicketCategory 
 
 export function isAssigneeFilter(value: string | null): value is AssigneeFilter {
   return ASSIGNEE_FILTERS.some((filter) => filter === value)
+}
+
+export function confirmResolution(id: string, cycleId: number): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/confirm`, { method: 'POST', body: { cycleId } })
+}
+
+export function contestResolution(id: string, cycleId: number, reason: string): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/contest`, { method: 'POST', body: { cycleId, reason } })
+}
+
+export function rateResolution(id: string, cycleId: number, rating: number, comment?: string): Promise<{ ticket: TicketDetail }> {
+  return apiRequest(`/tickets/${encodeURIComponent(id)}/resolution/rating`, { method: 'POST', body: { cycleId, rating, ...(comment ? { comment } : {}) } })
 }

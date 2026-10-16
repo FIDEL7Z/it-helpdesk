@@ -173,7 +173,7 @@ export interface TicketFilters {
   /** "none": no assignee yet; "me": assigned to the authenticated user. */
   assignee?: AssigneeFilter;
   /** Creation order; oldest first helps pick the next ticket from a queue. */
-  sort?: 'newest' | 'oldest';
+  sort?: 'newest' | 'oldest' | 'priority';
 }
 
 export interface ListTicketsQuery extends TicketFilters {
@@ -447,6 +447,27 @@ export async function createTicket(input: CreateTicketInput, actor: PublicUser):
   return toTicketDetail(ticket, actor);
 }
 
+const PRIORITY_RANK = ['alta', 'media', 'baixa'];
+
+/**
+ * Service order: high, then medium, then low priority; within each, the oldest first. The stored
+ * priority is text, so the page is chosen by an aggregation with a numeric rank over the same
+ * (cast) authorization filter, and the documents are then read normally in that order.
+ */
+async function findByPriority(filter: QueryFilter<TicketDocument>, page: number, limit: number, fields: string): Promise<TicketDocument[]> {
+  const match = TicketModel.find().cast(TicketModel, filter);
+  const ids = (await TicketModel.aggregate<{ _id: Types.ObjectId }>([
+    { $match: match },
+    { $addFields: { priorityRank: { $indexOfArray: [PRIORITY_RANK, '$priority'] } } },
+    { $sort: { priorityRank: 1, createdAt: 1, _id: 1 } },
+    { $skip: (page - 1) * limit },
+    { $limit: limit },
+    { $project: { _id: 1 } },
+  ])).map((row) => row._id.toString());
+  const found = await TicketModel.find({ _id: { $in: ids } }).select(fields);
+  return ids.flatMap((id) => found.filter((ticket) => ticket.id === id));
+}
+
 export async function listTickets(
   query: ListTicketsQuery,
   actor: PublicUser,
@@ -454,14 +475,17 @@ export async function listTickets(
   const filter = buildTicketFilter(query, actor);
   const { page, limit } = query;
 
+  // History stays (without messages) to tell whether the requester contested the resolution.
+  const fields = '-description -history.message';
   const [total, tickets] = await Promise.all([
     TicketModel.countDocuments(filter),
-    TicketModel.find(filter)
-      .sort(query.attention === 'oldest' || query.sort === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      // History stays (without messages) to tell whether the requester contested the resolution.
-      .select('-description -history.message'),
+    query.sort === 'priority'
+      ? findByPriority(filter, page, limit, fields)
+      : TicketModel.find(filter)
+        .sort(query.attention === 'oldest' || query.sort === 'oldest' ? { createdAt: 1, _id: 1 } : { createdAt: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select(fields),
   ]);
 
   const users = await loadUsers(tickets.flatMap((ticket) => [ticket.requester, ticket.assignee, ticket.resolvedBy]));

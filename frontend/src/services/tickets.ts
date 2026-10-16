@@ -160,7 +160,8 @@ export type TicketFilters = {
   createdTo?: string
   attention?: 'high_unassigned' | 'oldest' | 'inactive' | 'contested'
   /** Creation order; 'oldest' puts the next ticket to pick first. */
-  sort?: 'newest' | 'oldest'
+  /** newest (default), oldest, or priority = service order: high to low, oldest first within each. */
+  sort?: 'newest' | 'oldest' | 'priority'
   ageDays?: number
   inactivityDays?: number
   pending?: boolean

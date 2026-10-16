@@ -43,7 +43,7 @@ const listTicketsQuerySchema = z.object({
   createdFrom: z.iso.datetime().optional(),
   createdTo: z.iso.datetime().optional(),
   attention: z.enum(['high_unassigned', 'oldest', 'inactive', 'contested']).optional(),
-  sort: z.enum(['newest', 'oldest']).optional(),
+  sort: z.enum(['newest', 'oldest', 'priority']).optional(),
   inactivityDays: z.coerce.number().int().min(1).max(90).optional(),
   ageDays: z.coerce.number().int().min(1).max(365).optional(),
   pending: z.enum(['true']).optional().transform(value => value === 'true' ? true : undefined),

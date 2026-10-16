@@ -29,7 +29,7 @@ import { affectedLabel } from '../services/incidents'
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin'
+type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin' | 'sort'
 
 type ListState = {
   key: string
@@ -61,7 +61,7 @@ function readFilters(params: URLSearchParams, team: boolean): TicketFilters {
     createdFrom: params.get('createdFrom') ?? undefined,
     createdTo: params.get('createdTo') ?? undefined,
     attention: ['high_unassigned', 'oldest', 'inactive', 'contested'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
-    sort: params.get('sort') === 'oldest' ? 'oldest' : undefined,
+    sort: params.get('sort') === 'oldest' || params.get('sort') === 'priority' ? params.get('sort') as TicketFilters['sort'] : undefined,
     ageDays: params.has('ageDays') ? Number(params.get('ageDays')) : undefined,
     inactivityDays: params.has('inactivityDays') ? Number(params.get('inactivityDays')) : undefined,
     pending: params.get('pending') === 'true' ? true : undefined,
@@ -206,7 +206,7 @@ export function TicketsPage() {
             )}
             {canFilterByAssignee && <nav className="queue-links" aria-label="Filas rápidas">
               <span className="queue-links__label">Filas rápidas</span>
-              <Link className="queue-link" to={shortcut('assignee=none&pending=true&sort=oldest')}>Sem responsável</Link>
+              <Link className="queue-link" to={shortcut('assignee=none&pending=true&sort=priority')}>Sem responsável</Link>
               <Link className="queue-link" to={shortcut('assignee=me&pending=true')}>Atribuídos a mim</Link>
               <Link className="queue-link" to={shortcut('status=em_andamento')}>Em andamento</Link>
               <Link className="queue-link" to={shortcut('attention=contested')}>Reabertos pelo solicitante</Link>
@@ -258,6 +258,16 @@ export function TicketsPage() {
                 onChange={(value) => updateFilter('assignee', value)}
               />
             )}
+            {seesAllTickets && (
+              <FilterSelect
+                id="filter-sort"
+                label="Ordenar por"
+                value={filters.sort ?? ''}
+                allLabel="Mais recentes"
+                options={[['priority', 'Prioridade e antiguidade'], ['oldest', 'Mais antigos']]}
+                onChange={(value) => updateFilter('sort', value)}
+              />
+            )}
             {DEMO_MODE && seesAllTickets && (
               <div className="filter">
                 <label className="filter__label" htmlFor="list-origin">Origem</label>
@@ -279,6 +289,7 @@ export function TicketsPage() {
       {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
       {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : filters.attention === 'contested' ? 'Reabertos pelo solicitante: a resolução anterior não resolveu o problema.' : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
       {filters.sort === 'oldest' && <p className="page__note">Ordenados do mais antigo para o mais recente.</p>}
+      {filters.sort === 'priority' && <p className="page__note">Ordem de atendimento: alta, média e baixa prioridade; dentro de cada uma, o mais antigo primeiro.</p>}
       {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       {view === 'board' ? (
@@ -476,16 +487,18 @@ type FilterSelectProps = {
   value: string
   options: [string, string][]
   onChange: (value: string) => void
+  /** Text of the empty option (no filter). */
+  allLabel?: string
 }
 
-function FilterSelect({ id, label, value, options, onChange }: FilterSelectProps) {
+function FilterSelect({ id, label, value, options, onChange, allLabel = 'Todos' }: FilterSelectProps) {
   return (
     <div className="filter">
       <label htmlFor={id} className="filter__label">
         {label}
       </label>
       <select id={id} className="field__input field__select" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Todos</option>
+        <option value="">{allLabel}</option>
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>
             {optionLabel}

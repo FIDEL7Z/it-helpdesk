@@ -45,7 +45,7 @@ function ageLabel(createdAt: string | null): string {
 async function loadCentral(origin: Origin, withMine: boolean, signal: AbortSignal): Promise<CentralData> {
   const count = async (filters: TicketFilters) => (await listTickets({ ...filters, dataOrigin: origin, limit: 1 }, signal)).pagination.total
   const queue = async (filters: TicketFilters): Promise<Queue> => {
-    const { tickets, pagination } = await listTickets({ ...filters, dataOrigin: origin, pending: true, sort: 'oldest', limit: 5 }, signal)
+    const { tickets, pagination } = await listTickets({ ...filters, dataOrigin: origin, pending: true, sort: 'priority', limit: 5 }, signal)
     return { tickets, total: pagination.total }
   }
   const [{ summary }, highUnassigned, contested, inactive, mine, unassigned] = await Promise.all([
@@ -158,15 +158,15 @@ function TeamDashboard() {
                 className="my-queue"
                 title="Meus atendimentos"
                 queue={data.mine}
-                to={at('assignee=me&pending=true&sort=oldest')}
+                to={at('assignee=me&pending=true&sort=priority')}
                 empty="Nenhum chamado com você agora."
               />
             )}
             <QueueCard
               id="unassigned-queue"
-              title="Sem responsável — mais antigos primeiro"
+              title="Sem responsável — por prioridade e antiguidade"
               queue={data.unassigned}
-              to={at('assignee=none&pending=true&sort=oldest')}
+              to={at('assignee=none&pending=true&sort=priority')}
               empty="Todos os chamados pendentes têm responsável."
             />
           </div>

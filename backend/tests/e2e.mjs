@@ -299,6 +299,13 @@ async function run() {
       await waitDocument(`${role} reload ${reload}: new document`, previousOrigin);
       await dashboard(expected, role);
     }
+    if (role === 'ti') {
+      // The four "Precisa de ação" cards: 2 + 2 on a tablet, never 3 + 1.
+      await command('Emulation.setDeviceMetricsOverride', { width: 768, height: 1024, deviceScaleFactor: 1, mobile: false });
+      check(await evaluate(`(() => { const tops = [...document.querySelectorAll('.action-cards > *')].map((el) => Math.round(el.getBoundingClientRect().top));
+        return tops.length === 4 && tops[0] === tops[1] && tops[2] === tops[3] && tops[1] < tops[2]; })()`), 'At 768px the four service desk actions are two per row');
+      await command('Emulation.clearDeviceMetricsOverride');
+    }
     const listing = await browserApi('GET', '/tickets');
     check(listing.status === 200 && listing.body.pagination.total === expected[0], `${role}: API list matches dashboard scope`);
     const detail = await browserApi('GET', `/tickets/${foreign.id}`);
@@ -650,6 +657,21 @@ async function run() {
   check(true, 'Requester follows, leaves and follows again with the count kept exact');
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Requester home with known problems fits 390px');
+  // Layout guards: on phones the search keeps its height with the icon inside; on a wide screen the
+  // header and the page share one portal container, and the main link-button keeps its label on hover.
+  check(await evaluate(`(() => { const field = document.querySelector('.portal-search__input').getBoundingClientRect();
+    const icon = document.querySelector('.portal-search__icon').getBoundingClientRect();
+    return field.height >= 44 && icon.top >= field.top && icon.bottom <= field.bottom; })()`), 'Home search keeps its height with the icon inside on a phone');
+  await command('Emulation.setDeviceMetricsOverride', { width: 1650, height: 954, deviceScaleFactor: 1, mobile: false });
+  check(await evaluate(`(() => { const brand = document.querySelector('.app-header .brand').getBoundingClientRect();
+    const page = document.querySelector('.app-main > .page').getBoundingClientRect();
+    return Math.abs(brand.left - page.left) <= 1 && page.width >= 1100 && page.width <= 1280; })()`), 'At 1650px the requester home lines up with the header in one portal container');
+  const cta = await evaluate(`(() => { const button = document.querySelector('.portal-hero__actions .button--primary'); button.scrollIntoView({ block: 'center' });
+    const box = button.getBoundingClientRect(); return { x: box.left + box.width / 2, y: box.top + box.height / 2 }; })()`);
+  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cta.x, y: cta.y });
+  check(await evaluate(`(() => { const button = document.querySelector('.portal-hero__actions .button--primary'); const style = getComputedStyle(button);
+    return button.matches(':hover') && style.color !== style.backgroundColor; })()`), 'The "Solicitar suporte" button keeps a visible label on hover');
+  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
   await command('Emulation.clearDeviceMetricsOverride');
 
   await go('/help?q=teclado');
@@ -672,6 +694,22 @@ async function run() {
   await clickButton('Ainda preciso de ajuda.');
   await waitDom('guided form from article', 'location.pathname === "/tickets/new" && document.querySelector("input[name=subject][value=hardware]")?.checked && !!document.querySelector(".context-chip") && !!document.querySelector(".guided-questions")');
   check(true, 'Still needing help opens the request form with the subject and the article as context');
+  // Layout guards for the request form: two columns on a wide screen, one column in reading order
+  // (subjects, context, questions, fields) on a tablet; five subjects as 3 + 2 and 2 + 2 + 1.
+  const requestLayout = `(() => { const form = document.querySelector('.request-layout .card.form').getBoundingClientRect();
+    const side = document.querySelector('.request-layout__context').getBoundingClientRect();
+    const rows = new Set([...document.querySelectorAll('.subject-option')].map((el) => Math.round(el.getBoundingClientRect().top))).size;
+    return { formWidth: form.width, formTop: form.top, formRight: form.right, sideLeft: side.left, sideTop: side.top, sideBottom: side.bottom, sideWidth: side.width, rows,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`;
+  await command('Emulation.setDeviceMetricsOverride', { width: 1650, height: 954, deviceScaleFactor: 1, mobile: false });
+  const wideForm = await evaluate(requestLayout);
+  check(wideForm.formWidth >= 640 && wideForm.formWidth <= 880 && wideForm.sideLeft >= wideForm.formRight && wideForm.sideTop < wideForm.formTop && wideForm.rows === 2 && !wideForm.overflow,
+    'At 1650px the request form has a main column and a context column, with subjects three per row');
+  await command('Emulation.setDeviceMetricsOverride', { width: 768, height: 1024, deviceScaleFactor: 1, mobile: false });
+  const tabletForm = await evaluate(requestLayout);
+  check(tabletForm.sideBottom <= tabletForm.formTop && Math.abs(tabletForm.sideWidth - tabletForm.formWidth) <= 1 && tabletForm.rows === 3 && !tabletForm.overflow,
+    'At 768px the request form is one column in reading order, with subjects two per row');
+  await command('Emulation.clearDeviceMetricsOverride');
   const pick = (name, value) => evaluate(`document.querySelector('input[name=${JSON.stringify(name)}][value=${JSON.stringify(value)}]').click()`);
   await pick('question-equipment', 'Notebook');
   await pick('question-powersOn', 'Sim');

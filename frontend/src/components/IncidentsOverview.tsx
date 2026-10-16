@@ -32,7 +32,7 @@ export function IncidentsOverview({ dataOrigin }: { dataOrigin: string }) {
           <dl className="incidents-overview__numbers">
             <div><dt>Ativos</dt><dd>{data.active}</dd></div>
             <div><dt>Pessoas afetadas nos ativos</dt><dd>{data.affectedInActive}</dd></div>
-            <div><dt>Novas adesões (30 dias)</dt><dd>{data.newParticipations30Days}</dd></div>
+            <div><dt>Entradas nos últimos 30 dias</dt><dd>{data.newParticipations30Days}</dd></div>
             <div><dt>Encerrados</dt><dd>{data.closed}</dd></div>
           </dl>
           {data.top.length === 0 ? (
@@ -56,7 +56,7 @@ export function IncidentsOverview({ dataOrigin }: { dataOrigin: string }) {
               </table>
             </div>
           )}
-          <p className="field__hint">Pessoas afetadas mostram o alcance do problema; não indicam quantos chamados deixaram de ser abertos.</p>
+          <p className="field__hint">Pessoas afetadas mostram o alcance do problema agora; não indicam quantos chamados deixaram de ser abertos. Entradas nos últimos 30 dias conta cada vez que alguém disse estar afetado nesse período, em incidentes ativos ou encerrados; quem saiu depois continua contado.</p>
         </>
       )}
     </section>

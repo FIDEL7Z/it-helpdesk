@@ -144,7 +144,10 @@ async function run() {
   const apiUrl = `http://127.0.0.1:${apiServer.address().port}/api`;
   process.env.VITE_API_URL = apiUrl;
   const { createServer } = await import('../../frontend/node_modules/vite/dist/node/index.js');
-  vite = await createServer({ root: join(root, 'frontend'), server: { host: '127.0.0.1', port: 0, open: false }, logLevel: 'error' });
+  vite = await createServer({ root: join(root, 'frontend'), server: { host: '127.0.0.1', port: 0, open: false }, logLevel: 'error',
+    // Discover every page's dependencies up front: a lazy page (management view) would otherwise make
+    // Vite optimize them on first visit and reload the whole page in the middle of a check.
+    optimizeDeps: { entries: ['index.html', 'src/**/*.tsx'] } });
   await vite.listen();
   const origin = `http://127.0.0.1:${vite.httpServer.address().port}`;
   env.CORS_ORIGIN.push(origin);
@@ -513,7 +516,9 @@ async function run() {
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
       await snap(join(output, 'manager-mobile-dark.png'));
       check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark" && document.querySelector(".theme-toggle").getAttribute("aria-pressed") === "true" && localStorage.getItem("it-helpdesk:theme") === "dark"'), 'The header switch turns the dark theme on and remembers it');
+      const beforeThemeReload = await evaluate('performance.timeOrigin');
       await command('Page.reload', { ignoreCache: true });
+      await waitDocument('dark theme reload: new document', beforeThemeReload);
       await waitDom('dark theme after reload', 'document.documentElement.dataset.theme === "dark" && document.querySelector(".theme-toggle")?.getAttribute("aria-pressed") === "true"');
       check(true, 'The dark choice survives a reload, applied before the app renders');
       await evaluate('document.querySelector(".theme-toggle").click()');
@@ -774,7 +779,9 @@ async function run() {
   await waitDom('protected page asks for login', 'location.pathname === "/login" && history.state?.usr?.from === "/tickets?status=aberto"');
   await signInHere('ti');
   check(await landedOn() === '/tickets?status=aberto', 'Login from a protected URL returns to that URL');
+  const beforeRefresh = await evaluate('performance.timeOrigin');
   await command('Page.reload', { ignoreCache: true });
+  await waitDocument('refresh: new document', beforeRefresh);
   await waitDom('refresh keeps session and page', `location.pathname + location.search === "/tickets?status=aberto" && document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users.ti.name)}`);
   check(true, 'A refresh after login keeps the session and the page');
   await logout('ti');
@@ -848,7 +855,9 @@ async function run() {
   check(ledgerRows.length === 1 && ledgerRows[0].actor.id === users.ti.id && ledgerRows[0].recipient.id === users.solicitante.id, 'The ledger records who delivered, who received and the ticket');
   check((await nodeApi('ti', 'GET', `/tickets/${keyboardTicketId}`)).body.ticket.status === 'aberto', 'Delivering material did not resolve the ticket');
   check(await evaluate(`document.querySelector(".materials-panel .movement-list__meta")?.textContent.includes(${JSON.stringify(`Registrado por ${users.ti.name}`)})`), 'The ticket shows who registered the delivery');
+  const beforeDeliveryReload = await evaluate('performance.timeOrigin');
   await command('Page.reload', { ignoreCache: true });
+  await waitDocument('delivery reload: new document', beforeDeliveryReload);
   await waitDom('delivery after reload', 'Array.from(document.querySelectorAll(".materials-panel .movement-list__item")).some(item => item.textContent.includes("Entrega · 1 un."))');
   check(true, 'A reload keeps the delivery on the ticket');
   // From the ticket to the stock and back.

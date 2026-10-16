@@ -729,6 +729,66 @@ async function run() {
   check(answered.resolutionFeedback.status === 'confirmed' && answered.resolutionFeedback.rating === 4 && answered.history.filter((event) => event.type === 'resolution_confirmed').length === 1, 'Requester confirms the resolution and rates it once');
   await logout('solicitante');
 
+  // Switching profiles in the same tab: the next person never lands on the previous person's page.
+  // This section signs in more than the 10-per-window limit allows, so it starts with fresh counters.
+  const { resetLoginRateLimit } = await import('../src/middlewares/rate-limit.middleware.ts');
+  await resetLoginRateLimit();
+  const signInHere = async (role) => {
+    await waitDom(`${role} login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
+    await fill('email', users[role].email);
+    await fill('password', password);
+    await submit();
+    await waitDom(`${role} signed in`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
+  };
+  const landedOn = () => evaluate('location.pathname + location.search');
+  await login('solicitante');
+  await go(`/tickets/${own.id}`);
+  await waitDom('requester ticket page', `location.pathname === "/tickets/${own.id}" && !!document.querySelector("h1")`);
+  await logout('solicitante');
+  check(await evaluate('history.state?.usr?.from === undefined'), 'Sair keeps no return page for the next person');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'Requester → Sair → TI lands on the TI home, not the requester ticket');
+  await go('/help/manage');
+  await waitDom('TI article management', '!!document.querySelector(".status-tab")');
+  await logout('ti');
+  await signInHere('gestor');
+  check(await landedOn() === '/manager', 'TI → Sair → manager lands on the management view, not Articles');
+  await go('/tickets?status=aberto');
+  await waitDom('manager queue', '!!document.querySelector(".queue-panel")');
+  await logout('gestor');
+  await signInHere('solicitante');
+  check(await landedOn() === '/dashboard', 'Manager → Sair → requester lands on the requester home');
+  await logout('solicitante');
+  // A visitor who opens a protected page goes back to it after signing in, and a refresh keeps it.
+  await go('/tickets?status=aberto');
+  await waitDom('protected page asks for login', 'location.pathname === "/login" && history.state?.usr?.from === "/tickets?status=aberto"');
+  await signInHere('ti');
+  check(await landedOn() === '/tickets?status=aberto', 'Login from a protected URL returns to that URL');
+  await command('Page.reload', { ignoreCache: true });
+  await waitDom('refresh keeps session and page', `location.pathname + location.search === "/tickets?status=aberto" && document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users.ti.name)}`);
+  check(true, 'A refresh after login keeps the session and the page');
+  await logout('ti');
+  await go('/manager');
+  await waitDom('manager page asks for login', 'location.pathname === "/login"');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'A return page the profile cannot open falls back to its home');
+  await logout('ti');
+  // Invalid session: a stored token the API rejects. Its owner is read only to compare people.
+  const rejectedToken = (userId) => `${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: String(userId) })).toString('base64url')}.invalid-signature`;
+  await evaluate(`localStorage.setItem('it-helpdesk:token', ${JSON.stringify(rejectedToken(users.gestor._id))})`);
+  await go('/tickets?status=resolvido');
+  await waitDom('invalid session sent to login', 'location.pathname === "/login" && localStorage.getItem("it-helpdesk:token") === null');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'After someone else\'s invalid session, the next person starts at their own home');
+  await logout('ti');
+  await evaluate(`localStorage.setItem('it-helpdesk:token', ${JSON.stringify(rejectedToken(users.ti._id))})`);
+  await go('/tickets?status=resolvido');
+  await waitDom('own invalid session sent to login', 'location.pathname === "/login"');
+  await signInHere('ti');
+  check(await landedOn() === '/tickets?status=resolvido', 'After their own expired session, the same person returns to the page they were on');
+  await logout('ti');
+
+  check(!diagnostics.some((item) => item.event === 'response' && item.status >= 500), 'No API response with a 5xx status during the whole run');
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);
   if (visibilityRecoveries) console.log(`The browser page was brought back to the front ${visibilityRecoveries} time(s) (hidden by the OS).`);

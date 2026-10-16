@@ -23,6 +23,13 @@ router.post('/products/:id/adjustments', requirePermission('inventory:adjust'), 
 router.post('/products/:id/discards', requirePermission('inventory:adjust'), inventory.discardUnits);
 router.post('/products/:id/reversals', requirePermission('inventory:adjust'), inventory.reverse);
 
+// Assets tracked one by one. /mine is open to everyone: only the person's own equipment.
+router.get('/assets/mine', inventory.myAssets);
+router.get('/assets', requirePermission('inventory:read'), inventory.listAssets);
+router.post('/assets', requirePermission('inventory:operate'), inventory.registerAsset);
+router.get('/assets/:id', requirePermission('inventory:read'), inventory.getAsset);
+router.post('/assets/:id/:action', requirePermission('inventory:operate'), inventory.changeAsset);
+
 // Ledger
 router.get('/movements', requirePermission('inventory:read'), inventory.movements);
 router.get('/movements/:id', requirePermission('inventory:read'), inventory.movement);

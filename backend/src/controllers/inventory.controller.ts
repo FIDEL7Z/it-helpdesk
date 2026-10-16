@@ -1,7 +1,10 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '../middlewares/auth.middleware';
-import { INVENTORY_LIMITS, MOVEMENT_TYPES, PRODUCT_TYPES, PRODUCT_UNITS, TRACKING_MODES, type StockMovementDocument } from '../models/inventory.model';
+import { ASSET_STATUSES, INVENTORY_LIMITS, MOVEMENT_TYPES, PRODUCT_TYPES, PRODUCT_UNITS, TRACKING_MODES, type StockMovementDocument } from '../models/inventory.model';
+import { can } from '../auth/permissions';
+import * as assets from '../services/asset.service';
+import type { AssetAction } from '../services/asset.service';
 import * as catalog from '../services/catalog.service';
 import { movementViews, listMovements } from '../services/movement.service';
 import * as stock from '../services/stock.service';
@@ -151,4 +154,69 @@ export async function movement(req: Request, res: Response): Promise<void> {
   const found = await StockMovementModel.findById(params.id);
   if (!found) throw new HttpError(404, 'Movement not found');
   res.json({ movement: (await movementViews([found]))[0] });
+}
+
+// ---------- Assets ----------
+
+const assetRegister = z.strictObject({
+  operationId,
+  productId: id,
+  assetTag: z.string().trim().min(2).max(INVENTORY_LIMITS.tagMax).regex(/^[A-Za-z0-9._/-]+$/, 'Use letters, digits, dots, slashes or hyphens'),
+  serialNumber: z.string().trim().max(INVENTORY_LIMITS.serialMax).nullable().optional(),
+  acquiredAt: z.iso.date().nullable().optional(),
+  notes: z.string().trim().max(INVENTORY_LIMITS.notesMax).nullable().optional(),
+  status: z.enum(['available', 'in_use']).default('available'),
+  holderId: id.nullable().optional(),
+  departmentId: id.nullable().optional(),
+  roomId: id.nullable().optional(),
+  ticketId: id.nullable().optional(),
+  reason: optionalReason,
+});
+const assetAction = z.strictObject({ operationId, reason: optionalReason, ...references, holderId: id.nullable().optional() });
+const assetQuery = z.strictObject({
+  q: z.string().trim().max(60).optional(),
+  status: z.enum(ASSET_STATUSES).optional(),
+  productId: id.optional(), departmentId: id.optional(), holderId: id.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+const ACTIONS = {
+  reserve: 'asset_reserve', 'cancel-reservation': 'asset_reservation_cancel', assign: 'asset_assign', transfer: 'asset_transfer',
+  return: 'asset_return', maintenance: 'asset_maintenance', defective: 'asset_defective', retire: 'asset_retire',
+} as const satisfies Record<string, AssetAction>;
+const actionParams = z.strictObject({ id, action: z.enum(Object.keys(ACTIONS) as [keyof typeof ACTIONS, ...(keyof typeof ACTIONS)[]]) });
+
+async function respondAsset(res: Response, assetId: string, result: { movement: StockMovementDocument; replayed: boolean }): Promise<void> {
+  const [movement] = await movementViews([result.movement]);
+  const [asset] = await assets.assetViews([await assets.getAsset(assetId)]);
+  res.status(result.replayed ? 200 : 201).json({ movement, asset, replayed: result.replayed });
+}
+
+export async function listAssets(req: Request, res: Response): Promise<void> {
+  res.json(await assets.listAssets(assetQuery.parse(req.query)));
+}
+
+export async function myAssets(req: Request, res: Response): Promise<void> {
+  res.json({ assets: await assets.myAssets(getAuthenticatedUser(req)) });
+}
+
+export async function getAsset(req: Request, res: Response): Promise<void> {
+  const params = idParams.parse(req.params);
+  const [asset] = await assets.assetViews([await assets.getAsset(params.id)]);
+  const history = await StockMovementModel.find({ kind: 'asset', asset: params.id }).sort({ sequence: -1 });
+  res.json({ asset, history: await movementViews(history) });
+}
+
+export async function registerAsset(req: Request, res: Response): Promise<void> {
+  const result = await assets.registerAsset(assetRegister.parse(req.body), getAuthenticatedUser(req));
+  await respondAsset(res, result.movement.asset!.toString(), result);
+}
+
+export async function changeAsset(req: Request, res: Response): Promise<void> {
+  const params = actionParams.parse(req.params);
+  const action = ACTIONS[params.action];
+  // Writing an asset off is an exceptional decision, like an inventory adjustment.
+  const actor = getAuthenticatedUser(req);
+  if (action === 'asset_retire' && !can(actor.role, 'inventory:adjust')) throw new HttpError(403, 'You do not have permission to access this resource');
+  await respondAsset(res, params.id, await assets.changeAsset(params.id, action, assetAction.parse(req.body), actor));
 }

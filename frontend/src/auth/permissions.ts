@@ -14,6 +14,13 @@ const PERMISSIONS = {
   'incidents:follow': ['solicitante', 'ti', 'gestor'],
   'kb:read': ['solicitante', 'ti', 'gestor'],
   'kb:manage': ['ti', 'gestor'],
+  'org:read': ['solicitante', 'ti', 'gestor'],
+  'org:manage': ['gestor'],
+  'people:list': ['ti', 'gestor'],
+  'inventory:read': ['ti', 'gestor'],
+  'inventory:operate': ['ti', 'gestor'],
+  'inventory:adjust': ['gestor'],
+  'inventory:insights': ['gestor'],
 } as const satisfies Record<string, readonly UserRole[]>
 
 export type Permission = keyof typeof PERMISSIONS

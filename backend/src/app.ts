@@ -8,6 +8,7 @@ import incidentRoutes from './routes/incident.routes';
 import articleRoutes from './routes/article.routes';
 import ticketRoutes from './routes/ticket.routes';
 import userRoutes from './routes/user.routes';
+import organizationRoutes from './routes/organization.routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/organization', organizationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use(notFoundHandler);

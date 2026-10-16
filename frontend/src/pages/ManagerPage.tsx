@@ -9,6 +9,7 @@ import { getManagerDashboard, type ManagerDashboard, type Count } from '../servi
 import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS, SUBJECT_LABELS } from '../services/tickets'
 import { IncidentsOverview } from '../components/IncidentsOverview'
 import { QualityOverview } from '../components/QualityOverview'
+import { OriginNotice } from '../components/TicketBadges'
 import { getErrorMessage } from '../utils/errors'
 
 const PERIODS = { today: 'Hoje', week: 'Últimos sete dias', month: 'Mês atual', year: 'Ano atual' }
@@ -32,9 +33,8 @@ function ManagerContent() {
   const key = params.toString()
   const [retry, setRetry] = useState(0)
   const requestKey = `${key}#${retry}`
-  const [state, setState] = useState<{ key: string; data: ManagerDashboard | null; error: string | null }>({ key: '', data: null, error: null })
-  // Set when the demo environment opened on the demo data because there is no operational data.
-  const [originNote, setOriginNote] = useState<string | null>(null)
+  // demoAvailable: no operational data yet but demonstration data exists; it is offered, never selected for the person.
+  const [state, setState] = useState<{ key: string; data: ManagerDashboard | null; error: string | null; demoAvailable: boolean }>({ key: '', data: null, error: null, demoAvailable: false })
   // Keyed results prevent stale totals from being displayed under newly selected filters.
   const loading = state.key !== requestKey
   const data = loading ? null : state.data
@@ -44,28 +44,21 @@ function ManagerContent() {
     const query = DEMO_MODE ? new URLSearchParams(key) : new URLSearchParams([...new URLSearchParams(key)].filter(([name]) => name !== 'dataOrigin'))
     getManagerDashboard(query, controller.signal)
       .then(async ({ dashboard }) => {
-        // Demo environment without operational data: open on the demo data once, saying so,
-        // instead of a page of zeros. The data stays separated and labelled as fictitious.
-        if (DEMO_MODE && dashboard.demoControlsEnabled && !query.has('dataOrigin') && isEmpty(dashboard)) {
+        let demoAvailable = false
+        if (DEMO_MODE && dashboard.demoControlsEnabled && (query.get('dataOrigin') ?? 'operational') === 'operational' && isEmpty(dashboard)) {
           const demoQuery = new URLSearchParams(query)
           demoQuery.set('dataOrigin', 'demo')
-          const demo = await getManagerDashboard(demoQuery, controller.signal)
-          if (!isEmpty(demo.dashboard)) {
-            setOriginNote('Ainda não há chamados operacionais. Você está vendo os dados de demonstração, que são fictícios e ficam separados.')
-            setParams(demoQuery, { replace: true })
-            return
-          }
+          demoAvailable = !isEmpty((await getManagerDashboard(demoQuery, controller.signal)).dashboard)
         }
-        setState({ key: requestKey, data: dashboard, error: null })
+        setState({ key: requestKey, data: dashboard, error: null, demoAvailable })
       })
-      .catch((error: unknown) => { if (!controller.signal.aborted) setState({ key: requestKey, data: null, error: getErrorMessage(error) }) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setState({ key: requestKey, data: null, error: getErrorMessage(error), demoAvailable: false }) })
     return () => controller.abort()
-  }, [key, requestKey, setParams])
+  }, [key, requestKey])
   function filter(name: string, value: string) {
     const next = new URLSearchParams(params)
     if (value) next.set(name, value)
     else next.delete(name)
-    if (name === 'dataOrigin') setOriginNote(null)
     setParams(next)
   }
   const origin = DEMO_MODE ? params.get('dataOrigin') ?? 'operational' : 'operational'
@@ -109,12 +102,12 @@ function ManagerContent() {
       </div><p className="field__hint">Analista filtra o responsável na carga atual e nas solicitações; nos eventos, filtra o autor da ação. Categoria, prioridade e status refletem o estado atual do chamado.</p></details>
     </div>
 
-    {originNote && <p className="alert alert--info" role="status">{originNote}</p>}
+    {origin !== 'operational' && <OriginNotice origin={origin as 'demo' | 'legacy'} />}
 
     {loading ? <div className="card card--empty" role="status"><span className="spinner" aria-hidden="true" />Carregando visão gerencial...</div>
       : error ? <div className="alert alert--error" role="alert"><p>{error}</p><button className="button button--secondary" onClick={() => setRetry(n => n + 1)}>Tentar novamente</button></div>
       : data && <div className="dashboard manager-sections">
-        {isEmpty(data) && <p className="alert alert--info" role="status">Não há chamados nesta origem de dados com os filtros atuais. Os zeros abaixo indicam ausência de registros, não desempenho da equipe.</p>}
+        {isEmpty(data) && <div className="alert alert--info" role="status"><p>Não há chamados nesta origem de dados com os filtros atuais. Os zeros abaixo indicam ausência de registros, não desempenho da equipe.</p>{state.demoAvailable && <p>Os dados de demonstração são fictícios e ficam separados. <button type="button" className="button button--secondary button--small" onClick={() => filter('dataOrigin', 'demo')}>Ver dados de demonstração</button></p>}</div>}
 
         <section aria-labelledby="manager-current" className="manager-section">
           <h2 id="manager-current" className="section-title">Situação atual</h2>

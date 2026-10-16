@@ -1,6 +1,7 @@
 import { Types, type PipelineStage } from 'mongoose';
 import { daysAgo, lastOperationalActivity } from './activity';
 import { env } from '../config/env';
+import { demoDataEnabled } from './data-origin';
 import { assessWorkload } from './workload-balance';
 import { TicketModel, type TicketCategory, type TicketPriority, type TicketStatus } from '../models/ticket.model';
 import { UserModel } from '../models/user.model';
@@ -170,7 +171,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
   for (const row of snapshot.trends) { const key = String(row._id); periods.set(key, { period: key, created: row.count, resolved: periods.get(key)?.resolved ?? 0 }); }
   for (const row of events.trends) { const key = String(row._id); const entry = periods.get(key) ?? { period: key, created: 0, resolved: 0 }; entry.resolved = row.count; periods.set(key, entry); }
   return {
-    filters, range, asOf: now, demoControlsEnabled: env.DEMO_MODE && process.env.NODE_ENV !== 'production',
+    filters, range, asOf: now, demoControlsEnabled: demoDataEnabled(),
     alerts: { highUnassigned: count(snapshot.highUnassigned), oldPending: count(snapshot.oldPending), inactive: count(snapshot.inactive), unknownActivity: count(snapshot.unknownActivity), ageDays: filters.ageDays ?? 7, inactivityDays: filters.inactivityDays ?? 3, oldest: snapshot.oldest.map(row => ({ id: row._id.toString(), title: row.title, createdAt: row.createdAt, lastOperationalAt: row.lastOperationalAt ?? null, ageDays: Math.floor((now.getTime() - row.createdAt.getTime()) / 86400000) })) },
     workload: snapshot.loads.map(row => ({ id: row._id?.toString() ?? null, name: row._id ? userMap.get(row._id.toString())?.name ?? 'Usuário indisponível' : 'Não atribuído', pending: row.pending, alta: row.highPriority, media: row.mediumPriority, baixa: row.lowPriority })).sort((a, b) => b.pending - a.pending),
     current: { total: snapshot.states.reduce((sum, row) => sum + row.count, 0), inProgress: state('em_andamento'), backlog: state('aberto') + state('em_andamento'), unassigned: snapshot.loads.find(row => row._id === null)?.pending ?? 0 },

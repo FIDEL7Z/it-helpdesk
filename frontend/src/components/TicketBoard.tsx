@@ -16,7 +16,7 @@ import {
   type TicketSummary,
 } from '../services/tickets'
 import { getErrorMessage } from '../utils/errors'
-import { PriorityBadge } from './TicketBadges'
+import { OriginTag, PriorityBadge } from './TicketBadges'
 
 const COLUMNS: { status: TicketStatus; title: string }[] = [
   { status: 'aberto', title: 'Abertos' },
@@ -202,8 +202,9 @@ function BoardCard({ ticket, returnTo, userId, canOperate, canBeAssigned, act }:
       <p className="board-card__meta">
         {CATEGORY_LABELS[ticket.category]} · {ticket.assignee?.name ?? 'Sem responsável'} · {ageLabel(ticket.createdAt)}
       </p>
-      {(ticket.incident || ticket.contested) && (
+      {(ticket.incident || ticket.contested || (ticket.dataOrigin && ticket.dataOrigin !== 'operational')) && (
         <p className="board-card__tags">
+          <OriginTag origin={ticket.dataOrigin} />
           {ticket.incident && (
             <span className={`incident-tag${ticket.incident.status === 'closed' ? ' incident-tag--closed' : ''}`}>
               {ticket.incident.status === 'closed' ? 'Incidente encerrado' : `Incidente · ${affectedLabel(ticket.incident.affectedCount)}`}

@@ -80,8 +80,9 @@ export function unfollowIncident(id: string): Promise<{ incident: PublicIncident
   return apiRequest(`/incidents/${encodeURIComponent(id)}/participation`, { method: 'DELETE' })
 }
 
-export function listManagedIncidents(status?: IncidentStatus, signal?: AbortSignal): Promise<{ incidents: ManagedIncident[] }> {
-  return apiRequest(`/incidents/manage${status ? `?status=${status}` : ''}`, { signal })
+export function listManagedIncidents(status?: IncidentStatus, signal?: AbortSignal, dataOrigin?: 'operational' | 'demo' | 'legacy'): Promise<{ incidents: ManagedIncident[] }> {
+  const query = new URLSearchParams({ ...(status && { status }), ...(dataOrigin && { dataOrigin }) }).toString()
+  return apiRequest(`/incidents/manage${query ? `?${query}` : ''}`, { signal })
 }
 
 export function getIncidentIndicators(dataOrigin?: string, signal?: AbortSignal): Promise<{ indicators: IncidentIndicators }> {

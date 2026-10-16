@@ -444,10 +444,20 @@ async function run() {
       await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
       await waitDom('queue recovery', '!!document.querySelector(".ticket-table tbody tr")');
       check(true, 'Queue retry recovers real persisted tickets');
+      // Origin policy: the queue opens on operational data; other origins only when chosen, and labelled.
+      check(await evaluate('!document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture") && !document.querySelector(".ticket-table .origin-tag") && !document.querySelector(".origin-notice") && document.getElementById("list-origin").value === "operational"'), 'The queue opens on operational data, without fictitious rows');
+      await select('list-origin', 'all');
+      await waitDom('all origins chosen', 'location.search.includes("dataOrigin=all") && !!document.querySelector(".origin-notice")');
       await fill('ticket-search', 'Aging and inactivity fixture');
       await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('all origins labelled', 'Array.from(document.querySelectorAll(".ticket-table tbody tr")).some(row => row.textContent.includes("Aging and inactivity fixture") && row.querySelector(".origin-tag--demo")?.textContent === "Demonstração")');
+      check(await evaluate('document.querySelector(".origin-notice")?.textContent.includes("todas as origens")'), 'Choosing all origins labels each demonstration row and keeps a notice on screen');
+      await go('/tickets');
+      await waitDom('back to operational', '!!document.querySelector(".ticket-table tbody tr") && !document.querySelector(".origin-notice")');
+      await fill('ticket-search', 'Requester open ticket');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
       await waitDom('literal queue search', 'location.search.includes("search=") && document.querySelectorAll(".ticket-table tbody tr").length === 1');
-      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Search reaches the API and filters actual queue rows');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Requester open ticket")'), 'Search reaches the API and filters actual queue rows');
       await fill('ticket-search', 'No matching fictitious ticket 987654321');
       await evaluate('document.querySelector("form[role=search]").requestSubmit()');
       await waitDom('queue empty state', '!document.querySelector(".ticket-table tbody tr") && document.querySelector(".card--empty")?.textContent.includes("Nenhum")');

@@ -798,6 +798,123 @@ async function run() {
   check(await landedOn() === '/tickets?status=resolvido', 'After their own expired session, the same person returns to the page they were on');
   await logout('ti');
 
+  // ---------- Stock and assets: the broken keyboard, end to end ----------
+  await resetLoginRateLimit();
+  const nodeApi = async (role, method, path, body) => {
+    const response = await fetch(apiUrl + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signAccessToken(users[role].id)}` }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const raw = await response.text();
+    return { status: response.status, body: raw ? JSON.parse(raw) : null };
+  };
+  const finance = (await nodeApi('gestor', 'POST', '/organization/departments', { name: 'Financeiro' })).body.department;
+  const room203 = (await nodeApi('gestor', 'POST', '/organization/rooms', { departmentId: finance.id, name: 'Sala 203' })).body.room;
+  const sales = (await nodeApi('gestor', 'POST', '/organization/departments', { name: 'Comercial' })).body.department;
+  await nodeApi('gestor', 'PATCH', `/organization/people/${users.solicitante.id}`, { departmentId: finance.id, roomId: room203.id });
+  const k120 = (await nodeApi('ti', 'POST', '/inventory/products', { name: 'Teclado Logitech K120', type: 'teclado', brand: 'Logitech', model: 'K120', tracking: 'quantity', minStock: 2, attributes: { layout: 'ABNT2' } })).body.product;
+  await nodeApi('ti', 'POST', `/inventory/products/${k120.id}/receipts`, { operationId: randomUUID(), quantity: 3 });
+  const availableKeyboards = async () => (await nodeApi('ti', 'GET', `/inventory/products/${k120.id}`)).body.product.stock.available;
+
+  // 1–2. The requester opens a ticket about a broken keyboard; the place starts at her Finance room 203.
+  await login('solicitante');
+  await go('/tickets/new');
+  await waitDom('request form with place', `document.getElementById("ticket-place-department")?.value === ${JSON.stringify(finance.id)} && document.getElementById("ticket-place-room")?.value === ${JSON.stringify(room203.id)}`);
+  check(true, 'The request form starts at the requester\'s department and room');
+  await pick('subject', 'hardware');
+  await fill('title', 'Teclado parou de funcionar');
+  await fill('description', 'Metade das teclas não responde desde cedo; troquei de porta USB.');
+  await submit();
+  await waitDom('requested', 'location.pathname.startsWith("/tickets/") && location.pathname !== "/tickets/new" && !!document.querySelector(".details")');
+  const keyboardTicketId = await evaluate('location.pathname.split("/").pop()');
+  check(await evaluate('Array.from(document.querySelectorAll(".details__row")).some(row => row.textContent.includes("Financeiro — Sala 203"))'), 'The ticket keeps where the problem is');
+  check((await nodeApi('ti', 'GET', `/tickets/${keyboardTicketId}`)).body.ticket.location.room.name === 'Sala 203', 'The place is persisted on the ticket');
+  await logout('solicitante');
+
+  // 3–7. IT opens the ticket, checks the stock and delivers one keyboard without leaving the ticket.
+  await login('ti');
+  await go(`/tickets/${keyboardTicketId}`);
+  await clickButton('Entregar material');
+  await waitDom('delivery form', '!!document.getElementById("deliver-product") && document.getElementById("deliver-product").options.length > 1');
+  check(await evaluate(`Array.from(document.getElementById("deliver-product").options).some(o => o.value === ${JSON.stringify(k120.id)} && o.textContent.includes("3 disponível"))`), 'IT sees the available keyboards from the ticket');
+  check(await evaluate(`document.getElementById("deliver-recipient").value === ${JSON.stringify(users.solicitante.id)} && document.getElementById("deliver-place-room").value === ${JSON.stringify(room203.id)}`), 'Recipient and place come from the ticket');
+  await choose('deliver-product', k120.id);
+  await fill('deliver-quantity', '5');
+  await evaluate('document.querySelector("form[aria-label=\'Entregar material\']").requestSubmit()');
+  await waitDom('insufficient stock message', 'document.querySelector("form[aria-label=\'Entregar material\'] [role=alert]")?.textContent.includes("Só há 3")');
+  check((await nodeApi('ti', 'POST', `/inventory/products/${k120.id}/issues`, { operationId: randomUUID(), quantity: 5, ticketId: keyboardTicketId })).body.code === 'INSUFFICIENT_STOCK', 'A delivery above the balance is refused by the API too');
+  await fill('deliver-quantity', '1');
+  await evaluate('document.querySelector("form[aria-label=\'Entregar material\']").requestSubmit()');
+  await waitDom('delivery recorded', 'Array.from(document.querySelectorAll(".materials-panel .movement-list__item")).some(item => item.textContent.includes("Entrega · 1 un.") && item.textContent.includes("Financeiro — Sala 203"))');
+  check(await availableKeyboards() === 2, 'The stock went down by exactly one unit (checked in the API)');
+  const ledgerRows = (await nodeApi('ti', 'GET', `/inventory/movements?ticketId=${keyboardTicketId}`)).body.movements;
+  check(ledgerRows.length === 1 && ledgerRows[0].actor.id === users.ti.id && ledgerRows[0].recipient.id === users.solicitante.id, 'The ledger records who delivered, who received and the ticket');
+  check((await nodeApi('ti', 'GET', `/tickets/${keyboardTicketId}`)).body.ticket.status === 'aberto', 'Delivering material did not resolve the ticket');
+  check(await evaluate(`document.querySelector(".materials-panel .movement-list__meta")?.textContent.includes(${JSON.stringify(`Registrado por ${users.ti.name}`)})`), 'The ticket shows who registered the delivery');
+  await command('Page.reload', { ignoreCache: true });
+  await waitDom('delivery after reload', 'Array.from(document.querySelectorAll(".materials-panel .movement-list__item")).some(item => item.textContent.includes("Entrega · 1 un."))');
+  check(true, 'A reload keeps the delivery on the ticket');
+  // From the ticket to the stock and back.
+  await evaluate('Array.from(document.querySelectorAll(".materials-panel a")).find(a => a.textContent === "Teclado Logitech K120").click()');
+  await waitDom('product page from ticket', `location.pathname === "/inventory/products/${k120.id}" && document.querySelector(".balance__main")?.textContent === "2"`);
+  await waitDom('ticket link on product history', `!!Array.from(document.querySelectorAll("a")).find(a => a.getAttribute("href") === "/tickets/${keyboardTicketId}")`);
+  await evaluate(`Array.from(document.querySelectorAll("a")).find(a => a.getAttribute("href") === "/tickets/${keyboardTicketId}").click()`);
+  await waitDom('back to the ticket', `location.pathname === "/tickets/${keyboardTicketId}"`);
+  check(true, 'Navigation goes from the ticket to the stock and back');
+
+  // Registering a material and a receipt in the module.
+  await go('/inventory/products');
+  await clickButton('Novo material');
+  await waitDom('product form', '!!document.getElementById("product-name")');
+  await fill('product-name', 'Mouse E2E M90');
+  await choose('product-type', 'mouse');
+  await fill('product-min', '1');
+  await evaluate('document.querySelector(".product-form").requestSubmit()');
+  await waitDom('product registered', 'location.pathname.startsWith("/inventory/products/") && document.querySelector(".page__title")?.textContent === "Mouse E2E M90"');
+  const mouseId = await evaluate('location.pathname.split("/").pop()');
+  await fill('stock-quantity', '4');
+  await evaluate('document.querySelector(".stock-form").requestSubmit()');
+  await waitDom('receipt recorded', 'document.querySelector(".balance__main")?.textContent === "4"');
+  check((await nodeApi('ti', 'GET', `/inventory/products/${mouseId}`)).body.product.stock.onHand === 4, 'A material registered in the interface receives units, persisted');
+
+  // A tagged asset moved to another department.
+  const notebook = (await nodeApi('ti', 'POST', '/inventory/products', { name: 'Notebook E2E', type: 'notebook', tracking: 'asset' })).body.product;
+  const asset = (await nodeApi('ti', 'POST', '/inventory/assets', { operationId: randomUUID(), productId: notebook.id, assetTag: 'E2E-0001', status: 'in_use', departmentId: finance.id, roomId: room203.id })).body.asset;
+  await go(`/inventory/assets/${asset.id}`);
+  await waitDom('asset actions', `!!document.getElementById("asset-action-${asset.id}")`);
+  await choose(`asset-action-${asset.id}`, 'transfer');
+  await waitDom('transfer fields', `!!document.getElementById("asset-place-${asset.id}-department")`);
+  await choose(`asset-place-${asset.id}-department`, sales.id);
+  await evaluate('document.querySelector(".asset-form").requestSubmit()');
+  await waitDom('asset transferred', 'Array.from(document.querySelectorAll(".movement-list__item")).some(item => item.textContent.includes("Transferência"))');
+  check((await nodeApi('ti', 'GET', `/inventory/assets/${asset.id}`)).body.asset.location.department.name === 'Comercial', 'A tagged asset is transferred to another department, persisted');
+
+  // Stock module on a phone.
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await go('/inventory');
+  await waitDom('inventory on mobile', '!!document.querySelector(".inventory-stats") && !document.querySelector(".spinner")');
+  check(await evaluate('document.documentElement.scrollWidth <= 390'), 'The stock overview fits 390px');
+  await go('/inventory/movements');
+  await waitDom('ledger on mobile', '!!document.querySelector(".inventory-table tbody tr")');
+  check(await evaluate('document.documentElement.scrollWidth <= 390'), 'The movement ledger fits 390px');
+  await command('Emulation.clearDeviceMetricsOverride');
+  await logout('ti');
+
+  // 8. The requester sees what was delivered for her request, and nothing of the stock.
+  await login('solicitante');
+  await go(`/tickets/${keyboardTicketId}`);
+  await waitDom('delivered material', '!!document.getElementById("delivered-title")');
+  check(await evaluate('document.querySelector(".delivery-list")?.textContent.includes("Teclado Logitech K120") && !document.querySelector(".materials-panel")'), 'The requester sees the delivered keyboard, without the stock panel');
+  check(!(await evaluate('Array.from(document.querySelectorAll(".app-nav a")).some(a => a.getAttribute("href") === "/inventory")')), 'Requesters have no stock menu');
+  await go('/inventory');
+  await waitDom('requester kept out of the stock', 'location.pathname === "/dashboard"');
+  check((await browserApi('GET', '/inventory/products')).status === 403, 'The stock API refuses requesters');
+  await logout('solicitante');
+
+  // 9. The manager sees the consumption.
+  await login('gestor');
+  await go('/manager');
+  await waitDom('manager inventory', '!!document.getElementById("manager-inventory") && !!document.getElementById("inventory-top")');
+  check(await evaluate('document.querySelector("[aria-labelledby=inventory-top]")?.textContent.includes("Teclado Logitech K120") && document.querySelector("[aria-labelledby=inventory-departments]")?.textContent.includes("Financeiro")'), 'The manager sees the keyboard consumption by material and department');
+  await logout('gestor');
+
   check(!diagnostics.some((item) => item.event === 'response' && item.status >= 500), 'No API response with a 5xx status during the whole run');
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);

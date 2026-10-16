@@ -22,7 +22,8 @@ export function AppLayout() {
   const isManager = user?.role === 'gestor'
 
   return (
-    <div className="app-shell">
+    // Requesters get the centered portal container; IT and managers keep the wide one for queues and tables.
+    <div className={`app-shell${isRequester ? ' app-shell--portal' : ''}`}>
       <header className="app-header">
         <div className="app-header__inner">
           <div className="brand">

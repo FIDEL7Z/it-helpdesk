@@ -50,6 +50,13 @@
   --space-5: 24px;
   --space-6: 32px;
 
+  /* Containers. The header and the page share one width per profile, so the brand, the menu and
+     the page title start on the same line. */
+  --container-wide: 1480px; /* IT and management: queues, boards, tables and dashboards */
+  --container-portal: 1280px; /* requester: a centered portal */
+  --container-reading: 760px; /* running text: articles */
+  --gutter: 24px;
+
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -456,10 +463,18 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 32px;
-  max-width: 1480px;
+  max-width: var(--shell-width);
   min-height: 64px;
   margin: 0 auto;
-  padding: 10px 24px;
+  padding: 10px var(--gutter);
+}
+
+.app-shell {
+  --shell-width: var(--container-wide);
+}
+
+.app-shell--portal {
+  --shell-width: var(--container-portal);
 }
 
 .app-nav {
@@ -510,14 +525,18 @@ textarea {
 }
 
 .app-main {
-  max-width: 1480px;
+  max-width: var(--shell-width);
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 32px var(--gutter);
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    --gutter: 16px;
+  }
+
   .app-header__inner {
-    padding: 10px 16px;
+    padding: 10px var(--gutter);
   }
 
   .brand {
@@ -540,7 +559,7 @@ textarea {
   }
 
   .app-main {
-    padding: 24px 16px;
+    padding: 24px var(--gutter);
   }
 }
 
@@ -978,8 +997,9 @@ textarea.field__input {
 
 /* ---------- Tickets: forms and details ---------- */
 
+/* Running text keeps a readable line length inside any container. */
 .page--narrow {
-  max-width: 760px;
+  max-width: var(--container-reading);
 }
 
 .back-link {
@@ -2993,11 +3013,10 @@ a:where(:not(.button)):hover {
 
 /* ---------- Requester help portal ---------- */
 
+/* The portal container (header and page) sets the width; the page itself does not narrow it again. */
 .portal {
   display: grid;
   gap: var(--space-6);
-  max-width: 1120px;
-  margin: 0 auto;
 }
 
 .portal-hero {

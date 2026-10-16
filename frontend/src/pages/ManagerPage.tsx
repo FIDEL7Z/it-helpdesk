@@ -81,9 +81,7 @@ function ManagerContent() {
     return `/tickets?${query}`
   }
   const highestLoad = data ? Math.max(0, ...data.team.map(row => row.pending)) : 0
-  const busiest = data ? data.team.filter(row => row.pending > 0 && row.pending === highestLoad) : []
-  const operators = data ? data.team.filter(row => row.active && (row.role === 'ti' || row.role === 'gestor')) : []
-  const averageLoad = operators.length ? operators.reduce((sum, row) => sum + row.pending, 0) / operators.length : 0
+  const balance = data?.workloadBalance
   return <section className="page manager-page">
     <header className="page__header page__header--with-action">
       <div><p className="eyebrow">Gestão de TI</p><h1 className="page__title">Visão gerencial</h1><p className="page__subtitle">Onde agir agora, como está a equipe e como os solicitantes avaliam as resoluções.</p></div>
@@ -135,10 +133,10 @@ function ManagerContent() {
           <Link className="alert-card" to={tickets({ attention: 'oldest', ageDays: String(data.alerts.ageDays), pending: 'true' })}><strong className="alert-card__value">{data.alerts.oldPending}</strong><span>Pendentes há {data.alerts.ageDays} dias ou mais</span><span>Consultar mais antigos →</span></Link>
           <Link className="alert-card" to={tickets({ attention: 'inactive', inactivityDays: String(data.alerts.inactivityDays), pending: 'true' })}><strong className="alert-card__value">{data.alerts.inactive}</strong><span>Sem movimentação há {data.alerts.inactivityDays} dias</span><span>Consultar fila →</span></Link>
         </div>
-        {busiest.length > 0 && operators.length > 1 && highestLoad > averageLoad && <p className="manager-load-note">
-          <strong>Carga desigual:</strong> {busiest.map(row => row.name).join(' e ')} {busiest.length > 1 ? 'estão' : 'está'} com {highestLoad} pendências; a média da equipe é {averageLoad.toFixed(1).replace('.', ',')}. Avalie redistribuir — é um dado de carga atual, não de desempenho. <Link to={tickets(busiest.length === 1 ? { assigneeId: busiest[0].id, pending: 'true' } : { pending: 'true' })}>Ver fila</Link>
+        {balance?.uneven && balance.highest && balance.lowest && <p className="manager-load-note">
+          <strong>Carga desigual:</strong> {balance.highest.names.join(' e ')} {balance.highest.names.length > 1 ? 'estão' : 'está'} com {balance.highest.pending} pendências e {balance.lowest.names.join(' e ')} com {balance.lowest.pending}; a média dos {balance.members} integrantes da escala é {balance.average.toFixed(1).replace('.', ',')}. Avalie redistribuir — é um dado de carga atual, não de desempenho. <Link to={tickets(balance.highest.ids.length === 1 ? { assigneeId: balance.highest.ids[0], pending: 'true' } : { pending: 'true' })}>Ver fila</Link>
         </p>}
-        <details className="manager-help"><summary>Como interpretar os alertas</summary><p>Idade: tempo desde a abertura. Inatividade: desde a última ação comprovada de suporte ou gestor. {data.alerts.unknownActivity} pendências sem movimentação comprovada não entram no alerta de inatividade. Não representam SLA. Ajuste os dias em “Mais filtros”.</p></details>
+        <details className="manager-help"><summary>Como interpretar os alertas</summary><p>Carga desigual compara os analistas de TI ativos, inclusive quem está sem chamados, e os gestores apenas enquanto têm pendências; aparece quando a diferença entre o mais e o menos carregado é de pelo menos 3 chamados e de metade da média. Idade: tempo desde a abertura. Inatividade: desde a última ação comprovada de suporte ou gestor. {data.alerts.unknownActivity} pendências sem movimentação comprovada não entram no alerta de inatividade. Não representam SLA. Ajuste os dias em “Mais filtros”.</p></details>
         {data.alerts.oldest.length > 0 && <details className="manager-help"><summary>Pendências mais antigas</summary><ul>{data.alerts.oldest.map(row => <li key={row.id}><Link to={`/tickets/${row.id}`} state={{ returnTo: tickets({ pending: 'true' }) }}>{row.title}</Link> · {row.ageDays} dias desde a abertura</li>)}</ul></details>}
         </section>
 

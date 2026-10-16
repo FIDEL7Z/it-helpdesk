@@ -1,6 +1,7 @@
 import { Types, type PipelineStage } from 'mongoose';
 import { daysAgo, lastOperationalActivity } from './activity';
 import { env } from '../config/env';
+import { assessWorkload } from './workload-balance';
 import { TicketModel, type TicketCategory, type TicketPriority, type TicketStatus } from '../models/ticket.model';
 import { UserModel } from '../models/user.model';
 
@@ -151,7 +152,7 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     workload: snapshot.loads.map(row => ({ id: row._id?.toString() ?? null, name: row._id ? userMap.get(row._id.toString())?.name ?? 'Usuário indisponível' : 'Não atribuído', pending: row.pending, alta: row.highPriority, media: row.mediumPriority, baixa: row.lowPriority })).sort((a, b) => b.pending - a.pending),
     current: { total: snapshot.states.reduce((sum, row) => sum + row.count, 0), inProgress: state('em_andamento'), backlog: state('aberto') + state('em_andamento'), unassigned: snapshot.loads.find(row => row._id === null)?.pending ?? 0 },
     period: { created: count(snapshot.created), resolutions: events.resolutions.reduce((sum, row) => sum + row.count, 0), resolvedTickets: count(events.uniqueTickets), reopenings: events.reopenings.reduce((sum, row) => sum + row.count, 0) },
-    distributions: { priority: snapshot.priority, category: snapshot.category }, team,
+    distributions: { priority: snapshot.priority, category: snapshot.category }, team, workloadBalance: assessWorkload(team),
     requesters: snapshot.requesters.map(row => ({ id: row._id.toString(), name: userMap.get(row._id.toString())?.name ?? 'Usuário indisponível', created: row.created, pending: row.pending, categories: row.categories })),
     options: { analysts: users.filter(u => ['ti', 'gestor'].includes(u.role)).map(u => ({ id: u._id.toString(), name: u.name })), requesters: users.map(u => ({ id: u._id.toString(), name: u.name })) },
     // Hour zeros are factual absence in the selected set; no synthetic historical events are introduced.

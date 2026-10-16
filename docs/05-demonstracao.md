@@ -159,8 +159,8 @@ Em **16/10/2026**, após a revisão de layout responsivo, as seguintes verifica�
 
 O contraste dos botões (primário, secundário, ghost e da barra, como `<button>` e como link) foi medido nos dois temas, nos estados normal, hover, focus e active: o texto fica entre 4,76:1 e 18,4:1, e o anel de foco não fica abaixo de 5,36:1.
 
-O E2E falhou 4 vezes em 8 execuções, sempre com a mesma assinatura: o sistema ocultou duas vezes seguidas a página headless e, em seguida, o navegador cancelou as requisições à API. Os pontos de falha variaram:
-- ao recarregar o painel do gestor (2 vezes);
+O E2E falhou 3 vezes em 8 execuções: 1 de 4 antes da correção do anel de foco e 2 de 4 depois. A assinatura foi sempre a mesma: o sistema ocultou a página headless ao menos duas vezes seguidas e, em seguida, o navegador cancelou as requisições à API. Os pontos de falha variaram:
+- ao recarregar o painel do gestor;
 - ao recarregar a página Início do solicitante;
 - na tela de login.
 

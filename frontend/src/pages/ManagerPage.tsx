@@ -10,6 +10,7 @@ import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tic
 import { IncidentsOverview } from '../components/IncidentsOverview'
 import { QualityOverview } from '../components/QualityOverview'
 import { OriginNotice } from '../components/TicketBadges'
+import { InventoryInsights } from '../components/inventory/InventoryInsights'
 import { getErrorMessage } from '../utils/errors'
 
 const PERIODS = { today: 'Hoje', week: 'Últimos sete dias', month: 'Mês atual', year: 'Ano atual' }
@@ -153,6 +154,7 @@ function ManagerContent() {
 
         <IncidentsOverview dataOrigin={origin} />
         <QualityOverview quality={data.quality} />
+        <InventoryInsights period={params.get('period') ?? 'month'} dataOrigin={origin} />
 
         <section aria-labelledby="manager-demand" className="manager-section">
           <h2 id="manager-demand" className="section-title">Demanda e tendências</h2>

@@ -2278,9 +2278,85 @@ html {
   color: var(--color-text);
 }
 
-.request-form {
+/* Request form. One column in reading order on phones and tablets; from 960px, the request on the
+   left (about 640-840px) and a context column (280-360px). Same width for requesters and for the
+   team, whose container is wider. */
+.request-page {
+  max-width: calc(var(--container-portal) - 2 * var(--gutter));
+}
+
+.request-layout {
   display: grid;
-  gap: 16px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.request-layout__context {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Nothing beside the form (team, no related problems): one column at a comfortable width. */
+.request-layout--single {
+  max-width: var(--container-reading);
+}
+
+.support-steps--aside {
+  display: none;
+}
+
+.support-steps--end {
+  display: grid;
+}
+
+@media (min-width: 960px) {
+  .request-layout:not(.request-layout--single) {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    /* Up to four items on the left (subject, consulted article, questions, fields). A taller
+       context column grows the last, flexible row instead of spreading the left column apart. */
+    grid-template-rows: repeat(4, auto) 1fr;
+    column-gap: var(--space-6);
+  }
+
+  .request-layout:not(.request-layout--single) > * {
+    grid-column: 1;
+  }
+
+  .request-layout:not(.request-layout--single) > .request-layout__context {
+    grid-column: 2;
+    grid-row: 1 / 6;
+  }
+
+  .support-steps--aside {
+    display: grid;
+  }
+
+  .support-steps--end {
+    display: none;
+  }
+}
+
+.support-steps {
+  gap: var(--space-2);
+}
+
+.support-steps .section-title {
+  margin-bottom: 0;
+}
+
+.support-steps__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* Short choices (priority, equipment) do not stretch across the whole form. */
+.request-layout .form > .field > .field__select {
+  max-width: 420px;
 }
 
 .subject-picker,
@@ -2305,9 +2381,11 @@ html {
   font-weight: 650;
 }
 
+/* Three columns in the desktop form, two on tablets and narrow desktops, one on phones: the
+   220px minimum keeps the two-word subjects and their hints readable. */
 .subject-picker__options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
   gap: 10px;
 }
 
@@ -3316,15 +3394,17 @@ a:where(:not(.button)):hover {
   font-weight: 650;
 }
 
+/* Icon on the first line of the name, even when the name wraps. */
 .subject-option__label {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .subject-option__label .subject-icon {
   width: 18px;
   height: 18px;
+  margin-top: 2px;
   color: var(--color-primary);
 }
 

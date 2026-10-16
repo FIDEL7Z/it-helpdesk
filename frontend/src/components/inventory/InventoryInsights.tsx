@@ -18,7 +18,7 @@ export function InventoryInsights({ period, dataOrigin }: { period: string; data
       </div>
       {error ? <p className="alert alert--error" role="alert">{error}</p> : !insights ? <p className="text-muted" role="status">Carregando estoque...</p> : (
         <>
-          <dl className="incidents-overview__numbers">
+          <dl className="incidents-overview__numbers inventory-insights__numbers">
             <div><dt>Abaixo do mínimo</dt><dd>{insights.stock.belowMinimum.length}</dd></div>
             <div><dt>Equipamentos em manutenção</dt><dd>{insights.assets.in_maintenance ?? 0}</dd></div>
             <div><dt>Equipamentos com defeito</dt><dd>{insights.assets.defective ?? 0}</dd></div>

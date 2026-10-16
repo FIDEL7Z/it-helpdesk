@@ -42,6 +42,8 @@
   --color-nav-hover: #22425f;
   --color-nav-active-bg: #d9f1ee;
   --color-nav-active-text: #17324d;
+  /* Keyboard focus ring on the bar: at least 3:1 against --color-nav in both themes. */
+  --color-nav-focus: #d9f1ee;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -49,6 +51,13 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+
+  /* Containers. The header and the page share one width per profile, so the brand, the menu and
+     the page title start on the same line. */
+  --container-wide: 1480px; /* IT and management: queues, boards, tables and dashboards */
+  --container-portal: 1280px; /* requester: a centered portal */
+  --container-reading: 760px; /* running text: articles */
+  --gutter: 24px;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -102,6 +111,7 @@
   --color-nav-hover: #15273a;
   --color-nav-active-bg: #123a40;
   --color-nav-active-text: #9de5ea;
+  --color-nav-focus: #9de5ea;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.35);
@@ -200,6 +210,7 @@ textarea {
 
 .button--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  color: var(--color-primary-contrast);
 }
 
 .button--secondary {
@@ -455,10 +466,18 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 32px;
-  max-width: 1480px;
+  max-width: var(--shell-width);
   min-height: 64px;
   margin: 0 auto;
-  padding: 10px 24px;
+  padding: 10px var(--gutter);
+}
+
+.app-shell {
+  --shell-width: var(--container-wide);
+}
+
+.app-shell--portal {
+  --shell-width: var(--container-portal);
 }
 
 .app-nav {
@@ -509,14 +528,18 @@ textarea {
 }
 
 .app-main {
-  max-width: 1480px;
+  max-width: var(--shell-width);
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 32px var(--gutter);
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    --gutter: 16px;
+  }
+
   .app-header__inner {
-    padding: 10px 16px;
+    padding: 10px var(--gutter);
   }
 
   .brand {
@@ -539,7 +562,7 @@ textarea {
   }
 
   .app-main {
-    padding: 24px 16px;
+    padding: 24px var(--gutter);
   }
 }
 
@@ -977,8 +1000,9 @@ textarea.field__input {
 
 /* ---------- Tickets: forms and details ---------- */
 
+/* Running text keeps a readable line length inside any container. */
 .page--narrow {
-  max-width: 760px;
+  max-width: var(--container-reading);
 }
 
 .back-link {
@@ -1713,6 +1737,15 @@ html {
   gap: 10px;
 }
 
+/* Status always on the right on tablets and desktops: a long date line wraps inside the card
+   instead of pushing the badge below it on some cards and not others. */
+@media (min-width: 721px) {
+  .request-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
 /* Known problems (public incidents) */
 
 .known-incidents {
@@ -2257,9 +2290,85 @@ html {
   color: var(--color-text);
 }
 
-.request-form {
+/* Request form. One column in reading order on phones and tablets; from 960px, the request on the
+   left (about 640-840px) and a context column (280-360px). Same width for requesters and for the
+   team, whose container is wider. */
+.request-page {
+  max-width: calc(var(--container-portal) - 2 * var(--gutter));
+}
+
+.request-layout {
   display: grid;
-  gap: 16px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.request-layout__context {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Nothing beside the form (team, no related problems): one column at a comfortable width. */
+.request-layout--single {
+  max-width: var(--container-reading);
+}
+
+.support-steps--aside {
+  display: none;
+}
+
+.support-steps--end {
+  display: grid;
+}
+
+@media (min-width: 960px) {
+  .request-layout:not(.request-layout--single) {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    /* Up to four items on the left (subject, consulted article, questions, fields). A taller
+       context column grows the last, flexible row instead of spreading the left column apart. */
+    grid-template-rows: repeat(4, auto) 1fr;
+    column-gap: var(--space-6);
+  }
+
+  .request-layout:not(.request-layout--single) > * {
+    grid-column: 1;
+  }
+
+  .request-layout:not(.request-layout--single) > .request-layout__context {
+    grid-column: 2;
+    grid-row: 1 / 6;
+  }
+
+  .support-steps--aside {
+    display: grid;
+  }
+
+  .support-steps--end {
+    display: none;
+  }
+}
+
+.support-steps {
+  gap: var(--space-2);
+}
+
+.support-steps .section-title {
+  margin-bottom: 0;
+}
+
+.support-steps__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* Short choices (priority, equipment) do not stretch across the whole form. */
+.request-layout .form > .field > .field__select {
+  max-width: 420px;
 }
 
 .subject-picker,
@@ -2284,9 +2393,11 @@ html {
   font-weight: 650;
 }
 
+/* Three columns in the desktop form, two on tablets and narrow desktops, one on phones: the
+   220px minimum keeps the two-word subjects and their hints readable. */
 .subject-picker__options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
   gap: 10px;
 }
 
@@ -2762,7 +2873,9 @@ a {
   color: var(--color-primary);
 }
 
-a:hover {
+/* Links styled as buttons keep their own text color: on the primary button, this hover color is
+   the button's own background and the label would disappear. :where() keeps the old specificity. */
+a:where(:not(.button)):hover {
   color: var(--color-primary-hover);
 }
 
@@ -2800,9 +2913,10 @@ a:hover {
   font-weight: 650;
 }
 
+/* Not --color-nav-active-bg: in the dark theme that is a dark teal (1.5:1 on the bar). */
 .app-nav__link:focus-visible,
 .button--nav:focus-visible {
-  outline: 3px solid var(--color-nav-active-bg);
+  outline: 3px solid var(--color-nav-focus);
   outline-offset: 2px;
 }
 
@@ -2990,11 +3104,10 @@ a:hover {
 
 /* ---------- Requester help portal ---------- */
 
+/* The portal container (header and page) sets the width; the page itself does not narrow it again. */
 .portal {
   display: grid;
   gap: var(--space-6);
-  max-width: 1120px;
-  margin: 0 auto;
 }
 
 .portal-hero {
@@ -3294,15 +3407,17 @@ a:hover {
   font-weight: 650;
 }
 
+/* Icon on the first line of the name, even when the name wraps. */
 .subject-option__label {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .subject-option__label .subject-icon {
   width: 18px;
   height: 18px;
+  margin-top: 2px;
   color: var(--color-primary);
 }
 
@@ -3313,6 +3428,12 @@ a:hover {
 
   .portal-search {
     flex-direction: column;
+  }
+
+  /* In a column, flex: 1 (basis 0) is vertical and squeezed the 52px field to a thin line,
+     leaving the icon (centered on 26px) below it. The field keeps its own height. */
+  .portal-search__input {
+    flex: none;
   }
 
   .portal-search__icon {
@@ -3328,6 +3449,54 @@ a:hover {
 
 .subject-cards:not(.subject-cards--compact) .subject-card__text {
   padding-right: 0;
+}
+
+/* Home subjects: five across when each card keeps about 200px of text, three (3 + 2) on tablets
+   and small laptops. A fixed count avoids a lone card on its own row (4 + 1 or 2 + 2 + 1). Below
+   720px, a compact list with the icon beside the text. */
+.subject-cards:not(.subject-cards--compact) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 719px) {
+  .subject-cards:not(.subject-cards--compact) .subject-card {
+    grid-template-columns: auto 1fr;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .subject-cards:not(.subject-cards--compact) .subject-card__text {
+    padding-right: var(--space-5);
+  }
+}
+
+@media (min-width: 720px) {
+  .subject-cards:not(.subject-cards--compact) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1120px) {
+  .subject-cards:not(.subject-cards--compact) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Filter chips (help center), always five: one row from 960px, 3 + 2 on tablets, a list on phones.
+   A fixed count avoids an empty slot at the end of the row or a lone chip (4 + 1). */
+.subject-cards--compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 600px) {
+  .subject-cards--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .subject-cards--compact {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 960px) {
@@ -3415,10 +3584,23 @@ a:hover {
   font-size: 0.875rem;
 }
 
+/* Always four cards: one row on desktops, 2 + 2 on tablets (never 3 + 1), stacked on phones. */
 .action-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .action-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .action-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .action-card {
@@ -3748,6 +3930,32 @@ a:hover {
 
 .inventory-stats {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+/* Five stock numbers on the management view: one row on desktops, 3 + 2 on tablets, pairs on
+   phones with the last one across, never a lone number on a row of four. */
+.inventory-insights__numbers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inventory-insights__numbers > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .inventory-insights__numbers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .inventory-insights__numbers > div:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+
+@media (min-width: 1100px) {
+  .inventory-insights__numbers {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .stat-card--link {

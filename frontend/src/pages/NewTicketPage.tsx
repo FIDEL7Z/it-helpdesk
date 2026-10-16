@@ -147,6 +147,8 @@ export function NewTicketPage() {
   // The article already read is shown as context, not suggested again.
   const relatedArticles = (related.category === category ? related.articles : []).filter((item) => item.id !== article?.id)
   const relatedIncidents = category ? incidents.filter((incident) => incident.category === category) : incidents
+  // Without anything to show beside it, the form keeps one balanced column instead of an empty one.
+  const hasContext = forRequester || relatedIncidents.length > 0 || relatedArticles.length > 0
   const othersAffected = category === 'rede' && subjectAnswers.othersAffected === 'Sim'
 
   function answer(key: string, value: string) {
@@ -201,7 +203,7 @@ export function NewTicketPage() {
   }
 
   return (
-    <section className="page page--narrow">
+    <section className="page request-page">
       <header className="page__header">
         <Link to={forRequester ? '/dashboard' : '/tickets'} className="back-link">
           {forRequester ? '← Voltar ao início' : '← Voltar para chamados'}
@@ -220,7 +222,9 @@ export function NewTicketPage() {
         </div>
       )}
 
-      <form className="form request-form" onSubmit={handleSubmit} noValidate>
+      {/* Wide screens: the request on the left, what helps decide on the right (known problems,
+          guidance, how support works). Narrow screens: one column, in reading order. */}
+      <form className={`form request-form request-layout${hasContext ? '' : ' request-layout--single'}`} onSubmit={handleSubmit} noValidate>
         <fieldset
           ref={subjectRef}
           tabIndex={-1}
@@ -250,27 +254,33 @@ export function NewTicketPage() {
           </div>
         )}
 
-        <KnownIncidents
-          incidents={relatedIncidents}
-          onChange={(updated) => setIncidents((list) => list.map((item) => (item.id === updated.id ? updated : item)))}
-          onStale={() => setIncidentsReload((n) => n + 1)}
-          headingId="form-known-incidents"
-          title={category ? 'A TI já está cuidando destes problemas' : 'Antes de enviar: é um destes problemas?'}
-          description="Se for o mesmo problema, avise com um clique e acompanhe por aqui, sem abrir outro pedido. Se o seu caso for diferente, continue abaixo."
-        />
+        {hasContext && (
+          <div className="request-layout__context">
+            <KnownIncidents
+              incidents={relatedIncidents}
+              onChange={(updated) => setIncidents((list) => list.map((item) => (item.id === updated.id ? updated : item)))}
+              onStale={() => setIncidentsReload((n) => n + 1)}
+              headingId="form-known-incidents"
+              title={category ? 'A TI já está cuidando destes problemas' : 'Antes de enviar: é um destes problemas?'}
+              description="Se for o mesmo problema, avise com um clique e acompanhe por aqui, sem abrir outro pedido. Se o seu caso for diferente, continue o pedido."
+            />
 
-        {relatedArticles.length > 0 && (
-          <section className="related-articles" aria-labelledby="related-articles-title">
-            <h2 id="related-articles-title" className="section-title">Orientações que podem resolver</h2>
-            <ul className="related-articles__list">
-              {relatedArticles.map((item) => (
-                <li key={item.id}>
-                  <Link to={`/help/${item.id}`}>{item.title}</Link>
-                  <span className="text-muted"> · {item.summary}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+            {relatedArticles.length > 0 && (
+              <section className="card related-articles" aria-labelledby="related-articles-title">
+                <h2 id="related-articles-title" className="section-title">Orientações que podem resolver</h2>
+                <ul className="related-articles__list">
+                  {relatedArticles.map((item) => (
+                    <li key={item.id}>
+                      <Link to={`/help/${item.id}`}>{item.title}</Link>
+                      <span className="text-muted"> · {item.summary}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {forRequester && <SupportSteps placement="aside" />}
+          </div>
         )}
 
         {subjectQuestions.length > 0 && (
@@ -393,7 +403,27 @@ export function NewTicketPage() {
             </button>
           </div>
         </div>
+
+        {forRequester && <SupportSteps placement="end" />}
       </form>
+    </section>
+  )
+}
+
+/**
+ * How a request is handled. Wide screens show it in the context column; narrow screens show it
+ * after the form so it never pushes the fields down. Only one of the two is displayed.
+ */
+function SupportSteps({ placement }: { placement: 'aside' | 'end' }) {
+  const headingId = `support-steps-${placement}`
+  return (
+    <section className={`card support-steps support-steps--${placement}`} aria-labelledby={headingId}>
+      <h2 id={headingId} className="section-title">Como funciona o atendimento</h2>
+      <ol className="support-steps__list">
+        <li>A equipe de TI recebe o pedido e define a prioridade.</li>
+        <li>Você acompanha cada etapa em <Link to="/tickets">Meus pedidos</Link>.</li>
+        <li>Quando a TI resolver, você confirma se deu certo ou avisa que o problema continua.</li>
+      </ol>
     </section>
   )
 }

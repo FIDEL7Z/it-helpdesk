@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-16T10:58:06.856Z",
+  "capturedAt": "2026-10-16T16:56:55.104Z",
   "timezone": "America/Fortaleza",
   "origin": "demo",
   "mode": "isolated",
@@ -34,11 +34,11 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:26.773Z",
+      "capturedAt": "2026-10-16T16:56:12.774Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
@@ -56,11 +56,11 @@
       "title": "Central de ajuda · IT Helpdesk",
       "heading": "Encontre uma solução",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:27.156Z",
+      "capturedAt": "2026-10-16T16:56:13.376Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -74,15 +74,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/help/6ad2031215f398da3bdada2f",
+      "path": "/help/6ad2572815f398da3bddb4f9",
       "title": "Como verificar problemas de Wi-Fi · IT Helpdesk",
       "heading": "Como verificar problemas de Wi-Fi",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:27.548Z",
+      "capturedAt": "2026-10-16T16:56:13.916Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -100,11 +100,11 @@
       "title": "Solicitar suporte · IT Helpdesk",
       "heading": "Solicitar suporte",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:28.104Z",
+      "capturedAt": "2026-10-16T16:56:14.796Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -122,11 +122,11 @@
       "title": "Solicitar suporte · IT Helpdesk",
       "heading": "Solicitar suporte",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:28.200Z",
+      "capturedAt": "2026-10-16T16:56:14.910Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -140,15 +140,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/tickets/6ad20312dc93e30da6f7e84e",
+      "path": "/tickets/6ad25728f093a9f1205fb16f",
       "title": "Erro ao iniciar o aplicativo de notas fiscais · IT Helpdesk",
       "heading": "Erro ao iniciar o aplicativo de notas fiscais",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:28.487Z",
+      "capturedAt": "2026-10-16T16:56:15.310Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -166,11 +166,11 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:29.003Z",
+      "capturedAt": "2026-10-16T16:56:15.849Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -188,15 +188,15 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad20312dc93e30da6f7e848",
+        "id": "6ad25728f093a9f1205fb169",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T10:57:29.555Z",
+      "capturedAt": "2026-10-16T16:56:16.585Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
-        "height": 2783
+        "height": 2573
       }
     },
     {
@@ -628,15 +628,15 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad20312dc93e30da6f7e84a",
+        "id": "6ad25728f093a9f1205fb16b",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T10:58:05.127Z",
+      "capturedAt": "2026-10-16T16:56:53.297Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 768,
-        "height": 7383
+        "height": 7364
       }
     },
     {
@@ -650,15 +650,15 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad20312dc93e30da6f7e84a",
+        "id": "6ad25728f093a9f1205fb16b",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T10:58:06.296Z",
+      "capturedAt": "2026-10-16T16:56:54.516Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
-        "height": 9072
+        "height": 9052
       }
     },
     {

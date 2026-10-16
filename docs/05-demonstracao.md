@@ -140,11 +140,39 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
 | Troca de perfil | E2E: Solicitante → Sair → TI, TI → Sair → Gestor e Gestor → Sair → Solicitante caem na página inicial do próprio perfil; URL protegida volta após o login; recarregar mantém a página; destino que o perfil não abre cai na página inicial; sessão inválida de outra pessoa não decide o destino; nenhuma resposta 5xx em toda a execução |
 | Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
-| Mobile | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
+| Mobile e layout | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px (busca com altura e ícone preservados) e em 1650 px (alinhado ao cabeçalho), formulário de suporte em duas colunas a 1650 px e em uma coluna, na ordem de leitura, a 768 px, as quatro ações da mesa de atendimento em 2 + 2 a 768 px, texto visível no botão **Solicitar suporte** com o mouse sobre ele, anel de foco visível na barra de navegação do tema escuro, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
 
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
+
+Em **16/10/2026**, após a revisão de layout responsivo, as seguintes verificações foram aprovadas:
+- containers por perfil alinhados ao cabeçalho;
+- formulário de suporte em duas colunas;
+- grades de conjuntos fixos sem cartão isolado;
+- texto do botão principal visível com o mouse sobre ele;
+- busca da página Início com a altura preservada no celular;
+- anel de foco do teclado visível na barra de navegação do tema escuro (era 1,5:1, agora 13:1);
+- **256 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`;
+- **186 verificações E2E**, entre elas sete de geometria, estado e foco;
+- typecheck, lint sem warnings, builds, `docs:check` e `git diff --check`.
+
+O contraste dos botões (primário, secundário, ghost e da barra, como `<button>` e como link) foi medido nos dois temas, nos estados normal, hover, focus e active: o texto fica entre 4,76:1 e 18,4:1, e o anel de foco não fica abaixo de 5,36:1.
+
+O E2E falhou 3 vezes em 8 execuções: 1 de 4 antes da correção do anel de foco e 2 de 4 depois. A assinatura foi sempre a mesma: o sistema ocultou a página headless ao menos duas vezes seguidas e, em seguida, o navegador cancelou as requisições à API. Os pontos de falha variaram:
+- ao recarregar o painel do gestor;
+- ao recarregar a página Início do solicitante;
+- na tela de login.
+
+Todas as verificações que chegaram a rodar passaram. É o mesmo padrão registrado abaixo, e a causa não está comprovada. Uma varredura com o navegador nas resoluções 390 × 844, 768 × 1024, 1024 × 768, 1440 × 900, 1650 × 954 e 1920 × 1080 percorreu as páginas dos três perfis e não encontrou:
+- rolagem horizontal;
+- texto cortado;
+- campos estreitos;
+- conjuntos fixos de cartões com um cartão isolado na última linha.
+
+Das 31 capturas, foram refeitas apenas as 10 de telas que mudaram:
+- solicitante: as duas do formulário, as duas da página Início, o problema conhecido na página Início, a Central de ajuda, o artigo e a confirmação de resolução;
+- gestor: as duas da página completa no tablet e no celular, por causa da grade do estoque.
 
 Em **16/10/2026**, com o módulo de estoque e patrimônio: **256 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`, e **179 verificações E2E**; typecheck, lint sem warnings, builds, `docs:check` (sete arquivos Markdown e 31 capturas) e `git diff --check` aprovados. Na última série, o E2E passou em 5 de 6 execuções seguidas; na que falhou, o sistema ocultou a janela do navegador headless 16 vezes (contra 3 ou 4 nas demais) e a página recarregada não iniciou a tempo, o mesmo efeito descrito em [solução de problemas](#solução-de-problemas). Duas instabilidades causadas pelo próprio teste foram corrigidas antes: verificações depois de recarregar que podiam ler a página antiga, e o Vite de teste recarregando ao descobrir dependências de uma página carregada sob demanda.
 

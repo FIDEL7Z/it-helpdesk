@@ -3432,6 +3432,54 @@ a:where(:not(.button)):hover {
   padding-right: 0;
 }
 
+/* Home subjects: five across when each card keeps about 200px of text, three (3 + 2) on tablets
+   and small laptops. A fixed count avoids a lone card on its own row (4 + 1 or 2 + 2 + 1). Below
+   720px, a compact list with the icon beside the text. */
+.subject-cards:not(.subject-cards--compact) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 719px) {
+  .subject-cards:not(.subject-cards--compact) .subject-card {
+    grid-template-columns: auto 1fr;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .subject-cards:not(.subject-cards--compact) .subject-card__text {
+    padding-right: var(--space-5);
+  }
+}
+
+@media (min-width: 720px) {
+  .subject-cards:not(.subject-cards--compact) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1120px) {
+  .subject-cards:not(.subject-cards--compact) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Filter chips (help center), always five: one row from 960px, 3 + 2 on tablets, a list on phones.
+   A fixed count avoids an empty slot at the end of the row or a lone chip (4 + 1). */
+.subject-cards--compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 600px) {
+  .subject-cards--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .subject-cards--compact {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 960px) {
   .portal-band .known-incidents {
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
@@ -3517,10 +3565,23 @@ a:where(:not(.button)):hover {
   font-size: 0.875rem;
 }
 
+/* Always four cards: one row on desktops, 2 + 2 on tablets (never 3 + 1), stacked on phones. */
 .action-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .action-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .action-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .action-card {
@@ -3850,6 +3911,32 @@ a:where(:not(.button)):hover {
 
 .inventory-stats {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+/* Five stock numbers on the management view: one row on desktops, 3 + 2 on tablets, pairs on
+   phones with the last one across, never a lone number on a row of four. */
+.inventory-insights__numbers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inventory-insights__numbers > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .inventory-insights__numbers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .inventory-insights__numbers > div:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+
+@media (min-width: 1100px) {
+  .inventory-insights__numbers {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .stat-card--link {

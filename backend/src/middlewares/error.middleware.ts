@@ -13,7 +13,7 @@ export const notFoundHandler: RequestHandler = (_req, res) => {
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof HttpError) {
-    res.status(error.statusCode).json({ message: error.message });
+    res.status(error.statusCode).json({ message: error.message, ...(error.code && { code: error.code }) });
     return;
   }
 

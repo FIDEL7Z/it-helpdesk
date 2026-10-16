@@ -105,9 +105,9 @@ async function seedEnvironment() {
   process.env.DEMO_MODE = 'true';
   process.env.VITE_DEMO_MODE = 'true';
   process.env.JWT_SECRET = randomUUID();
-  const [{ default: app }, { env }, { UserModel, toPublicUser }, { hashPassword }, { ensureDemoArticles }, { createDemoScenarios }] = await Promise.all([
+  const [{ default: app }, { env }, { UserModel, toPublicUser }, { hashPassword }, { ensureDemoArticles }, { createDemoScenarios }, { seedDemoInventory }] = await Promise.all([
     import('../src/app.ts'), import('../src/config/env.ts'), import('../src/models/user.model.ts'), import('../src/utils/password.ts'),
-    import('../src/services/demo-articles.ts'), import('../src/services/demo-scenarios.ts'),
+    import('../src/services/demo-articles.ts'), import('../src/services/demo-scenarios.ts'), import('../src/services/demo-inventory.ts'),
   ]);
   await mongoose.connect(env.MONGODB_URI, { dbName: database, serverSelectionTimeoutMS: 10000 });
   databaseConnected = true;
@@ -118,7 +118,8 @@ async function seedEnvironment() {
   await ensureDemoArticles(people.tech.id);
   const scenarios = await createDemoScenarios(people);
   if (scenarios.skipped.length || scenarios.created.length === 0) throw new Error('Demo scenarios were not fully created');
-  console.log(`Isolated database seeded: ${scenarios.created.length} fictitious scenarios and the demo help articles.`);
+  await seedDemoInventory(people);
+  console.log(`Isolated database seeded: ${scenarios.created.length} fictitious scenarios, the demo help articles and the demo company inventory.`);
 
   apiServer = app.listen(0, '127.0.0.1');
   await once(apiServer, 'listening');
@@ -305,16 +306,31 @@ async function run() {
   if (!incidentTicket) throw new Error('No active incident');
   await go(`/tickets/${incidentTicket}`, '!!document.querySelector(".incident-panel__public")');
   await capture('incidente-ti-desktop.png', '.incident-panel');
+  // Stock and assets, from the fictitious company seeded above.
+  const listReady = '!!document.querySelector(".inventory-table tbody tr") && !document.querySelector(".spinner") && !document.querySelector("[aria-busy=true]")';
+  await go('/inventory', '!!document.querySelector(".inventory-stats") && !!document.querySelector(".movement-list__item") && !document.querySelector(".spinner")');
+  await capture('estoque-visao-geral-desktop.png');
+  await go('/inventory/products?new=1', '!!document.getElementById("product-name") && !!document.getElementById("product-attr-layout") && ' + listReady);
+  await capture('estoque-cadastro-material-desktop.png', '.product-form');
+  await go('/inventory/assets', listReady);
+  await capture('estoque-equipamentos-desktop.png');
+  await go('/inventory/movements', listReady);
+  await capture('estoque-movimentacoes-desktop.png');
+  const keyboardTicket = (await apiGet('/tickets?search=' + encodeURIComponent('Teclado parou de funcionar') + '&limit=5')).tickets[0]?.id;
+  if (!keyboardTicket) throw new Error('No keyboard ticket in the demo inventory');
+  await go(`/tickets/${keyboardTicket}`, '!!document.querySelector(".materials-panel .movement-list__item")');
+  await capture('chamado-entrega-material-desktop.png', '.materials-panel');
   await logout();
 
   // ---------- Manager ----------
   await login('gestor');
-  const managerReady = '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".chart-container .recharts-surface").length === 4 && Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100) && !document.querySelector(".spinner")';
+  const managerReady = '!!document.querySelector(".manager-source--demo") && document.querySelectorAll(".chart-container .recharts-surface").length === 4 && Array.from(document.querySelectorAll(".chart-container .recharts-surface")).every(el => el.getBoundingClientRect().width > 100) && !!document.getElementById("inventory-top") && !document.querySelector(".spinner")';
   await go('/manager?dataOrigin=demo', managerReady);
   await capture('gestor-visao-geral-desktop.png', null, true);
   await capture('gestor-equipe-carga-desktop.png', '#manager-team');
   await capture('gestor-solicitantes-desktop.png', '#manager-requesters');
   await capture('gestor-graficos-desktop.png', '#manager-trends');
+  await capture('gestor-estoque-desktop.png', '#manager-inventory');
   await setViewport('tablet');
   await go('/manager?dataOrigin=demo', managerReady);
   await capture('gestor-tablet.png', null, true);
@@ -325,7 +341,7 @@ async function run() {
   await go('/help/manage', '!!document.querySelector(".article-table tbody tr") && !!document.querySelector(".status-tab__count") && !document.querySelector(".is-loading")');
   await capture('artigos-gerenciar-desktop.png');
 
-  await writeFile(join(output, 'capture-info.json'), JSON.stringify({ capturedAt: new Date().toISOString(), timezone: 'America/Fortaleza', origin: 'demo', mode: 'isolated', environment: 'Temporary database, API and frontend started by the script, seeded only with the fictitious demo scenarios and help articles, and dropped at the end. The development database is not used.', tool: `${basename(executable)} headless via Chrome DevTools Protocol`, captures }, null, 2) + '\n');
+  await writeFile(join(output, 'capture-info.json'), JSON.stringify({ capturedAt: new Date().toISOString(), timezone: 'America/Fortaleza', origin: 'demo', mode: 'isolated', environment: 'Temporary database, API and frontend started by the script, seeded only with the fictitious demo scenarios, help articles and demo company inventory, and dropped at the end. The development database is not used.', tool: `${basename(executable)} headless via Chrome DevTools Protocol`, captures }, null, 2) + '\n');
   console.log(`${captures.length} real application screenshots saved from the isolated environment.`);
 }
 

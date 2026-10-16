@@ -48,6 +48,13 @@ erDiagram
   USERS ||--o{ KNOWLEDGE_ARTICLES : "autor / último editor"
   KNOWLEDGE_ARTICLES ||--o{ ARTICLE_FEEDBACKS : article
   USERS ||--o{ ARTICLE_FEEDBACKS : user
+  DEPARTMENTS ||--o{ ROOMS : department
+  DEPARTMENTS o|--o{ USERS : "onde trabalha"
+  PRODUCTS ||--o{ ASSETS : "modelo"
+  PRODUCTS ||--o{ STOCK_MOVEMENTS : product
+  ASSETS o|--o{ STOCK_MOVEMENTS : asset
+  TICKETS o|--o{ STOCK_MOVEMENTS : ticket
+  USERS ||--o{ STOCK_MOVEMENTS : "autor"
   USERS {
     ObjectId _id
     String name
@@ -119,6 +126,47 @@ erDiagram
     ObjectId user
     Boolean helpful
   }
+  DEPARTMENTS {
+    ObjectId _id
+    String name "único sem acento"
+    String code "único, opcional"
+    Boolean active
+  }
+  ROOMS {
+    ObjectId _id
+    ObjectId department
+    String name "único no departamento"
+    Boolean active
+  }
+  PRODUCTS {
+    ObjectId _id
+    String sku "único, opcional"
+    String name
+    String type
+    String tracking "quantity ou asset, fixo"
+    Object attributes "por tipo"
+    Number minStock
+    Object stock "projeção: onHand, reserved, defective, version"
+  }
+  ASSETS {
+    ObjectId _id
+    ObjectId product
+    String assetTag "único"
+    String status
+    Object location "snapshot"
+    Object holder "snapshot"
+    Number version
+  }
+  STOCK_MOVEMENTS {
+    ObjectId _id
+    String type
+    Number sequence "única por produto ou equipamento"
+    Object before
+    Object after
+    ObjectId actor
+    ObjectId ticket "nullable"
+    String operationId "único"
+  }
 ```
 
 `HISTORY_EMBEDDED` representa subdocumentos dentro de `tickets`, **não uma terceira coleção**. O diagrama mostra cardinalidades da aplicação, não foreign keys impostas pelo MongoDB. Um usuário pode abrir vários chamados, ser responsável por vários ou ser autor de vários eventos. Cada chamado referencia um solicitante e, opcionalmente, um responsável.
@@ -149,6 +197,26 @@ Os incidentes compartilhados ficam fora do documento do chamado. Assim, a revis�
 
 O MongoDB do Compose roda sem réplica, portanto sem transações entre coleções. Resolver o chamado e encerrar o incidente são duas escritas. Se a segunda falhar, a leitura seguinte de qualquer tela de incidentes encontra a resolução (pelo status atual ou por um evento de resolução posterior à publicação, caso o chamado já tenha sido reaberto) e conclui o encerramento. Se esse reparo também falhar, a resposta mostra o incidente como encerrado sem gravar nada, e a leitura seguinte tenta de novo. Publicação, republicação e participação reconciliam o resultado logo após gravar, o que cobre uma resolução que chegue entre a verificação e a escrita. Regras completas em [produto e regras](01-produto-e-regras.md#incidentes-compartilhados).
 
+### Departamentos e salas
+
+`departments` e `rooms` guardam a estrutura da empresa; a unicidade usa o nome normalizado (sem acento e sem diferença de maiúsculas). Uma sala nunca muda de departamento. `users` ganhou `department`, `room` e `jobTitle` opcionais. Chamados, equipamentos e movimentações guardam o local como snapshot (id e nome do momento), não só a referência.
+
+### Estoque, patrimônio e livro-razão
+
+`products` é o catálogo; `attributes` só aceita as características do tipo, validadas pelo backend. `assets` é um documento por equipamento com número de patrimônio. `stockmovements` é o livro-razão, só de inclusão: o model recusa qualquer atualização ou exclusão.
+
+Cada movimentação leva o estado anterior e o posterior, o autor e seu snapshot, a data do servidor, o motivo, o chamado, quem recebeu, os locais, a reserva que encerra (`closes`), o registro que estorna (`reverses`), a chave de idempotência (`operationId`) e a origem.
+
+**Consistência sem transações.** O MongoDB local roda sem réplica e, portanto, sem transações entre documentos; o módulo não depende delas.
+
+- **A movimentação é o ponto de gravação.** Cada movimentação pega a próxima `sequence` do seu produto (ou do seu equipamento), e o par (produto, sequência) é único. Duas operações simultâneas leem a mesma sequência N e tentam gravar N+1; só uma consegue. A outra relê o saldo e decide de novo: se não houver unidades, recebe "estoque insuficiente". O saldo nunca é lido, subtraído em JavaScript e salvo sem essa garantia.
+- **`products.stock` e o estado de `assets` são projeções.** Se a projeção ficar atrás do livro-razão (escrita interrompida), a próxima operação ou leitura a refaz a partir da última movimentação.
+- **Idempotência.** Repetir uma requisição com a mesma chave devolve a mesma movimentação; a mesma chave com outro autor ou outro conteúdo é recusada (o hash do pedido fica gravado).
+- **Unicidade.** `closes` e `reverses` são únicos: uma reserva fecha e um registro é estornado no máximo uma vez.
+- **Cadastro de equipamento.** São duas escritas; a chave do cadastro fica no equipamento, e repetir a requisição conclui um cadastro interrompido em vez de duplicá-lo.
+
+Se o ambiente tiver réplica, transações poderiam substituir a projeção reparada, mas não são necessárias para estas garantias.
+
 ### Índices explícitos
 
 - `users`: `{ email: 1 }`, único.
@@ -160,6 +228,10 @@ O MongoDB do Compose roda sem réplica, portanto sem transações entre coleçõ
 - `incidentparticipations`: `{ incident: 1, cycle: 1, user: 1 }`, único (participação idempotente); `{ user: 1, leftAt: 1 }` para "problemas que você acompanhou".
 - `knowledgearticles`: `{ status: 1, category: 1, updatedAt: -1 }` para a lista pública por assunto; `{ demoKey: 1 }`, único e parcial, para o seed idempotente.
 - `articlefeedbacks`: `{ article: 1, user: 1 }`, único (um voto por pessoa e artigo).
+- `departments`: `{ nameKey: 1 }`, único; `{ code: 1 }`, único e parcial. `rooms`: `{ department: 1, nameKey: 1 }`, único.
+- `products`: `{ sku: 1 }`, único e parcial; `{ type: 1, active: 1 }`.
+- `assets`: `{ assetTag: 1 }`, único; `{ product: 1, serialNumber: 1 }`, único e parcial; `{ registrationOperationId: 1 }`, único; `{ status: 1, 'location.departmentId': 1 }`; `{ 'holder.id': 1 }`.
+- `stockmovements`: `{ operationId: 1 }`, único; `{ product: 1, sequence: 1 }` e `{ asset: 1, sequence: 1 }`, únicos e parciais por modo; `{ closes: 1 }` e `{ reverses: 1 }`, únicos e parciais; `{ ticket: 1, occurredAt: -1 }`, `{ occurredAt: -1 }`, `{ product: 1, occurredAt: -1 }`.
 - Cada coleção possui também o índice padrão de `_id`.
 
 Por padrão, a lista ordena por `createdAt` e `_id`, ambos descendentes. O alerta `attention=oldest` usa ordem crescente para trazer as pendências mais antigas primeiro. Busca usa regex escapada sobre título, sem índice de texto. Referências de usuários são carregadas em lote, evitando uma consulta por chamado/evento.

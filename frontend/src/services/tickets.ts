@@ -1,3 +1,4 @@
+import type { Location } from './organization'
 import { apiRequest } from './api'
 import type { User } from './auth'
 import type { IncidentBadge } from './incidents'
@@ -123,6 +124,10 @@ export type TicketSummary = {
   awaitingConfirmation?: boolean
   /** Only in the team's list: this ticket is the main ticket of a shared incident. */
   incident?: IncidentBadge | null
+  /** Where the problem happened, as named when the ticket was opened. */
+  location?: Location | null
+  /** The equipment involved (team: with its id; requester: their own, tag and name). */
+  affectedAsset?: { id?: string; assetTag: string; name: string } | null
 }
 
 /** The requester's answer to the resolution of the current cycle (or the one they contested). */
@@ -201,9 +206,11 @@ export type CreateTicketInput = {
   category: TicketCategory
   priority: TicketPriority
   intake?: { answers: { key: string; answer: string }[]; articleId?: string }
+  location?: { departmentId: string | null; roomId: string | null }
+  affectedAssetId?: string
 }
 
-export type UpdateTicketInput = Partial<Omit<CreateTicketInput, 'intake'>> & { reason?: string }
+export type UpdateTicketInput = Partial<Omit<CreateTicketInput, 'intake' | 'location' | 'affectedAssetId'>> & { reason?: string }
 
 export function getIntakeQuestions(signal?: AbortSignal): Promise<{ questions: Record<TicketCategory, IntakeQuestion[]> }> {
   return apiRequest('/tickets/intake-questions', { signal })

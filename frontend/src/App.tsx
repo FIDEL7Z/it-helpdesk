@@ -11,6 +11,13 @@ import { HelpCenterPage } from './pages/HelpCenterPage'
 import { NewTicketPage } from './pages/NewTicketPage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
 import { TicketsPage } from './pages/TicketsPage'
+import { AssetDetailPage } from './pages/inventory/AssetDetailPage'
+import { AssetsPage } from './pages/inventory/AssetsPage'
+import { InventoryOverviewPage } from './pages/inventory/InventoryOverviewPage'
+import { MovementsPage } from './pages/inventory/MovementsPage'
+import { OrganizationPage } from './pages/inventory/OrganizationPage'
+import { ProductDetailPage } from './pages/inventory/ProductDetailPage'
+import { ProductsPage } from './pages/inventory/ProductsPage'
 
 const ManagerPage = lazy(() => import('./pages/ManagerPage').then(module => ({ default: module.ManagerPage })))
 
@@ -32,6 +39,13 @@ function App() {
             <Route path="/help/manage/new" element={<ArticleEditorPage key="new" />} />
             <Route path="/help/manage/:id" element={<ArticleEditorPage key="edit" />} />
             <Route path="/help/:id" element={<ArticlePage />} />
+            <Route path="/inventory" element={<InventoryOverviewPage />} />
+            <Route path="/inventory/products" element={<ProductsPage />} />
+            <Route path="/inventory/products/:id" element={<ProductDetailPage />} />
+            <Route path="/inventory/assets" element={<AssetsPage />} />
+            <Route path="/inventory/assets/:id" element={<AssetDetailPage />} />
+            <Route path="/inventory/movements" element={<MovementsPage />} />
+            <Route path="/inventory/organization" element={<OrganizationPage />} />
           </Route>
         </Route>
 

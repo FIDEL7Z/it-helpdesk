@@ -9,10 +9,12 @@
 1. **Buscar uma solução.** A página **Início** pergunta **Como podemos ajudar?**: digite o problema na busca e clique em **Buscar orientações**, ou escolha um dos cinco cartões de assunto, que levam direto ao pedido guiado. A **Central de ajuda** mostra as orientações publicadas; abra uma e responda **Isso resolveu meu problema.** ou **Ainda preciso de ajuda.**
 2. **Ver se é um problema conhecido.** Em **Problemas conhecidos**, se o problema também está afetando você, clique em **Também estou com esse problema**. Nada mais é necessário: a TI vê que mais uma pessoa foi atingida. Se passar, clique em **Não estou mais com esse problema**.
 3. **Solicitar suporte.** Clique em **Solicitar suporte**, o único botão principal da página, (ou em **Ainda preciso de ajuda.**, que já traz o assunto e o artigo lido). Responda **Com o que você precisa de ajuda?**; aparecem os problemas conhecidos e as orientações daquele assunto, que não impedem o envio.
-4. **Responder às perguntas.** Em **Conte um pouco mais**, responda o que souber; todas são opcionais e podem ser limpas. Se trocar de assunto e voltar, as respostas continuam lá. Preencha **Assunto**, **O que aconteceu?** e **Prioridade sugerida** e clique em **Enviar solicitação**.
-5. **Acompanhar.** A página do pedido abre com a confirmação. Em Início, **Meus pedidos** resume quantos estão aguardando, em atendimento e resolvidos e lista os mais recentes. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
-6. **Confirmar ou contestar a solução.** Quando a TI resolve, o pedido mostra **Seu problema foi resolvido?** (e a marca **Confirme se resolveu** na lista). **Sim, foi resolvido.** encerra; **Não, o problema continua.** pede o que continua acontecendo e devolve o pedido à TI.
-7. **Avaliar (opcional).** Depois de confirmar, escolha de 1 a 5 estrelas e, se quiser, escreva um comentário. **Agora não** pula a avaliação.
+4. **Dizer onde é (opcional).** Em **Onde está o problema?**, o departamento e a sala começam pelo seu local de trabalho; troque se o problema for em outro lugar. Se você tiver equipamentos com patrimônio, pode indicar qual está com problema.
+5. **Responder às perguntas.** Em **Conte um pouco mais**, responda o que souber; todas são opcionais e podem ser limpas. Se trocar de assunto e voltar, as respostas continuam lá. Preencha **Assunto**, **O que aconteceu?** e **Prioridade sugerida** e clique em **Enviar solicitação**.
+6. **Acompanhar.** A página do pedido abre com a confirmação. Em Início, **Meus pedidos** resume quantos estão aguardando, em atendimento e resolvidos e lista os mais recentes. A situação aparece como **Aguardando atendimento**, **Em atendimento** ou **Resolvido**; enquanto ninguém iniciou o atendimento, **Editar chamado** corrige o texto. Todos os pedidos ficam em **Meus pedidos**.
+7. **Confirmar ou contestar a solução.** Quando a TI resolve, o pedido mostra **Seu problema foi resolvido?** (e a marca **Confirme se resolveu** na lista). **Sim, foi resolvido.** encerra; **Não, o problema continua.** pede o que continua acontecendo e devolve o pedido à TI.
+8. **Avaliar (opcional).** Depois de confirmar, escolha de 1 a 5 estrelas e, se quiser, escreva um comentário. **Agora não** pula a avaliação.
+9. **Ver o material entregue.** Se a TI entregou algo no seu atendimento, o pedido mostra **Material entregue**: o quê, quanto, quando e por quem.
 
 ### Suporte TI
 
@@ -22,7 +24,9 @@
 4. **Ler o pedido e corrigir a categoria.** **Informações do pedido** mostra o assunto escolhido, as respostas e o artigo consultado. Se a categoria estiver errada, corrija em **Salvar classificação**; a correção fica no histórico.
 5. **Publicar incidentes.** Em **Incidente compartilhado**, use **Publicar como incidente**, escreva título e mensagem para os usuários (sem dados do chamado) e clique em **Publicar incidente**. **Editar comunicação** atualiza o texto; resolver o chamado encerra o incidente; **Encerrar incidente** encerra antes; **Republicar** vale depois de reabrir o chamado.
 6. **Gerenciar artigos.** Em **Artigos** (`/help/manage`), as abas **Publicados**, **Rascunhos**, **Arquivados** e **Todos** mostram quantos há em cada situação; cada linha tem **Editar** e, se publicado, **Ver**. **Novo artigo** abre o editor com pré-visualização. Escolha **Rascunho**, **Publicado** ou **Arquivado**; só os publicados aparecem para os solicitantes. A lista mostra quantas pessoas disseram que cada artigo ajudou ou não.
-7. **Resolver.** Ao marcar como resolvido, o solicitante recebe a pergunta **Seu problema foi resolvido?**. Uma contestação volta para a fila em atendimento, com o motivo no histórico.
+7. **Entregar material sem sair do chamado.** No chamado, **Materiais e equipamentos** tem **Entregar material** (escolha o material; o formulário mostra quantas unidades há, e o solicitante e o local do chamado já vêm preenchidos), **Entregar equipamento** (um patrimônio disponível) e **Registrar item retirado** (o equipamento ou a peça com defeito). **Só reservar agora** separa o material para entregar depois. A entrega não resolve o chamado.
+8. **Estoque.** O menu **Estoque** abre o módulo: **Visão geral** (abaixo do mínimo, em manutenção, movimentações recentes), **Materiais** (busca, tipo, saldo e mínimo; cadastro com características por tipo; entrada, entrega e devolução), **Equipamentos** (patrimônio, responsável, local e situação; transferir, manutenção, defeito, devolução), **Movimentações** e **Departamentos e salas** (consulta).
+9. **Resolver.** Ao marcar como resolvido, o solicitante recebe a pergunta **Seu problema foi resolvido?**. Uma contestação volta para a fila em atendimento, com o motivo no histórico.
 
 ### Gestor
 
@@ -31,7 +35,9 @@
 3. **Acompanhar analistas.** **Equipe de suporte** e **Carga por responsável e prioridade** mostram a distribuição atual; **Ver chamados** abre a fila do analista.
 4. **Consultar incidentes.** **Incidentes compartilhados** mostra ativos, pessoas afetadas, novas adesões em 30 dias, encerrados e os incidentes com mais afetados.
 5. **Ver a qualidade do atendimento.** **Qualidade do atendimento** mostra, para as resoluções do período, quantas foram confirmadas, contestadas ou ficaram sem resposta, a taxa de resposta e a nota média. Use como sinal; não é avaliação individual.
-6. **Operar chamados.** Pelo grupo **Operação** do menu (**Atendimento**, **Chamados** em Lista ou Quadro, e **Artigos**), o gestor opera como a TI: assume, atribui, classifica, resolve, reabre, publica incidentes e gerencia artigos. O texto de chamados de outras pessoas continua restrito ao autor.
+6. **Acompanhar o estoque.** A seção **Estoque e equipamentos** da Visão gerencial mostra o que repor, os equipamentos em manutenção ou com defeito, as unidades entregues e as movimentações ligadas a chamados no período, os materiais mais entregues, as entregas por departamento e os defeitos por modelo.
+7. **Estrutura e exceções.** Em **Estoque → Departamentos e salas**, o gestor cadastra e desativa departamentos e salas e define onde cada pessoa trabalha. Ajuste de inventário, descarte, estorno e baixa de patrimônio são exclusivos da gestão e pedem motivo.
+8. **Operar chamados.** Pelo grupo **Operação** do menu (**Atendimento**, **Chamados** em Lista ou Quadro, **Artigos** e **Estoque**), o gestor opera como a TI: assume, atribui, classifica, resolve, reabre, publica incidentes, gerencia artigos e movimenta o estoque. O texto de chamados de outras pessoas continua restrito ao autor.
 
 **Sair e trocar de perfil:** depois de **Sair**, quem entra em seguida vai para a página inicial do próprio perfil, nunca para a página em que a pessoa anterior estava. Quem abre uma URL protegida sem sessão volta a ela depois do login, se o perfil puder abri-la (`/manager` só gestor; `/help/manage` só TI e gestor); se a sessão expirou, só a mesma pessoa volta à página. O backend continua validando o acesso a cada requisição.
 
@@ -135,7 +141,44 @@ Rotas em `/api/articles`, todas autenticadas. Regras em [produto e regras](01-pr
 
 ### Criação com o formulário guiado
 
-`POST /tickets` aceita `intake?: { answers: [{ key, answer }], articleId? }`. As respostas são validadas contra o catálogo da categoria enviada; `articleId` precisa ser de um artigo publicado. O chamado devolve `intake` (assunto, respostas com o texto da pergunta e artigo) ou `null`. A lista e o detalhe também trazem, para o solicitante, `awaitingConfirmation` e `resolutionFeedback`; para a equipe, `contested` e `resolutionFeedback` com comentário.
+`POST /tickets` aceita `intake?: { answers: [{ key, answer }], articleId? }`, `location?: { departmentId?, roomId? }` (departamento e sala ativos; a sala precisa ser do departamento) e `affectedAssetId?` (o solicitante só indica equipamentos que estão com ele). O chamado devolve `location` (ids e nomes do momento) e `affectedAsset`. As respostas são validadas contra o catálogo da categoria enviada; `articleId` precisa ser de um artigo publicado. O chamado devolve `intake` (assunto, respostas com o texto da pergunta e artigo) ou `null`. A lista e o detalhe também trazem, para o solicitante, `awaitingConfirmation` e `resolutionFeedback`; para a equipe, `contested` e `resolutionFeedback` com comentário.
+
+### Estrutura da empresa
+
+Rotas em `/api/organization`, autenticadas.
+
+| Método | Rota | Acesso e contrato |
+|---|---|---|
+| GET | `/organization` | Todos; departamentos ativos com salas e `myLocation` (local de quem pergunta); `includeInactive=true` só para a gestão |
+| POST / PATCH | `/organization/departments`, `/organization/departments/:id` | Gestão (`org:manage`); `{ name, code?, description?, active? }`; nome ou código repetido → 409 |
+| POST / PATCH | `/organization/rooms`, `/organization/rooms/:id` | Gestão; `{ departmentId, name, building?, floor? }`; a sala nunca muda de departamento |
+| GET | `/organization/people` | TI e gestão; nome, papel, função, departamento e sala, sem e-mail |
+| PATCH | `/organization/people/:id` | Gestão; `{ departmentId, roomId, jobTitle? }` |
+
+### Estoque e patrimônio
+
+Rotas em `/api/inventory`. Leitura exige `inventory:read` (TI e gestão); operações, `inventory:operate`; ajuste, descarte, estorno e baixa, `inventory:adjust` (gestão); indicadores, `inventory:insights` (gestão). Toda operação que muda saldo ou equipamento exige `operationId` (chave de idempotência escolhida pelo cliente, 8–100 caracteres): a primeira requisição responde 201; a repetição com o mesmo conteúdo responde 200 com a mesma movimentação e `replayed: true`; a mesma chave com outro conteúdo ou autor responde 409 `OPERATION_KEY_REUSED`.
+
+| Método | Rota | Contrato |
+|---|---|---|
+| GET | `/inventory/product-types` | Tipos e características aceitas por tipo |
+| GET / POST | `/inventory/products` | Lista com `q`, `type`, `tracking`, `status`, `belowMinimum`, paginação; cadastro com `tracking` fixo |
+| GET / PATCH | `/inventory/products/:id` | Detalhe com saldo e reservas abertas; edição do cadastro com `expectedRevision` |
+| POST | `/inventory/products/:id/receipts` | `{ operationId, quantity, reason? }` |
+| POST | `/inventory/products/:id/reservations` | `{ operationId, quantity, ticketId, recipientId?, departmentId?, roomId? }` |
+| POST | `/inventory/products/:id/reservations/:reservationId/cancel` | `{ operationId, reason? }` |
+| POST | `/inventory/products/:id/issues` | Entrega: `{ operationId, quantity, reservationId?, ticketId?, recipientId?, departmentId?, roomId?, reason? }` |
+| POST | `/inventory/products/:id/returns` | `{ operationId, quantity, condition: good \| defective, ... }` |
+| POST | `/inventory/products/:id/adjustments` · `/discards` · `/reversals` | Gestão, com `reason`; ajuste usa `delta`, estorno usa `movementId` |
+| GET / POST | `/inventory/assets` | Lista com `q`, `status`, `departmentId`, `holderId`; cadastro com `assetTag`, `serialNumber?`, `status` (disponível ou em uso com local) |
+| GET | `/inventory/assets/mine` | Qualquer perfil: só os equipamentos da própria pessoa (patrimônio e nome) |
+| GET | `/inventory/assets/:id` | Equipamento e histórico |
+| POST | `/inventory/assets/:id/:action` | `reserve`, `cancel-reservation`, `assign`, `transfer`, `return`, `maintenance`, `defective`, `retire` (gestão) |
+| GET | `/inventory/movements`, `/inventory/movements/:id` | Livro-razão com `type`, `productId`, `assetId`, `ticketId`, `departmentId`, `from`, `to`, paginação |
+| GET | `/inventory/insights` | Gestão; `period` e `dataOrigin` como a visão gerencial |
+| GET | `/tickets/:id/materials` | Dono ou equipe: a equipe recebe as movimentações e reservas do chamado; o dono recebe só as entregas, resumidas |
+
+Regras de negócio respondem 409 com `code`: `INSUFFICIENT_STOCK`, `NEGATIVE_BALANCE`, `BELOW_RESERVED`, `RESERVATION_CLOSED`, `ALREADY_REVERSED`, `NOT_REVERSIBLE`, `INVALID_TRANSITION`, `ASSET_TAG_TAKEN`, `SERIAL_TAKEN`, `PRODUCT_INACTIVE`, `STOCK_BUSY` (a interface mostra cada uma em português). `TRACKING_MISMATCH` responde 400. Movimentações não têm rota de edição nem de exclusão.
 
 ### Quadro (Kanban)
 

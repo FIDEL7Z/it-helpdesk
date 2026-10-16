@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { daysAgo, lastOperationalActivity } from './activity';
 import { DEMO_EMAILS } from './data-origin';
+import { resolveLocation, toLocationView, type LocationView } from './organization.service';
+import { AssetModel, ProductModel } from '../models/inventory.model';
 import { Types, type QueryFilter } from 'mongoose';
 import { can } from '../auth/permissions';
 import { HttpError } from '../errors/http-error';
@@ -67,6 +69,8 @@ export interface TicketSummary {
   dataOrigin: Ticket['dataOrigin'];
   /** The requester said the last resolution did not solve the problem (current cycle). */
   contested: boolean;
+  location: LocationView | null;
+  affectedAsset: { id: string; assetTag: string; name: string } | null;
 }
 
 /** Guided-form answers as the team and the requester read them. */
@@ -131,6 +135,9 @@ export interface RequesterTicketDetail extends RequesterTicketSummary {
   intake: IntakeView | null;
   resolutionFeedback: ResolutionFeedbackView | null;
   history: RequesterEventView[];
+  /** Where they said the problem is, and the equipment they pointed to (their own). */
+  location: LocationView | null;
+  affectedAsset: { assetTag: string; name: string } | null;
 }
 
 export type TicketSummaryView = TicketSummary | RequesterTicketSummary;
@@ -151,6 +158,8 @@ export interface CreateTicketInput {
   category: TicketCategory;
   priority: TicketPriority;
   intake?: { answers: IntakeAnswerInput[]; articleId?: string };
+  location?: { departmentId?: string | null; roomId?: string | null } | null;
+  affectedAssetId?: string | null;
 }
 
 export const ASSIGNEE_FILTERS = ['none', 'me'] as const;
@@ -216,6 +225,8 @@ function toSummary(ticket: TicketDocument, users: UserMap): TicketSummary {
     resolvedById: ticket.resolvedBy?.toString() ?? null,
     dataOrigin: ticket.dataOrigin ?? 'legacy',
     contested: resolutionFeedbackOf(ticket)?.status === 'contested',
+    location: toLocationView(ticket.location),
+    affectedAsset: ticket.affectedAsset ? { id: ticket.affectedAsset.id.toString(), assetTag: ticket.affectedAsset.assetTag, name: ticket.affectedAsset.name } : null,
   };
 }
 
@@ -293,6 +304,8 @@ export async function toTicketDetail(ticket: TicketDocument, actor: PublicUser):
         // The name recorded at the time of the action, when available.
         author: event.audit?.actorSnapshot ? { name: event.audit.actorSnapshot.name } : nameOf(userFrom(users, event.author)),
       })),
+      location: toLocationView(ticket.location),
+      affectedAsset: ticket.affectedAsset ? { assetTag: ticket.affectedAsset.assetTag, name: ticket.affectedAsset.name } : null,
     };
   }
 
@@ -427,15 +440,29 @@ async function buildIntake(input: CreateTicketInput): Promise<Ticket['intake']> 
   return answers.length === 0 && !article ? undefined : { category: input.category, answers, article };
 }
 
+/** The equipment a ticket is about: requesters may only point to equipment they hold. */
+async function affectedAssetFor(assetId: string, actor: PublicUser): Promise<{ id: Types.ObjectId; assetTag: string; name: string }> {
+  const asset = Types.ObjectId.isValid(assetId) ? await AssetModel.findById(assetId) : null;
+  const own = asset?.holder?.id?.equals(actor.id) ?? false;
+  if (!asset || (!own && !can(actor.role, 'inventory:read'))) throw new HttpError(400, 'Unknown equipment');
+  const product = await ProductModel.findById(asset.product).select('name');
+  return { id: asset._id, assetTag: asset.assetTag, name: product?.name ?? 'Equipamento' };
+}
+
 export async function createTicket(input: CreateTicketInput, actor: PublicUser): Promise<TicketDetailView> {
   // The requester always comes from the authenticated user, never from the request body.
   const at = new Date();
-  const { intake: _guided, ...fields } = input;
+  const { intake: _guided, location: where, affectedAssetId, ...fields } = input;
   const intake = await buildIntake(input);
+  // Where it happened is part of the request: validated now and kept as named today.
+  const location = where && (where.departmentId || where.roomId) ? await resolveLocation(where.departmentId, where.roomId) : null;
+  const affectedAsset = affectedAssetId ? await affectedAssetFor(affectedAssetId, actor) : null;
   const origin = DEMO_EMAILS.has(actor.email) ? 'demo' : 'operational';
   const ticket = await TicketModel.create({
     ...fields,
     ...(intake && { intake }),
+    location,
+    affectedAsset,
     dataOrigin: origin,
     createdAt: at,
     updatedAt: at,

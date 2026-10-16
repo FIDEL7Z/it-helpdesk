@@ -64,6 +64,13 @@ export interface TicketIntake {
   article: { id: Types.ObjectId; title: string } | null;
 }
 
+export interface TicketLocation {
+  departmentId: Types.ObjectId;
+  departmentName: string;
+  roomId: Types.ObjectId | null;
+  roomName: string | null;
+}
+
 export interface Ticket {
   title: string;
   description: string;
@@ -80,6 +87,10 @@ export interface Ticket {
   dataOrigin: 'operational' | 'demo' | 'legacy';
   /** Absent on tickets opened before the guided form or without answers. */
   intake?: TicketIntake | null;
+  /** Where the problem happened, as named at the time (the person may work elsewhere later). */
+  location?: TicketLocation | null;
+  /** The equipment involved, when the person knew it. */
+  affectedAsset?: { id: Types.ObjectId; assetTag: string; name: string } | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -163,6 +174,19 @@ const ticketSchema = new Schema<Ticket>(
     resolvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     dataOrigin: { type: String, enum: ['operational', 'demo', 'legacy'], default: 'legacy' },
     intake: { type: intakeSchema, default: undefined },
+    location: {
+      type: new Schema<TicketLocation>({
+        departmentId: { type: Schema.Types.ObjectId, ref: 'Department', required: true },
+        departmentName: { type: String, required: true },
+        roomId: { type: Schema.Types.ObjectId, ref: 'Room', default: null },
+        roomName: { type: String, default: null },
+      }, { _id: false }),
+      default: null,
+    },
+    affectedAsset: {
+      type: new Schema({ id: { type: Schema.Types.ObjectId, ref: 'Asset', required: true }, assetTag: { type: String, required: true }, name: { type: String, required: true } }, { _id: false }),
+      default: null,
+    },
   },
   { timestamps: true },
 );

@@ -25,6 +25,20 @@ export const PERMISSIONS = {
   'kb:read': ['solicitante', 'ti', 'gestor'],
   /** Write, publish and archive help articles; see drafts and feedback totals. */
   'kb:manage': ['ti', 'gestor'],
+  /** Read departments and rooms, to say where a problem happens. */
+  'org:read': ['solicitante', 'ti', 'gestor'],
+  /** Create, rename and deactivate departments and rooms; set where people work. */
+  'org:manage': ['gestor'],
+  /** List people with their department and room (who receives a material). */
+  'people:list': ['ti', 'gestor'],
+  /** See the stock, the catalog, the assets and the movement ledger. */
+  'inventory:read': ['ti', 'gestor'],
+  /** Register products, receipts, reservations, deliveries, returns and asset moves. */
+  'inventory:operate': ['ti', 'gestor'],
+  /** Inventory adjustments, reversals and asset retirement, always with a justification. */
+  'inventory:adjust': ['gestor'],
+  /** Stock and asset indicators for management decisions. */
+  'inventory:insights': ['gestor'],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

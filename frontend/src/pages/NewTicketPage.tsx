@@ -23,6 +23,9 @@ import {
   type TicketPriority,
 } from '../services/tickets'
 import { getErrorMessage } from '../utils/errors'
+import { LocationFields } from '../components/inventory/InventoryUi'
+import { myAssets } from '../services/inventory'
+import { getOrganization, type Department } from '../services/organization'
 
 type FieldErrors = {
   title?: string
@@ -82,6 +85,11 @@ export function NewTicketPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('media')
+  // Where the problem is: starts at the person's usual place, which they can change.
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [place, setPlace] = useState({ departmentId: '', roomId: '' })
+  const [equipment, setEquipment] = useState<{ id: string; assetTag: string; name: string }[]>([])
+  const [affectedAssetId, setAffectedAssetId] = useState('')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -91,6 +99,18 @@ export function NewTicketPage() {
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   // The form works without these lists; failures are not worth blocking a request.
+  useEffect(() => {
+    const controller = new AbortController()
+    getOrganization(controller.signal)
+      .then(({ departments: list, myLocation }) => {
+        setDepartments(list)
+        if (myLocation) setPlace((current) => current.departmentId ? current : { departmentId: myLocation.department.id, roomId: myLocation.room?.id ?? '' })
+      })
+      .catch(() => {})
+    myAssets(controller.signal).then(({ assets }) => setEquipment(assets)).catch(() => {})
+    return () => controller.abort()
+  }, [])
+
   useEffect(() => {
     const controller = new AbortController()
     getIntakeQuestions(controller.signal).then((result) => setQuestions(result.questions)).catch(() => {})
@@ -164,6 +184,8 @@ export function NewTicketPage() {
         category,
         priority,
         ...((guided.length > 0 || article) && { intake: { answers: guided, ...(article && { articleId: article.id }) } }),
+        ...(place.departmentId && { location: { departmentId: place.departmentId, roomId: place.roomId || null } }),
+        ...(affectedAssetId && { affectedAssetId }),
       })
       // Straight to the new request, where the person can follow it.
       navigate(`/tickets/${ticket.id}`, { state: { created: true } })
@@ -323,6 +345,19 @@ export function NewTicketPage() {
               </p>
             )}
           </div>
+
+          {departments.length > 0 && (
+            <LocationFields idPrefix="ticket-place" departments={departments} value={place} onChange={setPlace} legend="Onde está o problema? (opcional)" />
+          )}
+          {equipment.length > 0 && (
+            <div className="field">
+              <label htmlFor="ticket-asset" className="field__label">Equipamento envolvido (opcional)</label>
+              <select id="ticket-asset" className="field__input field__select" value={affectedAssetId} onChange={(event) => setAffectedAssetId(event.target.value)} disabled={submitting}>
+                <option value="">Não sei ou não se aplica</option>
+                {equipment.map((item) => <option key={item.id} value={item.id}>{item.name} · patrimônio {item.assetTag}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="field">
             <label htmlFor="priority" className="field__label">

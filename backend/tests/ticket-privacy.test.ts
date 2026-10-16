@@ -17,8 +17,9 @@ const REOPEN_REASON = 'Reabertura interna: falha voltou no teste de carga';
 
 // awaitingConfirmation: resolved and still waiting for the requester's "was it solved?" answer.
 const REQUESTER_SUMMARY_KEYS = ['assignee', 'awaitingConfirmation', 'category', 'createdAt', 'id', 'priority', 'requesterId', 'resolvedAt', 'revision', 'status', 'title', 'updatedAt'];
-// intake: their own guided-form answers; resolutionFeedback: their own answer to the resolution.
-const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'description', 'history', 'intake', 'resolutionFeedback'].sort();
+// intake: their own guided-form answers; resolutionFeedback: their own answer to the resolution;
+// location and affectedAsset: where they said the problem is and the equipment they pointed to (their own).
+const REQUESTER_DETAIL_KEYS = [...REQUESTER_SUMMARY_KEYS, 'affectedAsset', 'description', 'history', 'intake', 'location', 'resolutionFeedback'].sort();
 const REQUESTER_EVENT_KEYS = ['at', 'author', 'message', 'type'];
 
 let server: Server;

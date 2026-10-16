@@ -200,6 +200,7 @@ textarea {
 
 .button--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  color: var(--color-primary-contrast);
 }
 
 .button--secondary {
@@ -2762,7 +2763,9 @@ a {
   color: var(--color-primary);
 }
 
-a:hover {
+/* Links styled as buttons keep their own text color: on the primary button, this hover color is
+   the button's own background and the label would disappear. :where() keeps the old specificity. */
+a:where(:not(.button)):hover {
   color: var(--color-primary-hover);
 }
 

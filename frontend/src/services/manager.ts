@@ -18,6 +18,8 @@ export type ManagerDashboard = {
   demand: { hours: Count[]; weekdays: Count[]; categories: Count[] }
   coverage: { resolvedWithoutStructuredHistory: number; conflictingResolutionCycles: number }
   /** Requester answers to the resolutions proved in the period. */
+  /** "Carga desigual": computed by the API; see backend/src/services/workload-balance.ts for the rule. */
+  workloadBalance: { members: number; average: number; highest: { names: string[]; ids: string[]; pending: number } | null; lowest: { names: string[]; pending: number } | null; gap: number; uneven: boolean }
   quality: { resolutions: number; confirmed: number; contested: number; awaiting: number; responseRate: number | null; ratings: number; averageRating: number | null }
 }
 export type Count = { _id: string | number | null; count: number }

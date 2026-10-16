@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '../middlewares/auth.middleware';
+import { DATA_ORIGINS, resolveOriginFilter } from '../services/data-origin';
 import { INCIDENT_LIMITS, INCIDENT_STATUSES } from '../models/incident.model';
 import * as incidentService from '../services/incident.service';
 
@@ -21,9 +22,9 @@ const closeSchema = z.strictObject({ resolutionMessage: messageSchema, expectedR
 const republishSchema = z.strictObject({ title: titleSchema, publicMessage: messageSchema, expectedRevision });
 const manageQuerySchema = z.strictObject({
   status: z.enum(INCIDENT_STATUSES).optional(),
-  dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional(),
+  dataOrigin: z.enum(DATA_ORIGINS).optional(),
 });
-const indicatorsQuerySchema = z.strictObject({ dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional() });
+const indicatorsQuerySchema = z.strictObject({ dataOrigin: z.enum(DATA_ORIGINS).optional() });
 // Following takes no body: the user is the authenticated one, never an id sent by the client.
 const noBodySchema = z.strictObject({});
 
@@ -59,12 +60,12 @@ export async function unfollow(req: Request, res: Response): Promise<void> {
 
 export async function listManaged(req: Request, res: Response): Promise<void> {
   const filters = manageQuerySchema.parse(req.query);
-  res.json({ incidents: await incidentService.listManaged(filters) });
+  res.json({ incidents: await incidentService.listManaged({ ...filters, dataOrigin: resolveOriginFilter(filters.dataOrigin) }) });
 }
 
 export async function indicators(req: Request, res: Response): Promise<void> {
   const { dataOrigin } = indicatorsQuerySchema.parse(req.query);
-  res.json({ indicators: await incidentService.indicators(dataOrigin) });
+  res.json({ indicators: await incidentService.indicators(resolveOriginFilter(dataOrigin)) });
 }
 
 export async function updatePublicText(req: Request, res: Response): Promise<void> {

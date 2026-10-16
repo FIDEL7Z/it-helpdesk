@@ -1,6 +1,8 @@
 import { Types, type PipelineStage } from 'mongoose';
 import { daysAgo, lastOperationalActivity } from './activity';
 import { env } from '../config/env';
+import { demoDataEnabled } from './data-origin';
+import { assessWorkload } from './workload-balance';
 import { TicketModel, type TicketCategory, type TicketPriority, type TicketStatus } from '../models/ticket.model';
 import { UserModel } from '../models/user.model';
 
@@ -29,6 +31,28 @@ export function periodRange(period: ManagerFilters['period'], now = new Date(), 
     if (!adjustment) break;
   }
   return { start: new Date(instant), end: now, timezone, bucket: period === 'year' ? 'month' as const : 'day' as const };
+}
+
+/**
+ * Every local day (or month, for the year) from the start of the range to the query instant, with the
+ * same keys as the $dateToString buckets. Days without records stay in the series with zero, so the
+ * chart shows real gaps instead of joining distant points; nothing else is added.
+ */
+export function calendarKeys(range: { start: Date; end: Date; timezone: string; bucket: 'day' | 'month' }): string[] {
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: range.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const local = (date: Date) => Object.fromEntries(formatter.formatToParts(date).filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+  const first = local(range.start);
+  const last = local(new Date(Math.max(range.start.getTime(), range.end.getTime() - 1)));
+  const keys: string[] = [];
+  const cursor = new Date(Date.UTC(first.year, first.month - 1, range.bucket === 'month' ? 1 : first.day));
+  const stop = Date.UTC(last.year, last.month - 1, range.bucket === 'month' ? 1 : last.day);
+  while (cursor.getTime() <= stop) {
+    const iso = cursor.toISOString();
+    keys.push(range.bucket === 'month' ? iso.slice(0, 7) : iso.slice(0, 10));
+    if (range.bucket === 'month') cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    else cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return keys;
 }
 
 type Count = { _id: string | number | null; count: number };
@@ -143,15 +167,16 @@ export async function getManagerDashboard(filters: ManagerFilters, now = new Dat
     ratings: ratings.length, averageRating: ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null,
   };
   const periods = new Map<string, { period: string; created: number; resolved: number }>();
-  for (const row of snapshot.trends) periods.set(String(row._id), { period: String(row._id), created: row.count, resolved: 0 });
+  for (const key of calendarKeys(range)) periods.set(key, { period: key, created: 0, resolved: 0 });
+  for (const row of snapshot.trends) { const key = String(row._id); periods.set(key, { period: key, created: row.count, resolved: periods.get(key)?.resolved ?? 0 }); }
   for (const row of events.trends) { const key = String(row._id); const entry = periods.get(key) ?? { period: key, created: 0, resolved: 0 }; entry.resolved = row.count; periods.set(key, entry); }
   return {
-    filters, range, asOf: now, demoControlsEnabled: env.DEMO_MODE && process.env.NODE_ENV !== 'production',
+    filters, range, asOf: now, demoControlsEnabled: demoDataEnabled(),
     alerts: { highUnassigned: count(snapshot.highUnassigned), oldPending: count(snapshot.oldPending), inactive: count(snapshot.inactive), unknownActivity: count(snapshot.unknownActivity), ageDays: filters.ageDays ?? 7, inactivityDays: filters.inactivityDays ?? 3, oldest: snapshot.oldest.map(row => ({ id: row._id.toString(), title: row.title, createdAt: row.createdAt, lastOperationalAt: row.lastOperationalAt ?? null, ageDays: Math.floor((now.getTime() - row.createdAt.getTime()) / 86400000) })) },
     workload: snapshot.loads.map(row => ({ id: row._id?.toString() ?? null, name: row._id ? userMap.get(row._id.toString())?.name ?? 'Usuário indisponível' : 'Não atribuído', pending: row.pending, alta: row.highPriority, media: row.mediumPriority, baixa: row.lowPriority })).sort((a, b) => b.pending - a.pending),
     current: { total: snapshot.states.reduce((sum, row) => sum + row.count, 0), inProgress: state('em_andamento'), backlog: state('aberto') + state('em_andamento'), unassigned: snapshot.loads.find(row => row._id === null)?.pending ?? 0 },
     period: { created: count(snapshot.created), resolutions: events.resolutions.reduce((sum, row) => sum + row.count, 0), resolvedTickets: count(events.uniqueTickets), reopenings: events.reopenings.reduce((sum, row) => sum + row.count, 0) },
-    distributions: { priority: snapshot.priority, category: snapshot.category }, team,
+    distributions: { priority: snapshot.priority, category: snapshot.category }, team, workloadBalance: assessWorkload(team),
     requesters: snapshot.requesters.map(row => ({ id: row._id.toString(), name: userMap.get(row._id.toString())?.name ?? 'Usuário indisponível', created: row.created, pending: row.pending, categories: row.categories })),
     options: { analysts: users.filter(u => ['ti', 'gestor'].includes(u.role)).map(u => ({ id: u._id.toString(), name: u.name })), requesters: users.map(u => ({ id: u._id.toString(), name: u.name })) },
     // Hour zeros are factual absence in the selected set; no synthetic historical events are introduced.

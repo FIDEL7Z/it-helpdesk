@@ -6,6 +6,8 @@ import { ApiStatus } from '../components/ApiStatus'
 import { BrandMark } from '../components/BrandMark'
 import { FullPageLoader } from '../components/FullPageLoader'
 import { ApiError } from '../services/api'
+import type { User, UserRole } from '../services/auth'
+import { can } from '../auth/permissions'
 
 type FieldErrors = {
   email?: string
@@ -40,19 +42,26 @@ function loginErrorMessage(error: unknown): string {
   return 'Ocorreu um erro inesperado. Tente novamente.'
 }
 
-/** Page the user tried to open before being sent to login (only internal paths). */
-function redirectTarget(state: unknown, manager: boolean): string {
-  if (
-    typeof state === 'object' &&
-    state !== null &&
-    'from' in state &&
-    typeof state.from === 'string' &&
-    state.from.startsWith('/') &&
-    !state.from.startsWith('/login')
-  ) {
-    return state.from
-  }
-  return manager ? '/manager' : '/dashboard'
+/** Whether a profile may open a page; the API still decides access to the data. */
+function pageAllowed(path: string, role: UserRole): boolean {
+  const pathname = path.split(/[?#]/)[0]
+  if (pathname === '/manager' || pathname.startsWith('/manager/')) return role === 'gestor'
+  if (pathname === '/help/manage' || pathname.startsWith('/help/manage/')) return can(role, 'kb:manage')
+  return true
+}
+
+/**
+ * Page the user tried to open before being sent to login: only an internal path, only for the
+ * same person whose session ended (or a visitor who had none), and only one their profile can open.
+ */
+function redirectTarget(state: unknown, user: User | null): string {
+  const home = user?.role === 'gestor' ? '/manager' : '/dashboard'
+  if (!user || typeof state !== 'object' || state === null || !('from' in state) || typeof state.from !== 'string') return home
+  const from = state.from
+  const previousUserId = 'previousUserId' in state && typeof state.previousUserId === 'string' ? state.previousUserId : null
+  if (!from.startsWith('/') || from.startsWith('//') || from.startsWith('/login')) return home
+  if (previousUserId && previousUserId !== user.id) return home
+  return pageAllowed(from, user.role) ? from : home
 }
 
 export function LoginPage() {
@@ -76,7 +85,7 @@ export function LoginPage() {
 
   // Covers both a user who is already logged in and a successful login below.
   if (status === 'authenticated') {
-    return <Navigate to={redirectTarget(location.state, user?.role === 'gestor')} replace />
+    return <Navigate to={redirectTarget(location.state, user)} replace />
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

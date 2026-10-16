@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { can } from '../auth/permissions';
+import { DATA_ORIGINS, resolveOriginFilter } from '../services/data-origin';
 import { getAuthenticatedUser } from '../middlewares/auth.middleware';
 import * as incidentService from '../services/incident.service';
 import {
@@ -42,13 +43,13 @@ const listTicketsQuerySchema = z.object({
   createdFrom: z.iso.datetime().optional(),
   createdTo: z.iso.datetime().optional(),
   attention: z.enum(['high_unassigned', 'oldest', 'inactive', 'contested']).optional(),
-  sort: z.enum(['newest', 'oldest']).optional(),
+  sort: z.enum(['newest', 'oldest', 'priority']).optional(),
   inactivityDays: z.coerce.number().int().min(1).max(90).optional(),
   ageDays: z.coerce.number().int().min(1).max(365).optional(),
   pending: z.enum(['true']).optional().transform(value => value === 'true' ? true : undefined),
   assigneeId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   requesterId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
-  dataOrigin: z.enum(['operational', 'demo', 'legacy']).optional(),
+  dataOrigin: z.enum(DATA_ORIGINS).optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   category: z.enum(TICKET_CATEGORIES).optional(),
@@ -78,7 +79,7 @@ export function getIntakeQuestions(_req: Request, res: Response): void {
 export async function listTickets(req: Request, res: Response): Promise<void> {
   const query = listTicketsQuerySchema.parse(req.query);
   const actor = getAuthenticatedUser(req);
-  const result = await ticketService.listTickets(query, actor);
+  const result = await ticketService.listTickets({ ...query, dataOrigin: resolveOriginFilter(query.dataOrigin) }, actor);
 
   // The team sees which tickets are the main ticket of a shared incident (and how many people joined).
   if (can(actor.role, 'incidents:manage')) {

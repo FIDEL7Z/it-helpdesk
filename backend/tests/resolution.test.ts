@@ -259,6 +259,28 @@ describe('queue filters for the team', () => {
     const dates = oldest.body.tickets.map((item: Json) => new Date(item.createdAt).getTime());
     assert.ok(dates.length > 1);
     assert.deepEqual(dates, [...dates].sort((a, b) => a - b));
-    assert.equal((await api('GET', '/tickets?sort=priority', tech)).status, 400);
+    assert.equal((await api('GET', '/tickets?sort=urgency', tech)).status, 400);
+  });
+
+  it('sort=priority orders by priority, then oldest first, without widening anyone\'s scope', async () => {
+    const make = async (title: string, priority: string, user = requester) => {
+      const created = await api('POST', '/tickets', user, { title, description: 'Pedido para conferir a ordem da fila.', category: 'software', priority });
+      assert.equal(created.status, 201);
+      return created.body.ticket.id as string;
+    };
+    const lowOld = await make('Ordem: baixa antiga', 'baixa');
+    const highOld = await make('Ordem: alta antiga', 'alta');
+    const mediumNew = await make('Ordem: média', 'media');
+    const highNew = await make('Ordem: alta recente', 'alta');
+    const foreign = await make('Ordem: de outra pessoa', 'alta', otherRequester);
+    const order = (await api('GET', '/tickets?sort=priority&search=Ordem%3A&limit=50', tech)).body.tickets.map((item: Json) => item.id);
+    assert.deepEqual(order, [highOld, highNew, foreign, mediumNew, lowOld].filter((id) => order.includes(id)));
+    assert.deepEqual(order.slice(0, 2), [highOld, highNew], 'same priority: oldest first');
+    assert.deepEqual(order.slice(-2), [mediumNew, lowOld]);
+    const page2 = (await api('GET', '/tickets?sort=priority&search=Ordem%3A&limit=2&page=2', tech)).body;
+    assert.deepEqual(page2.tickets.map((item: Json) => item.id), order.slice(2, 4), 'pages follow the same order');
+    assert.equal(page2.pagination.total, 5);
+    const own = (await api('GET', '/tickets?sort=priority&search=Ordem%3A&limit=50', requester)).body.tickets.map((item: Json) => item.id);
+    assert.deepEqual(own, [highOld, highNew, mediumNew, lowOld], 'a requester still sees only their own requests');
   });
 });

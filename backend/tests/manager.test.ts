@@ -10,7 +10,7 @@ import { env } from '../src/config/env';
 import { TicketModel } from '../src/models/ticket.model';
 import { UserModel } from '../src/models/user.model';
 import { signAccessToken } from '../src/utils/jwt';
-import { getManagerDashboard, periodRange, type ManagerFilters } from '../src/services/manager.service';
+import { calendarKeys, getManagerDashboard, periodRange, type ManagerFilters } from '../src/services/manager.service';
 
 let server: Server;
 let url: string;
@@ -126,6 +126,19 @@ describe('Manager analytics and authorization', () => {
     assert.equal(result.team.find(u => u.id === otherTech.toString())?.resolutions, 0);
     assert.equal(result.team.find(u => u.id === manager.toString())?.reopenings, 1);
     assert.equal(result.trends.reduce((sum, row) => sum + row.resolved, 0), 2);
+    // The whole month so far is in the series: days without records are zero, not skipped.
+    assert.equal(result.trends.length, 15);
+    assert.deepEqual(result.trends.find(row => row.period === '2026-06-11'), { period: '2026-06-11', created: 0, resolved: 0 });
+    assert.deepEqual(result.trends.filter(row => row.resolved).map(row => row.period), ['2026-06-10', '2026-06-12']);
+    assert.deepEqual(result.trends.filter(row => row.created).map(row => row.period), ['2026-06-01']);
+  });
+  it('lists every local day or month of the period, across months, years and DST', () => {
+    assert.deepEqual(calendarKeys(periodRange('today', now)), ['2026-06-15']);
+    assert.deepEqual(calendarKeys(periodRange('week', now)), ['2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12', '2026-06-13', '2026-06-14', '2026-06-15']);
+    assert.deepEqual(calendarKeys(periodRange('week', new Date('2026-01-03T15:00:00Z'))), ['2025-12-28', '2025-12-29', '2025-12-30', '2025-12-31', '2026-01-01', '2026-01-02', '2026-01-03']);
+    assert.deepEqual(calendarKeys(periodRange('month', new Date('2026-03-01T03:30:00Z'))), ['2026-03-01'], 'first minutes of the month in Fortaleza');
+    assert.deepEqual(calendarKeys(periodRange('year', now)), ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']);
+    assert.deepEqual(calendarKeys(periodRange('week', new Date('2026-03-10T15:00:00Z'), 'America/New_York')), ['2026-03-04', '2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08', '2026-03-09', '2026-03-10']);
   });
   it('excludes free-form legacy resolutions, contradictory actors, and mismatching audit identities', async () => {
     await fixture('2026-06-01T12:00:00Z', { status: 'resolvido', assignee: tech, history: [{ type: 'status_changed', message: 'Resolvido por Analista A', author: tech, at: new Date('2026-06-10T12:00:00Z') }] });

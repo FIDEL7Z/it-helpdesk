@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { can } from '../auth/permissions';
+import { resolveOriginFilter } from './data-origin';
 import { HttpError } from '../errors/http-error';
 import {
   IncidentParticipationModel,
@@ -288,7 +289,9 @@ async function publicView(incidents: SharedIncidentDocument[], actor: PublicUser
 
 /** Active incidents, newest first. Public fields only. */
 export async function listActive(actor: PublicUser): Promise<PublicIncident[]> {
-  const incidents = await reconcile(await SharedIncidentModel.find({ status: 'active' }).sort({ publishedAt: -1 }));
+  // Outside the demonstration mode, fictitious incidents are never shown as known problems.
+  const origin = resolveOriginFilter(undefined);
+  const incidents = await reconcile(await SharedIncidentModel.find({ status: 'active', ...(origin && { dataOrigin: origin }) }).sort({ publishedAt: -1 }));
   return publicView(incidents.filter((incident) => incident.status === 'active'), actor);
 }
 

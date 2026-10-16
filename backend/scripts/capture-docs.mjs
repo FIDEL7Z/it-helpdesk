@@ -157,7 +157,8 @@ async function run() {
   async function setViewport(name, theme = 'light') {
     const [width, height] = VIEWPORTS[name];
     await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: name === 'mobile' });
-    await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+    // The theme is the person's choice saved in the browser (light by default); the next navigation applies it.
+    await evaluate(`(() => { try { localStorage.setItem('it-helpdesk:theme', ${JSON.stringify(theme)}) } catch { /* about:blank has no storage */ } return true })()`);
   }
   const apiGet = (path) => evaluate(`(async () => { const response = await fetch(${JSON.stringify(apiUrl)} + ${JSON.stringify(path)}, { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); return response.json(); })()`);
 
@@ -173,7 +174,7 @@ async function run() {
       identity = await evaluate(`(async () => { const response = await fetch(${JSON.stringify(apiUrl)} + '/auth/me', { headers: { Authorization: 'Bearer ' + localStorage.getItem('it-helpdesk:token') } }); if (!response.ok) throw new Error('Session verification failed'); const { user } = await response.json(); return { id: user.id, name: user.name, role: user.role }; })()`);
       if (identity.role !== authenticatedRole || await evaluate('document.querySelector(".user-menu__name").textContent') !== identity.name) throw new Error('Profile mismatch');
     }
-    const page = await evaluate('({ path: location.pathname + location.search, title: document.title, heading: document.querySelector("h1")?.textContent, width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" })');
+    const page = await evaluate('({ path: location.pathname + location.search, title: document.title, heading: document.querySelector("h1")?.textContent, width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light" })');
     if (page.overflow) throw new Error(`${name}: horizontal page overflow`);
     if (fullPage) {
       const home = { gestor: ['/manager', 'Visão gerencial', 'Visão gerencial'], ti: ['/dashboard', 'Atendimento', 'Atendimento'], solicitante: ['/dashboard', 'Início', 'Como podemos ajudar?'] }[authenticatedRole];
@@ -188,7 +189,7 @@ async function run() {
         if (!(await evaluate('!!document.getElementById("known-incidents")'))) throw new Error('No active known problem');
         if (!(await evaluate(`!!document.querySelector('a[href="/tickets/new"]')`))) throw new Error('Missing support request action');
       } else {
-        // No operational tickets here: the service desk switches to the demonstration origin and says so.
+        // No operational tickets here: the person chose the demonstration origin (see deskOnDemo).
         const { summary } = await apiGet('/dashboard/summary?dataOrigin=demo');
         if (summary.scope !== 'all' || summary.byStatus.total <= 0) throw new Error('Incorrect dashboard scope or unexpectedly empty data');
         await ready('queue totals match UI', `document.getElementById('dashboard-origin')?.value === 'demo' && document.querySelector('.service-desk .stat-card__value')?.textContent === ${JSON.stringify(String(summary.byStatus.total))}`);
@@ -199,7 +200,18 @@ async function run() {
     }
     const metrics = await command('Page.getLayoutMetrics');
     const size = metrics.cssContentSize;
-    const screenshot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: fullPage, ...(fullPage && { clip: { x: 0, y: 0, width: page.width, height: Math.ceil(size.height), scale: 1 } }) });
+    // A locked Windows session can stall a frame; bring the page back and retry, like the E2E does.
+    let screenshot;
+    for (let attempt = 1; !screenshot; attempt++) {
+      try {
+        screenshot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: fullPage, ...(fullPage && { clip: { x: 0, y: 0, width: page.width, height: Math.ceil(size.height), scale: 1 } }) });
+      } catch (error) {
+        if (attempt >= 3 || !/timed out/.test(error.message)) throw error;
+        console.log(`${name}: screenshot timed out, retrying (${attempt}/2)`);
+        await command('Page.bringToFront');
+        await evaluate('(async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); return true; })()');
+      }
+    }
     const png = Buffer.from(screenshot.data, 'base64');
     await writeFile(join(output, name), png);
     captures.push({ file: name, viewport: { width: page.width, height: page.height }, theme: page.theme, path: page.path, title: page.title, heading: page.heading, ...(identity && { user: identity }), capturedAt: new Date().toISOString(), fullPage, imageDimensions: { width: png.readUInt32BE(16), height: png.readUInt32BE(20) } });
@@ -260,10 +272,17 @@ async function run() {
   // ---------- IT ----------
   await login('ti');
   const tiHome = '!!document.querySelector(".action-card") && document.getElementById("dashboard-origin")?.value === "demo" && !document.querySelector("[aria-busy=true]") && !document.querySelector(".spinner")';
-  await go('/dashboard', tiHome);
+  // The desk always opens on operational data (none here) and only offers the demonstration data.
+  const deskOnDemo = async () => {
+    await go('/dashboard', 'Array.from(document.querySelectorAll(".origin-bar button")).some(el => el.textContent === "Ver dados de demonstração")');
+    if (await evaluate('document.getElementById("dashboard-origin").value') !== 'operational') throw new Error('The desk must not switch origin on its own');
+    await evaluate('Array.from(document.querySelectorAll(".origin-bar button")).find(el => el.textContent === "Ver dados de demonstração").click()');
+    await ready('desk on demo data', tiHome);
+  };
+  await deskOnDemo();
   await capture('dashboard-ti-desktop.png', null, true);
   await setViewport('desktop', 'dark');
-  await go('/dashboard', tiHome);
+  await deskOnDemo();
   await capture('dashboard-ti-escuro-desktop.png', null, true);
   await setViewport('desktop');
   await go('/tickets?dataOrigin=demo', '!!document.querySelector(".ticket-table tbody tr") && !document.querySelector("[aria-busy=true]")');

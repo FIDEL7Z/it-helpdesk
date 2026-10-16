@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Link } from 'react-router'
 import { SUBJECT_DESCRIPTIONS, SUBJECT_LABELS, SUBJECT_ORDER, type TicketCategory } from '../services/tickets'
 
@@ -26,6 +27,7 @@ export function SubjectIcon({ category }: { category: TicketCategory }) {
 export function SubjectCards(props:
   | { mode: 'link'; compact?: boolean }
   | { mode: 'filter'; selected?: TicketCategory; onSelect: (category: TicketCategory | undefined) => void; compact?: boolean }) {
+  const idPrefix = `subject-${useId().replace(/:/g, '')}`
   return (
     <ul className={`subject-cards${props.compact ? ' subject-cards--compact' : ''}`}>
       {SUBJECT_ORDER.map((category) => {
@@ -33,18 +35,20 @@ export function SubjectCards(props:
           <>
             <span className="subject-card__icon"><SubjectIcon category={category} /></span>
             <span className="subject-card__text">
-              <span className="subject-card__title">{SUBJECT_LABELS[category]}</span>
-              {!props.compact && <span className="subject-card__description">{SUBJECT_DESCRIPTIONS[category]}</span>}
+              <span id={`${idPrefix}-${category}-title`} className="subject-card__title">{SUBJECT_LABELS[category]}</span>
+              {!props.compact && <span id={`${idPrefix}-${category}-description`} className="subject-card__description">{SUBJECT_DESCRIPTIONS[category]}</span>}
             </span>
             {props.mode === 'link' && <span className="subject-card__cue" aria-hidden="true">→</span>}
           </>
         )
+        // The accessible name is the subject; the description is a hint (screen readers read both, separately).
+        const a11y = { 'aria-labelledby': `${idPrefix}-${category}-title`, 'aria-describedby': props.compact ? undefined : `${idPrefix}-${category}-description` }
         return (
           <li key={category}>
             {props.mode === 'link' ? (
-              <Link to={`/tickets/new?category=${category}`} className="subject-card">{body}</Link>
+              <Link to={`/tickets/new?category=${category}`} className="subject-card" {...a11y}>{body}</Link>
             ) : (
-              <button type="button" className="subject-card" aria-pressed={props.selected === category}
+              <button type="button" className="subject-card" aria-pressed={props.selected === category} {...a11y}
                 onClick={() => props.onSelect(props.selected === category ? undefined : category)}>
                 {body}
               </button>

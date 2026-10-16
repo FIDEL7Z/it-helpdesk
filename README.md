@@ -17,7 +17,7 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Confirmação de resolução:** "Seu problema foi resolvido?", com contestação que reabre o pedido e avaliação opcional.
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
-- **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados (claro e escuro, contraste AA) e layout para celular.
+- **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados, tema claro por padrão e botão **Tema escuro** no cabeçalho (escolha guardada no navegador), contraste AA nos dois temas e layout para celular.
 
 Regras detalhadas em [produto e regras](docs/01-produto-e-regras.md); passo a passo de cada perfil em [como usar, por perfil](docs/03-fluxos-e-api.md#como-usar-por-perfil).
 
@@ -64,7 +64,7 @@ TI e gestor alternam a fila entre **Lista** e **Quadro** (Abertos, Em andamento,
 
 Telas reais, com dados fictícios de demonstração. A página do solicitante está em [Portal do Solicitante](#portal-do-solicitante).
 
-**Suporte TI (Carlos Andrade) — Atendimento.** Uma mesa de trabalho, não um painel: **Precisa de ação** (alta prioridade sem responsável, reabertos pelo solicitante, sem movimentação, sem responsável), **Meus atendimentos**, **Sem responsável — mais antigos primeiro**, incidentes ativos e, por último, a situação da fila. Atalhos para a fila e o quadro.
+**Suporte TI (Carlos Andrade) — Atendimento.** Uma mesa de trabalho, não um painel: **Precisa de ação** (alta prioridade sem responsável, reabertos pelo solicitante, sem movimentação, sem responsável), **Meus atendimentos** e **Sem responsável**, ambos por prioridade e antiguidade, incidentes ativos e, por último, a situação da fila. Atalhos para a fila e o quadro.
 
 ![Página Atendimento da TI com cartões de ação, filas pessoal e sem responsável, incidente ativo e situação da fila](docs/assets/screenshots/dashboard-ti-desktop.png)
 
@@ -72,7 +72,7 @@ Telas reais, com dados fictícios de demonstração. A página do solicitante es
 
 ![Visão gerencial com situação atual, alertas, equipe, incidentes, qualidade e gráficos](docs/assets/screenshots/gestor-visao-geral-desktop.png)
 
-Com o modo demonstração ligado e nenhum chamado operacional, Atendimento e Visão gerencial passam uma vez para a origem **Demonstração** e avisam isso; uma origem vazia é explicada ("os zeros indicam ausência de registros, não desempenho da equipe"), e dados demonstrativos nunca se misturam aos operacionais.
+Todas as telas da equipe começam com dados **operacionais**. Com o modo demonstração ligado, Demonstração, Legado ou Todas as origens são uma escolha explícita: aparece uma faixa fixa de aviso, e cada chamado fictício ou legado tem uma etiqueta na linha ou no cartão. Sem chamados operacionais, a página oferece **Ver dados de demonstração**, sem trocar sozinha; uma origem vazia é explicada ("os zeros indicam ausência de registros, não desempenho da equipe"). Fora do modo demonstração, e sempre em produção, a API só entrega dados operacionais. Veja a [política de origem](docs/04-metricas-decisoes-e-limites.md#origem-dos-dados).
 
 As demais telas estão no [guia de demonstração](docs/05-demonstracao.md#capturas-reproduzíveis) e nos documentos técnicos.
 
@@ -283,6 +283,6 @@ docker-compose.yml  MongoDB local
 - O quadro não tem arrastar e soltar: as mudanças de status são feitas pelos botões dos cartões. A avaliação de atendimento é por resolução e opcional; não há lembrete para quem não respondeu.
 - Sem SLA, tempo médio de atendimento ou evolução histórica do backlog. Indicadores mostram estado atual e ações comprovadas, não qualidade da equipe.
 - O MongoDB local roda sem réplica, portanto sem transações entre coleções. Encerrar o incidente após resolver o chamado são duas escritas, e uma falha entre elas é corrigida na leitura seguinte.
-- Dashboards não atualizam em tempo real. O tema segue o sistema operacional; não há seletor manual.
+- Dashboards não atualizam em tempo real. A escolha de tema fica no navegador (localStorage), não na conta: em outro navegador a pessoa começa no tema claro.
 
 Mais detalhes em [métricas, decisões e limites](docs/04-metricas-decisoes-e-limites.md).

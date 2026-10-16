@@ -214,11 +214,26 @@ describe('structured ticket audit', () => {
     // The requester response does not carry dataOrigin; the classification is checked where it is stored.
     assert.equal((await TicketModel.findById((await create(demo)).id))?.dataOrigin, 'demo');
     await TicketModel.create({ title: 'Legado desconhecido', description: 'Origem sem comprovação.', category: 'rede', requester: requester.id });
-    for (const dataOrigin of ['operational', 'demo', 'legacy']) {
-      const summary = await request(manager, 'GET', `/dashboard/summary?dataOrigin=${dataOrigin}`);
-      assert.equal(summary.body.summary.byStatus.total, 1);
-      const listing = await request(manager, 'GET', `/tickets?dataOrigin=${dataOrigin}`);
-      assert.equal(listing.body.pagination.total, 1);
+    const demoMode = env.DEMO_MODE;
+    try {
+      // Demonstration mode: each origin is consulted on its own.
+      env.DEMO_MODE = true;
+      for (const dataOrigin of ['operational', 'demo', 'legacy']) {
+        const summary = await request(manager, 'GET', `/dashboard/summary?dataOrigin=${dataOrigin}`);
+        assert.equal(summary.body.summary.byStatus.total, 1);
+        const listing = await request(manager, 'GET', `/tickets?dataOrigin=${dataOrigin}`);
+        assert.equal(listing.body.pagination.total, 1);
+      }
+      // Normal mode: only operational data, whatever the client asks for.
+      env.DEMO_MODE = false;
+      for (const dataOrigin of ['demo', 'legacy']) {
+        assert.equal((await request(manager, 'GET', `/dashboard/summary?dataOrigin=${dataOrigin}`)).status, 403);
+        assert.equal((await request(manager, 'GET', `/tickets?dataOrigin=${dataOrigin}`)).status, 403);
+      }
+      assert.equal((await request(manager, 'GET', '/dashboard/summary')).body.summary.byStatus.total, 1);
+      assert.equal((await request(manager, 'GET', '/tickets')).body.pagination.total, 1);
+    } finally {
+      env.DEMO_MODE = demoMode;
     }
   });
 

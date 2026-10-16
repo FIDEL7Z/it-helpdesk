@@ -45,7 +45,7 @@ function ageLabel(createdAt: string | null): string {
 async function loadCentral(origin: Origin, withMine: boolean, signal: AbortSignal): Promise<CentralData> {
   const count = async (filters: TicketFilters) => (await listTickets({ ...filters, dataOrigin: origin, limit: 1 }, signal)).pagination.total
   const queue = async (filters: TicketFilters): Promise<Queue> => {
-    const { tickets, pagination } = await listTickets({ ...filters, dataOrigin: origin, pending: true, sort: 'oldest', limit: 5 }, signal)
+    const { tickets, pagination } = await listTickets({ ...filters, dataOrigin: origin, pending: true, sort: 'priority', limit: 5 }, signal)
     return { tickets, total: pagination.total }
   }
   const [{ summary }, highUnassigned, contested, inactive, mine, unassigned] = await Promise.all([
@@ -68,38 +68,32 @@ function TeamDashboard() {
   useDocumentTitle('Atendimento')
   const { user } = useAuth()
   const withMine = can(user?.role, 'tickets:be-assigned')
+  // Always starts with operational data; demonstration data is shown only when the person chooses it.
   const [origin, setOrigin] = useState<Origin>('operational')
-  // In the demo environment, an empty operational set switches to the demo data once, saying so.
-  const [originNote, setOriginNote] = useState<string | null>(null)
-  const [originChosen, setOriginChosen] = useState(false)
   const [reload, setReload] = useState(0)
   const key = `${origin}|${reload}`
-  const [state, setState] = useState<{ key: string; data: CentralData | null; error: string | null }>({ key: '', data: null, error: null })
+  const [state, setState] = useState<{ key: string; data: CentralData | null; error: string | null; demoAvailable: boolean }>({ key: '', data: null, error: null, demoAvailable: false })
   const loading = state.key !== key
 
   useEffect(() => {
     const controller = new AbortController()
     loadCentral(origin, withMine, controller.signal)
       .then(async (data) => {
-        if (DEMO_MODE && !originChosen && origin === 'operational' && data.summary.byStatus.total === 0) {
-          const demo = await getDashboardSummary(controller.signal, 'demo')
-          if (demo.summary.byStatus.total > 0) {
-            setOriginNote('Ainda não há chamados operacionais. Você está vendo os dados de demonstração, que são fictícios e ficam separados.')
-            setOrigin('demo')
-            return
-          }
-        }
-        setState({ key, data, error: null })
+        // With no operational tickets yet, only offer the demonstration data; never switch to it.
+        const demoAvailable = DEMO_MODE && origin === 'operational' && data.summary.byStatus.total === 0
+          && (await getDashboardSummary(controller.signal, 'demo')).summary.byStatus.total > 0
+        setState({ key, data, error: null, demoAvailable })
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setState({ key, data: null, error: getErrorMessage(error) })
+        if (!controller.signal.aborted) setState({ key, data: null, error: getErrorMessage(error), demoAvailable: false })
       })
     return () => controller.abort()
-  }, [key, origin, withMine, originChosen])
+  }, [key, origin, withMine])
 
   if (!user) return null
   const data = loading ? null : state.data
-  const at = (query: string) => `/tickets?${query}${origin ? `&dataOrigin=${origin}` : ''}`
+  // Operational is the list's default, so only another origin goes into the link.
+  const at = (query: string) => `/tickets?${query}${origin !== 'operational' ? `&dataOrigin=${origin}` : ''}`
 
   return (
     <section className="page service-desk">
@@ -110,8 +104,8 @@ function TeamDashboard() {
           <p className="page__subtitle">O que precisa de ação agora, a sua fila e os chamados sem responsável.</p>
         </div>
         <div className="page__actions">
-          <Link to="/tickets?pending=true" className="button button--primary">Ver fila de chamados</Link>
-          <Link to="/tickets?view=board" className="button button--secondary">Ver quadro</Link>
+          <Link to={at('pending=true')} className="button button--primary">Ver fila de chamados</Link>
+          <Link to={at('view=board')} className="button button--secondary">Ver quadro</Link>
           <Link to="/tickets/new" className="button button--ghost">Abrir chamado</Link>
         </div>
       </header>
@@ -120,14 +114,21 @@ function TeamDashboard() {
         <div className={`origin-bar${origin !== 'operational' ? ' origin-bar--fictitious' : ''}`}>
           <label className="origin-bar__label" htmlFor="dashboard-origin">Origem dos dados</label>
           <select id="dashboard-origin" className="field__input field__select origin-bar__select" value={origin}
-            onChange={(event) => { setOriginChosen(true); setOriginNote(null); setOrigin(event.target.value as Origin) }}>
+            onChange={(event) => setOrigin(event.target.value as Origin)}>
             {(Object.keys(ORIGIN_LABELS) as Origin[]).map((value) => <option key={value} value={value}>{ORIGIN_LABELS[value]}</option>)}
           </select>
           <p className="origin-bar__note">
-            {originNote ?? (origin === 'operational'
-              ? 'Somente chamados reais. Demonstração e legado ficam separados.'
-              : 'Dados fictícios ou sem origem comprovada: não representam a operação real.')}
+            {origin === 'operational'
+              ? state.demoAvailable && !loading
+                ? 'Ainda não há chamados operacionais. Os dados de demonstração são fictícios e ficam separados.'
+                : 'Somente chamados reais. Demonstração e legado ficam separados.'
+              : origin === 'demo'
+                ? 'Dados de demonstração: fictícios, não representam a operação real.'
+                : 'Registros legados, sem origem comprovada: não representam a operação real.'}
           </p>
+          {origin === 'operational' && state.demoAvailable && !loading && (
+            <button type="button" className="button button--secondary" onClick={() => setOrigin('demo')}>Ver dados de demonstração</button>
+          )}
         </div>
       )}
 
@@ -157,25 +158,25 @@ function TeamDashboard() {
                 className="my-queue"
                 title="Meus atendimentos"
                 queue={data.mine}
-                to={at('assignee=me&pending=true&sort=oldest')}
+                to={at('assignee=me&pending=true&sort=priority')}
                 empty="Nenhum chamado com você agora."
               />
             )}
             <QueueCard
               id="unassigned-queue"
-              title="Sem responsável — mais antigos primeiro"
+              title="Sem responsável — por prioridade e antiguidade"
               queue={data.unassigned}
-              to={at('assignee=none&pending=true&sort=oldest')}
+              to={at('assignee=none&pending=true&sort=priority')}
               empty="Todos os chamados pendentes têm responsável."
             />
           </div>
 
-          {can(user.role, 'incidents:manage') && <ActiveIncidentsCard />}
+          {can(user.role, 'incidents:manage') && <ActiveIncidentsCard origin={origin} />}
 
           <section aria-labelledby="queue-status" className="service-section">
             <h2 id="queue-status" className="section-title">Situação da fila</h2>
             <div className="stats stats--compact" aria-label="Chamados por status">
-              <StatCard to={`/tickets?dataOrigin=${origin}`} label="Total" value={data.summary.byStatus.total} />
+              <StatCard to={at('')} label="Total" value={data.summary.byStatus.total} />
               <StatCard to={at('status=aberto')} label="Abertos" value={data.summary.byStatus.aberto} tone="aberto" />
               <StatCard to={at('status=em_andamento')} label="Em andamento" value={data.summary.byStatus.em_andamento} tone="em_andamento" />
               <StatCard to={at('status=resolvido')} label="Resolvidos" value={data.summary.byStatus.resolvido} tone="resolvido" />
@@ -227,18 +228,18 @@ function QueueCard({ id, className, title, queue, to, empty }: { id: string; cla
 }
 
 /** Active shared incidents, most affected first, with a direct link to the main ticket. */
-function ActiveIncidentsCard() {
+function ActiveIncidentsCard({ origin }: { origin: Origin }) {
   const [state, setState] = useState<{ incidents: ManagedIncident[] | null; error: string | null }>({ incidents: null, error: null })
 
   useEffect(() => {
     const controller = new AbortController()
-    listManagedIncidents('active', controller.signal)
+    listManagedIncidents('active', controller.signal, DEMO_MODE ? origin : undefined)
       .then(({ incidents }) => setState({ incidents, error: null }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setState({ incidents: null, error: getErrorMessage(error, 'incident') })
       })
     return () => controller.abort()
-  }, [])
+  }, [origin])
 
   return (
     <section className="card incidents-card" aria-labelledby="active-incidents">

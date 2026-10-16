@@ -444,10 +444,20 @@ async function run() {
       await evaluate(`window.fetch = window.__e2eRealFetch; delete window.__e2eRealFetch; Array.from(document.querySelectorAll('button')).find(el => el.textContent === 'Tentar novamente').click()`);
       await waitDom('queue recovery', '!!document.querySelector(".ticket-table tbody tr")');
       check(true, 'Queue retry recovers real persisted tickets');
+      // Origin policy: the queue opens on operational data; other origins only when chosen, and labelled.
+      check(await evaluate('!document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture") && !document.querySelector(".ticket-table .origin-tag") && !document.querySelector(".origin-notice") && document.getElementById("list-origin").value === "operational"'), 'The queue opens on operational data, without fictitious rows');
+      await select('list-origin', 'all');
+      await waitDom('all origins chosen', 'location.search.includes("dataOrigin=all") && !!document.querySelector(".origin-notice")');
       await fill('ticket-search', 'Aging and inactivity fixture');
       await evaluate('document.querySelector("form[role=search]").requestSubmit()');
+      await waitDom('all origins labelled', 'Array.from(document.querySelectorAll(".ticket-table tbody tr")).some(row => row.textContent.includes("Aging and inactivity fixture") && row.querySelector(".origin-tag--demo")?.textContent === "Demonstração")');
+      check(await evaluate('document.querySelector(".origin-notice")?.textContent.includes("todas as origens")'), 'Choosing all origins labels each demonstration row and keeps a notice on screen');
+      await go('/tickets');
+      await waitDom('back to operational', '!!document.querySelector(".ticket-table tbody tr") && !document.querySelector(".origin-notice")');
+      await fill('ticket-search', 'Requester open ticket');
+      await evaluate('document.querySelector("form[role=search]").requestSubmit()');
       await waitDom('literal queue search', 'location.search.includes("search=") && document.querySelectorAll(".ticket-table tbody tr").length === 1');
-      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Aging and inactivity fixture")'), 'Search reaches the API and filters actual queue rows');
+      check(await evaluate('document.querySelector(".ticket-table tbody").textContent.includes("Requester open ticket")'), 'Search reaches the API and filters actual queue rows');
       await fill('ticket-search', 'No matching fictitious ticket 987654321');
       await evaluate('document.querySelector("form[role=search]").requestSubmit()');
       await waitDom('queue empty state', '!document.querySelector(".ticket-table tbody tr") && document.querySelector(".card--empty")?.textContent.includes("Nenhum")');
@@ -472,8 +482,10 @@ async function run() {
       const output = resolve(root, 'backend/e2e-results');
       await mkdir(output, { recursive: true });
       await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+      // The system preference is dark here on purpose: the app must still start in the light theme.
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
       await delay(200); // Let palette transitions settle before visual capture.
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "light" && !document.documentElement.dataset.theme && document.querySelector(".theme-toggle")?.getAttribute("aria-pressed") === "false"'), 'Light theme is the default, even when the system prefers dark');
       const contrast = () => evaluate(`(() => {
         const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 });
         const luminance = value => { const [r,g,b] = rgb(value); return .2126*r + .7152*g + .0722*b; };
@@ -495,11 +507,18 @@ async function run() {
       await waitDom('manager charts resized to mobile', 'document.documentElement.scrollWidth <= document.documentElement.clientWidth');
       check(await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'Exclusive manager dashboard fits 390px; tables scroll inside cards');
       await snap(join(output, 'manager-mobile-light.png'));
-      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+      await evaluate('document.querySelector(".theme-toggle").click()');
+      await waitDom('dark theme chosen', 'document.documentElement.dataset.theme === "dark"');
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
       await snap(join(output, 'manager-mobile-dark.png'));
-      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark"'), 'Manager dark theme uses the shared system palette');
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark" && document.querySelector(".theme-toggle").getAttribute("aria-pressed") === "true" && localStorage.getItem("it-helpdesk:theme") === "dark"'), 'The header switch turns the dark theme on and remembers it');
+      await command('Page.reload', { ignoreCache: true });
+      await waitDom('dark theme after reload', 'document.documentElement.dataset.theme === "dark" && document.querySelector(".theme-toggle")?.getAttribute("aria-pressed") === "true"');
+      check(true, 'The dark choice survives a reload, applied before the app renders');
+      await evaluate('document.querySelector(".theme-toggle").click()');
+      await waitDom('light theme again', '!document.documentElement.dataset.theme && localStorage.getItem("it-helpdesk:theme") === "light"');
+      check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "light"'), 'The same switch returns to the light theme');
       await command('Emulation.clearDeviceMetricsOverride');
       await command('Emulation.setEmulatedMedia', { features: [] });
     }
@@ -720,6 +739,66 @@ async function run() {
   check(answered.resolutionFeedback.status === 'confirmed' && answered.resolutionFeedback.rating === 4 && answered.history.filter((event) => event.type === 'resolution_confirmed').length === 1, 'Requester confirms the resolution and rates it once');
   await logout('solicitante');
 
+  // Switching profiles in the same tab: the next person never lands on the previous person's page.
+  // This section signs in more than the 10-per-window limit allows, so it starts with fresh counters.
+  const { resetLoginRateLimit } = await import('../src/middlewares/rate-limit.middleware.ts');
+  await resetLoginRateLimit();
+  const signInHere = async (role) => {
+    await waitDom(`${role} login form`, 'location.pathname === "/login" && !!document.getElementById("email")');
+    await fill('email', users[role].email);
+    await fill('password', password);
+    await submit();
+    await waitDom(`${role} signed in`, `document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users[role].name)}`);
+  };
+  const landedOn = () => evaluate('location.pathname + location.search');
+  await login('solicitante');
+  await go(`/tickets/${own.id}`);
+  await waitDom('requester ticket page', `location.pathname === "/tickets/${own.id}" && !!document.querySelector("h1")`);
+  await logout('solicitante');
+  check(await evaluate('history.state?.usr?.from === undefined'), 'Sair keeps no return page for the next person');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'Requester → Sair → TI lands on the TI home, not the requester ticket');
+  await go('/help/manage');
+  await waitDom('TI article management', '!!document.querySelector(".status-tab")');
+  await logout('ti');
+  await signInHere('gestor');
+  check(await landedOn() === '/manager', 'TI → Sair → manager lands on the management view, not Articles');
+  await go('/tickets?status=aberto');
+  await waitDom('manager queue', '!!document.querySelector(".queue-panel")');
+  await logout('gestor');
+  await signInHere('solicitante');
+  check(await landedOn() === '/dashboard', 'Manager → Sair → requester lands on the requester home');
+  await logout('solicitante');
+  // A visitor who opens a protected page goes back to it after signing in, and a refresh keeps it.
+  await go('/tickets?status=aberto');
+  await waitDom('protected page asks for login', 'location.pathname === "/login" && history.state?.usr?.from === "/tickets?status=aberto"');
+  await signInHere('ti');
+  check(await landedOn() === '/tickets?status=aberto', 'Login from a protected URL returns to that URL');
+  await command('Page.reload', { ignoreCache: true });
+  await waitDom('refresh keeps session and page', `location.pathname + location.search === "/tickets?status=aberto" && document.querySelector('.user-menu__name')?.textContent === ${JSON.stringify(users.ti.name)}`);
+  check(true, 'A refresh after login keeps the session and the page');
+  await logout('ti');
+  await go('/manager');
+  await waitDom('manager page asks for login', 'location.pathname === "/login"');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'A return page the profile cannot open falls back to its home');
+  await logout('ti');
+  // Invalid session: a stored token the API rejects. Its owner is read only to compare people.
+  const rejectedToken = (userId) => `${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: String(userId) })).toString('base64url')}.invalid-signature`;
+  await evaluate(`localStorage.setItem('it-helpdesk:token', ${JSON.stringify(rejectedToken(users.gestor._id))})`);
+  await go('/tickets?status=resolvido');
+  await waitDom('invalid session sent to login', 'location.pathname === "/login" && localStorage.getItem("it-helpdesk:token") === null');
+  await signInHere('ti');
+  check(await landedOn() === '/dashboard', 'After someone else\'s invalid session, the next person starts at their own home');
+  await logout('ti');
+  await evaluate(`localStorage.setItem('it-helpdesk:token', ${JSON.stringify(rejectedToken(users.ti._id))})`);
+  await go('/tickets?status=resolvido');
+  await waitDom('own invalid session sent to login', 'location.pathname === "/login"');
+  await signInHere('ti');
+  check(await landedOn() === '/tickets?status=resolvido', 'After their own expired session, the same person returns to the page they were on');
+  await logout('ti');
+
+  check(!diagnostics.some((item) => item.event === 'response' && item.status >= 500), 'No API response with a 5xx status during the whole run');
   check(!diagnostics.some((item) => item.event === 'browser-exception'), 'No uncaught browser exceptions');
   console.log(`\n${checks} E2E checks passed. Dashboard: initial load + 3 reloads per role.`);
   if (visibilityRecoveries) console.log(`The browser page was brought back to the front ${visibilityRecoveries} time(s) (hidden by the OS).`);

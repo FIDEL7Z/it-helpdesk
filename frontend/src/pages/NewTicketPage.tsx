@@ -210,9 +210,11 @@ export function NewTicketPage() {
           <div className="subject-picker__options">
             {SUBJECT_ORDER.map((value) => (
               <label key={value} className="subject-option">
-                <input type="radio" name="subject" value={value} checked={category === value} onChange={() => chooseSubject(value)} />
-                <span className="subject-option__label"><SubjectIcon category={value} />{SUBJECT_LABELS[value]}</span>
-                <span className="subject-option__hint">{SUBJECT_DESCRIPTIONS[value]}</span>
+                {/* Name = the subject only; the description is read as a hint, not glued to the name. */}
+                <input type="radio" name="subject" value={value} checked={category === value} onChange={() => chooseSubject(value)}
+                  aria-labelledby={`subject-${value}-label`} aria-describedby={`subject-${value}-hint`} />
+                <span id={`subject-${value}-label`} className="subject-option__label"><SubjectIcon category={value} />{SUBJECT_LABELS[value]}</span>
+                <span id={`subject-${value}-hint`} className="subject-option__hint">{SUBJECT_DESCRIPTIONS[value]}</span>
               </label>
             ))}
           </div>

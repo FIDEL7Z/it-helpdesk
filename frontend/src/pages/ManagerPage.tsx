@@ -6,9 +6,10 @@ import { DEMO_MODE } from '../config/demo'
 import { PieChart, TrendLineChart, HorizontalChart, HoursChart } from '../components/ManagerCharts'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getManagerDashboard, type ManagerDashboard, type Count } from '../services/manager'
-import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS, SUBJECT_LABELS } from '../services/tickets'
+import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tickets'
 import { IncidentsOverview } from '../components/IncidentsOverview'
 import { QualityOverview } from '../components/QualityOverview'
+import { OriginNotice } from '../components/TicketBadges'
 import { getErrorMessage } from '../utils/errors'
 
 const PERIODS = { today: 'Hoje', week: 'Últimos sete dias', month: 'Mês atual', year: 'Ano atual' }
@@ -32,9 +33,8 @@ function ManagerContent() {
   const key = params.toString()
   const [retry, setRetry] = useState(0)
   const requestKey = `${key}#${retry}`
-  const [state, setState] = useState<{ key: string; data: ManagerDashboard | null; error: string | null }>({ key: '', data: null, error: null })
-  // Set when the demo environment opened on the demo data because there is no operational data.
-  const [originNote, setOriginNote] = useState<string | null>(null)
+  // demoAvailable: no operational data yet but demonstration data exists; it is offered, never selected for the person.
+  const [state, setState] = useState<{ key: string; data: ManagerDashboard | null; error: string | null; demoAvailable: boolean }>({ key: '', data: null, error: null, demoAvailable: false })
   // Keyed results prevent stale totals from being displayed under newly selected filters.
   const loading = state.key !== requestKey
   const data = loading ? null : state.data
@@ -44,28 +44,21 @@ function ManagerContent() {
     const query = DEMO_MODE ? new URLSearchParams(key) : new URLSearchParams([...new URLSearchParams(key)].filter(([name]) => name !== 'dataOrigin'))
     getManagerDashboard(query, controller.signal)
       .then(async ({ dashboard }) => {
-        // Demo environment without operational data: open on the demo data once, saying so,
-        // instead of a page of zeros. The data stays separated and labelled as fictitious.
-        if (DEMO_MODE && dashboard.demoControlsEnabled && !query.has('dataOrigin') && isEmpty(dashboard)) {
+        let demoAvailable = false
+        if (DEMO_MODE && dashboard.demoControlsEnabled && (query.get('dataOrigin') ?? 'operational') === 'operational' && isEmpty(dashboard)) {
           const demoQuery = new URLSearchParams(query)
           demoQuery.set('dataOrigin', 'demo')
-          const demo = await getManagerDashboard(demoQuery, controller.signal)
-          if (!isEmpty(demo.dashboard)) {
-            setOriginNote('Ainda não há chamados operacionais. Você está vendo os dados de demonstração, que são fictícios e ficam separados.')
-            setParams(demoQuery, { replace: true })
-            return
-          }
+          demoAvailable = !isEmpty((await getManagerDashboard(demoQuery, controller.signal)).dashboard)
         }
-        setState({ key: requestKey, data: dashboard, error: null })
+        setState({ key: requestKey, data: dashboard, error: null, demoAvailable })
       })
-      .catch((error: unknown) => { if (!controller.signal.aborted) setState({ key: requestKey, data: null, error: getErrorMessage(error) }) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setState({ key: requestKey, data: null, error: getErrorMessage(error), demoAvailable: false }) })
     return () => controller.abort()
-  }, [key, requestKey, setParams])
+  }, [key, requestKey])
   function filter(name: string, value: string) {
     const next = new URLSearchParams(params)
     if (value) next.set(name, value)
     else next.delete(name)
-    if (name === 'dataOrigin') setOriginNote(null)
     setParams(next)
   }
   const origin = DEMO_MODE ? params.get('dataOrigin') ?? 'operational' : 'operational'
@@ -81,9 +74,7 @@ function ManagerContent() {
     return `/tickets?${query}`
   }
   const highestLoad = data ? Math.max(0, ...data.team.map(row => row.pending)) : 0
-  const busiest = data ? data.team.filter(row => row.pending > 0 && row.pending === highestLoad) : []
-  const operators = data ? data.team.filter(row => row.active && (row.role === 'ti' || row.role === 'gestor')) : []
-  const averageLoad = operators.length ? operators.reduce((sum, row) => sum + row.pending, 0) / operators.length : 0
+  const balance = data?.workloadBalance
   return <section className="page manager-page">
     <header className="page__header page__header--with-action">
       <div><p className="eyebrow">Gestão de TI</p><h1 className="page__title">Visão gerencial</h1><p className="page__subtitle">Onde agir agora, como está a equipe e como os solicitantes avaliam as resoluções.</p></div>
@@ -111,12 +102,12 @@ function ManagerContent() {
       </div><p className="field__hint">Analista filtra o responsável na carga atual e nas solicitações; nos eventos, filtra o autor da ação. Categoria, prioridade e status refletem o estado atual do chamado.</p></details>
     </div>
 
-    {originNote && <p className="alert alert--info" role="status">{originNote}</p>}
+    {origin !== 'operational' && <OriginNotice origin={origin as 'demo' | 'legacy'} />}
 
     {loading ? <div className="card card--empty" role="status"><span className="spinner" aria-hidden="true" />Carregando visão gerencial...</div>
       : error ? <div className="alert alert--error" role="alert"><p>{error}</p><button className="button button--secondary" onClick={() => setRetry(n => n + 1)}>Tentar novamente</button></div>
       : data && <div className="dashboard manager-sections">
-        {isEmpty(data) && <p className="alert alert--info" role="status">Não há chamados nesta origem de dados com os filtros atuais. Os zeros abaixo indicam ausência de registros, não desempenho da equipe.</p>}
+        {isEmpty(data) && <div className="alert alert--info" role="status"><p>Não há chamados nesta origem de dados com os filtros atuais. Os zeros abaixo indicam ausência de registros, não desempenho da equipe.</p>{state.demoAvailable && <p>Os dados de demonstração são fictícios e ficam separados. <button type="button" className="button button--secondary button--small" onClick={() => filter('dataOrigin', 'demo')}>Ver dados de demonstração</button></p>}</div>}
 
         <section aria-labelledby="manager-current" className="manager-section">
           <h2 id="manager-current" className="section-title">Situação atual</h2>
@@ -135,10 +126,10 @@ function ManagerContent() {
           <Link className="alert-card" to={tickets({ attention: 'oldest', ageDays: String(data.alerts.ageDays), pending: 'true' })}><strong className="alert-card__value">{data.alerts.oldPending}</strong><span>Pendentes há {data.alerts.ageDays} dias ou mais</span><span>Consultar mais antigos →</span></Link>
           <Link className="alert-card" to={tickets({ attention: 'inactive', inactivityDays: String(data.alerts.inactivityDays), pending: 'true' })}><strong className="alert-card__value">{data.alerts.inactive}</strong><span>Sem movimentação há {data.alerts.inactivityDays} dias</span><span>Consultar fila →</span></Link>
         </div>
-        {busiest.length > 0 && operators.length > 1 && highestLoad > averageLoad && <p className="manager-load-note">
-          <strong>Carga desigual:</strong> {busiest.map(row => row.name).join(' e ')} {busiest.length > 1 ? 'estão' : 'está'} com {highestLoad} pendências; a média da equipe é {averageLoad.toFixed(1).replace('.', ',')}. Avalie redistribuir — é um dado de carga atual, não de desempenho. <Link to={tickets(busiest.length === 1 ? { assigneeId: busiest[0].id, pending: 'true' } : { pending: 'true' })}>Ver fila</Link>
+        {balance?.uneven && balance.highest && balance.lowest && <p className="manager-load-note">
+          <strong>Carga desigual:</strong> {balance.highest.names.join(' e ')} {balance.highest.names.length > 1 ? 'estão' : 'está'} com {balance.highest.pending} pendências e {balance.lowest.names.join(' e ')} com {balance.lowest.pending}; a média dos {balance.members} integrantes da escala é {balance.average.toFixed(1).replace('.', ',')}. Avalie redistribuir — é um dado de carga atual, não de desempenho. <Link to={tickets(balance.highest.ids.length === 1 ? { assigneeId: balance.highest.ids[0], pending: 'true' } : { pending: 'true' })}>Ver fila</Link>
         </p>}
-        <details className="manager-help"><summary>Como interpretar os alertas</summary><p>Idade: tempo desde a abertura. Inatividade: desde a última ação comprovada de suporte ou gestor. {data.alerts.unknownActivity} pendências sem movimentação comprovada não entram no alerta de inatividade. Não representam SLA. Ajuste os dias em “Mais filtros”.</p></details>
+        <details className="manager-help"><summary>Como interpretar os alertas</summary><p>Carga desigual compara os analistas de TI ativos, inclusive quem está sem chamados, e os gestores apenas enquanto têm pendências; aparece quando a diferença entre o mais e o menos carregado é de pelo menos 3 chamados e de metade da média. Idade: tempo desde a abertura. Inatividade: desde a última ação comprovada de suporte ou gestor. {data.alerts.unknownActivity} pendências sem movimentação comprovada não entram no alerta de inatividade. Não representam SLA. Ajuste os dias em “Mais filtros”.</p></details>
         {data.alerts.oldest.length > 0 && <details className="manager-help"><summary>Pendências mais antigas</summary><ul>{data.alerts.oldest.map(row => <li key={row.id}><Link to={`/tickets/${row.id}`} state={{ returnTo: tickets({ pending: 'true' }) }}>{row.title}</Link> · {row.ageDays} dias desde a abertura</li>)}</ul></details>}
         </section>
 
@@ -148,9 +139,9 @@ function ManagerContent() {
           <section className="card" aria-labelledby="manager-team">
             <h3 id="manager-team" className="card__title">Equipe de suporte</h3>
             <p className="card__description">Ordenada por pendências atuais. Inclui TI e gestores operadores, mesmo sem chamados. Resoluções contam o autor comprovado, não o responsável atual. Volume e carga não medem qualidade.</p>
-            <div className="table-scroll" tabIndex={0} role="region" aria-label="Indicadores da equipe, role horizontalmente quando necessário"><table className="manager-table">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Indicadores da equipe"><table className="manager-table manager-table--stack">
               <caption className="sr-only">Carga atual e ações comprovadas por autor no período</caption><thead><tr><th>Analista</th><th>Carga atual</th><th>Em andamento</th><th>Alta prioridade</th><th>Resoluções no período</th><th>Fila</th></tr></thead>
-              <tbody>{data.team.map(row => <tr key={row.id}><th scope="row">{row.name}<small>{row.role === 'gestor' ? 'Gestor operador' : row.role === 'ti' ? 'Suporte TI' : 'Participação histórica'}{!row.active ? ' · Inativo / indisponível' : ''}</small>{row.pending > 0 && row.pending === highestLoad && <small className="load-highlight">Maior carga atual</small>}</th><td>{row.pending}</td><td>{row.inProgress}</td><td><Link to={tickets({ assigneeId: row.id, priority: 'alta', pending: 'true' })}>{row.highPriority}</Link></td><td>{row.resolutions}</td><td><Link to={tickets({ assigneeId: row.id })}>Ver chamados</Link></td></tr>)}</tbody>
+              <tbody>{data.team.map(row => <tr key={row.id}><th scope="row">{row.name}<small>{row.role === 'gestor' ? 'Gestor operador' : row.role === 'ti' ? 'Suporte TI' : 'Participação histórica'}{!row.active ? ' · Inativo / indisponível' : ''}</small>{row.pending > 0 && row.pending === highestLoad && <small className="load-highlight">Maior carga atual</small>}</th><td data-label="Carga atual">{row.pending}</td><td data-label="Em andamento">{row.inProgress}</td><td data-label="Alta prioridade"><Link to={tickets({ assigneeId: row.id, priority: 'alta', pending: 'true' })}>{row.highPriority}</Link></td><td data-label="Resoluções no período">{row.resolutions}</td><td data-label="Fila" className="manager-table__action"><Link to={tickets({ assigneeId: row.id })}>Ver chamados</Link></td></tr>)}</tbody>
             </table></div>
             {data.team.length === 0 && <p className="text-muted">Nenhum operador corresponde ao filtro.</p>}
             <details className="manager-help"><summary>Entenda os indicadores de equipe</summary><p>Atribuídos: todos os status. Pendentes: abertos + em andamento. Participação: chamados distintos com ação do autor no período. Reaberturas: executadas pelo próprio autor; não atribuem culpa ao responsável ou ao resolvedor anterior.</p></details>
@@ -166,15 +157,15 @@ function ManagerContent() {
         <section aria-labelledby="manager-demand" className="manager-section">
           <h2 id="manager-demand" className="section-title">Demanda e tendências</h2>
           <div className="dashboard__grid">
-            <Distribution title="Assuntos mais solicitados no período" rows={data.demand.categories} label={id => SUBJECT_LABELS[id as keyof typeof SUBJECT_LABELS] ?? id} />
+            <Distribution title="Categorias mais solicitadas no período" rows={data.demand.categories} label={id => CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ?? id} />
             <section className="card" aria-labelledby="manager-requesters">
               <h3 id="manager-requesters" className="card__title">Solicitantes no período</h3><p className="card__description">Até dez maiores volumes de criação. Pendências pertencem aos chamados criados no período; qualquer perfil pode ser solicitante.</p>
-              {data.requesters.length === 0 ? <p className="text-muted">Nenhuma solicitação criada neste período com os filtros selecionados.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Ranking de solicitantes"><table className="manager-table"><thead><tr><th>Solicitante</th><th>Solicitações</th><th>Ainda pendentes</th><th>Categorias mais solicitadas</th></tr></thead><tbody>{data.requesters.map(row => <tr key={row.id}><th scope="row"><Link to={tickets({ requesterId: row.id, createdFrom: data.range.start, createdTo: data.range.end })}>{row.name}</Link></th><td>{row.created}</td><td>{row.pending}</td><td>{row.categories.slice(0, 3).map(c => `${CATEGORY_LABELS[c.category as keyof typeof CATEGORY_LABELS] ?? c.category} (${c.count})`).join(', ')}</td></tr>)}</tbody></table></div>}
+              {data.requesters.length === 0 ? <p className="text-muted">Nenhuma solicitação criada neste período com os filtros selecionados.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Ranking de solicitantes"><table className="manager-table manager-table--stack"><thead><tr><th>Solicitante</th><th>Solicitações</th><th>Ainda pendentes</th><th>Categorias mais solicitadas</th></tr></thead><tbody>{data.requesters.map(row => <tr key={row.id}><th scope="row"><Link to={tickets({ requesterId: row.id, createdFrom: data.range.start, createdTo: data.range.end })}>{row.name}</Link></th><td data-label="Solicitações">{row.created}</td><td data-label="Ainda pendentes">{row.pending}</td><td data-label="Categorias mais solicitadas">{row.categories.slice(0, 3).map(c => `${CATEGORY_LABELS[c.category as keyof typeof CATEGORY_LABELS] ?? c.category} (${c.count})`).join(', ')}</td></tr>)}</tbody></table></div>}
             </section>
           </div>
           <section className="card" aria-labelledby="manager-trends"><h3 id="manager-trends" className="card__title">Tendências e horários</h3><p className="card__description">Criações e resoluções no período selecionado.</p>
             <TrendLineChart rows={data.trends} />
-            {data.trends.length === 0 ? <p className="text-muted">Sem criações ou resoluções comprovadas no período.</p> : <details><summary>Consultar valores por período</summary><div className="table-scroll" tabIndex={0} role="region" aria-label="Evolução de chamados"><table className="manager-table manager-table--trends"><thead><tr><th>Período</th><th>Criados</th><th>Resoluções</th><th>Evolução</th></tr></thead><tbody>{data.trends.map(row => <tr key={row.period}><th scope="row">{periodLabel(row.period)}</th><td>{row.created}</td><td>{row.resolved}</td><td><div className="trend-bars" aria-hidden="true"><span className="trend-bars__created" style={{ width: `${row.created / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /><span className="trend-bars__resolved" style={{ width: `${row.resolved / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /></div></td></tr>)}</tbody></table></div></details>}
+            {!data.trends.some(row => row.created || row.resolved) ? <p className="text-muted">Sem criações ou resoluções comprovadas no período.</p> : <details><summary>Consultar valores por período</summary><div className="table-scroll" tabIndex={0} role="region" aria-label="Evolução de chamados"><table className="manager-table manager-table--trends"><thead><tr><th>Período</th><th>Criados</th><th>Resoluções</th><th>Evolução</th></tr></thead><tbody>{data.trends.map(row => <tr key={row.period}><th scope="row">{periodLabel(row.period)}</th><td>{row.created}</td><td>{row.resolved}</td><td><div className="trend-bars" aria-hidden="true"><span className="trend-bars__created" style={{ width: `${row.created / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /><span className="trend-bars__resolved" style={{ width: `${row.resolved / Math.max(1, ...data.trends.map(r => Math.max(r.created, r.resolved))) * 100}%` }} /></div></td></tr>)}</tbody></table></div></details>}
           </section>
           <div className="dashboard__grid">
             <PieChart title="Backlog por prioridade" rows={data.distributions.priority} label={id => PRIORITY_LABELS[id as keyof typeof PRIORITY_LABELS] ?? id} />

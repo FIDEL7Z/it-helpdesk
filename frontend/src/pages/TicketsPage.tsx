@@ -4,12 +4,13 @@ import { Link, useLocation, useSearchParams } from 'react-router'
 import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { PriorityBadge, StatusBadge } from '../components/TicketBadges'
+import { OriginNotice, OriginTag, PriorityBadge, StatusBadge } from '../components/TicketBadges'
 import { TicketBoard } from '../components/TicketBoard'
 import {
   ASSIGNEE_FILTERS,
   ASSIGNEE_FILTER_LABELS,
   CATEGORY_LABELS,
+  SUBJECT_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   TICKET_CATEGORIES,
@@ -28,7 +29,7 @@ import { affectedLabel } from '../services/incidents'
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
-type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin'
+type FilterKey = 'status' | 'priority' | 'category' | 'assignee' | 'search' | 'dataOrigin' | 'sort'
 
 type ListState = {
   key: string
@@ -37,8 +38,19 @@ type ListState = {
   error: string | null
 }
 
+/**
+ * Origin shown to the team: operational unless the person chooses another origin ("all" = every
+ * origin, each record labelled). Requesters see their own requests and have no origin choice.
+ */
+function readOrigin(params: URLSearchParams, team: boolean): TicketFilters['dataOrigin'] {
+  if (!DEMO_MODE) return 'operational'
+  const value = params.get('dataOrigin')
+  if (value === 'operational' || value === 'demo' || value === 'legacy') return value
+  return team && value !== 'all' ? 'operational' : undefined
+}
+
 /** Filters live in the URL, so they survive reloads and work with the back button. */
-function readFilters(params: URLSearchParams): TicketFilters {
+function readFilters(params: URLSearchParams, team: boolean): TicketFilters {
   const status = params.get('status')
   const priority = params.get('priority')
   const category = params.get('category')
@@ -49,13 +61,13 @@ function readFilters(params: URLSearchParams): TicketFilters {
     createdFrom: params.get('createdFrom') ?? undefined,
     createdTo: params.get('createdTo') ?? undefined,
     attention: ['high_unassigned', 'oldest', 'inactive', 'contested'].includes(params.get('attention') ?? '') ? params.get('attention') as TicketFilters['attention'] : undefined,
-    sort: params.get('sort') === 'oldest' ? 'oldest' : undefined,
+    sort: params.get('sort') === 'oldest' || params.get('sort') === 'priority' ? params.get('sort') as TicketFilters['sort'] : undefined,
     ageDays: params.has('ageDays') ? Number(params.get('ageDays')) : undefined,
     inactivityDays: params.has('inactivityDays') ? Number(params.get('inactivityDays')) : undefined,
     pending: params.get('pending') === 'true' ? true : undefined,
     assigneeId: /^[a-f\d]{24}$/i.test(params.get('assigneeId') ?? '') ? params.get('assigneeId')! : undefined,
     requesterId: /^[a-f\d]{24}$/i.test(params.get('requesterId') ?? '') ? params.get('requesterId')! : undefined,
-    dataOrigin: !DEMO_MODE ? 'operational' : ['operational', 'demo', 'legacy'].includes(params.get('dataOrigin') ?? '') ? params.get('dataOrigin') as TicketFilters['dataOrigin'] : undefined,
+    dataOrigin: readOrigin(params, team),
     status: isTicketStatus(status) ? status : undefined,
     priority: isTicketPriority(priority) ? priority : undefined,
     category: isTicketCategory(category) ? category : undefined,
@@ -78,7 +90,10 @@ export function TicketsPage() {
   const { user } = useAuth()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const filters = readFilters(searchParams)
+  const seesAllTickets = can(user?.role, 'tickets:view-all')
+  const filters = readFilters(searchParams, seesAllTickets)
+  // What the team is looking at: operational by default, or the origin the person chose.
+  const originView = !DEMO_MODE || !seesAllTickets ? 'operational' : filters.dataOrigin ?? 'all'
   const queryKey = searchParams.toString()
 
   const [reloadCount, setReloadCount] = useState(0)
@@ -92,24 +107,23 @@ export function TicketsPage() {
   const { tickets, pagination } = list
 
   const createdTitle = readCreatedTitle(location.state)
-  const seesAllTickets = can(user?.role, 'tickets:view-all')
   // "Atribuídos a mim" only makes sense for people who can be assigned.
   const canFilterByAssignee = can(user?.role, 'tickets:be-assigned')
   // Lista | Quadro: the team chooses; the choice lives in the URL with the filters.
   const view = seesAllTickets && searchParams.get('view') === 'board' ? 'board' : 'list'
   const hasFilters = Boolean(
-    filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && filters.dataOrigin) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
+    filters.createdFrom || filters.createdTo || filters.attention || filters.pending || filters.assigneeId || filters.requesterId || (DEMO_MODE && searchParams.has('dataOrigin')) || filters.status || filters.priority || filters.category || filters.assignee || filters.search,
   )
   // On a phone the filters start collapsed, so the queue is visible first; larger screens always show them.
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const activeSelects = [filters.status, filters.priority, filters.category, canFilterByAssignee && filters.assignee, DEMO_MODE && filters.dataOrigin].filter(Boolean).length
+  const activeSelects = [filters.status, filters.priority, filters.category, canFilterByAssignee && filters.assignee, DEMO_MODE && searchParams.has('dataOrigin')].filter(Boolean).length
 
   useEffect(() => {
     // The board loads its own columns.
     if (new URLSearchParams(queryKey).get('view') === 'board') return
     const controller = new AbortController()
 
-    listTickets(readFilters(new URLSearchParams(queryKey)), controller.signal)
+    listTickets(readFilters(new URLSearchParams(queryKey), seesAllTickets), controller.signal)
       .then((result) => {
         setList({ key: requestKey, tickets: result.tickets, pagination: result.pagination, error: null })
       })
@@ -119,7 +133,7 @@ export function TicketsPage() {
       })
 
     return () => controller.abort()
-  }, [queryKey, requestKey])
+  }, [queryKey, requestKey, seesAllTickets])
 
   function updateFilter(key: FilterKey, value: string) {
     const next = new URLSearchParams(searchParams)
@@ -143,7 +157,8 @@ export function TicketsPage() {
 
   /** Quick queues keep the data origin and the current view (list or board). */
   function shortcut(query: string): string {
-    return `/tickets?${query}${filters.dataOrigin ? `&dataOrigin=${filters.dataOrigin}` : ''}${view === 'board' ? '&view=board' : ''}`
+    const origin = searchParams.get('dataOrigin')
+    return `/tickets?${query}${origin ? `&dataOrigin=${origin}` : ''}${view === 'board' ? '&view=board' : ''}`
   }
 
   function setView(next: 'list' | 'board') {
@@ -191,7 +206,7 @@ export function TicketsPage() {
             )}
             {canFilterByAssignee && <nav className="queue-links" aria-label="Filas rápidas">
               <span className="queue-links__label">Filas rápidas</span>
-              <Link className="queue-link" to={shortcut('assignee=none&pending=true&sort=oldest')}>Sem responsável</Link>
+              <Link className="queue-link" to={shortcut('assignee=none&pending=true&sort=priority')}>Sem responsável</Link>
               <Link className="queue-link" to={shortcut('assignee=me&pending=true')}>Atribuídos a mim</Link>
               <Link className="queue-link" to={shortcut('status=em_andamento')}>Em andamento</Link>
               <Link className="queue-link" to={shortcut('attention=contested')}>Reabertos pelo solicitante</Link>
@@ -243,11 +258,21 @@ export function TicketsPage() {
                 onChange={(value) => updateFilter('assignee', value)}
               />
             )}
-            {DEMO_MODE && (
+            {seesAllTickets && (
+              <FilterSelect
+                id="filter-sort"
+                label="Ordenar por"
+                value={filters.sort ?? ''}
+                allLabel="Mais recentes"
+                options={[['priority', 'Prioridade e antiguidade'], ['oldest', 'Mais antigos']]}
+                onChange={(value) => updateFilter('sort', value)}
+              />
+            )}
+            {DEMO_MODE && seesAllTickets && (
               <div className="filter">
                 <label className="filter__label" htmlFor="list-origin">Origem</label>
-                <select id="list-origin" className="field__input field__select" value={filters.dataOrigin ?? ''} onChange={event => updateFilter('dataOrigin', event.target.value)}>
-                  <option value="">Todas (inclui demonstração e legado)</option><option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option>
+                <select id="list-origin" className="field__input field__select" value={originView} onChange={event => updateFilter('dataOrigin', event.target.value === 'operational' ? '' : event.target.value)}>
+                  <option value="operational">Operacionais</option><option value="demo">Demonstração</option><option value="legacy">Legado não classificado</option><option value="all">Todas as origens</option>
                 </select>
               </div>
             )}
@@ -260,9 +285,11 @@ export function TicketsPage() {
         </div>
       </div>
 
+      <OriginNotice origin={originView} />
       {(filters.assigneeId || filters.requesterId) && <p className="page__note">Fila filtrada pelo {filters.assigneeId ? 'responsável atribuído' : 'solicitante'} selecionado na visão gerencial. {filters.createdFrom || filters.createdTo ? 'O período de criação gerencial está preservado nesta fila.' : 'O período gerencial não restringe esta fila atual.'} Use “Limpar filtros” para consultar todos.</p>}
       {filters.attention && <p className="page__note">{filters.attention === 'high_unassigned' ? 'Alta prioridade sem responsável.' : filters.attention === 'oldest' ? `Pendentes há ${filters.ageDays ?? 7} dias ou mais, do mais antigo para o mais recente.` : filters.attention === 'contested' ? 'Reabertos pelo solicitante: a resolução anterior não resolveu o problema.' : `Sem ação comprovada de suporte ou gestor há ${filters.inactivityDays ?? 3} dias ou mais.`}</p>}
       {filters.sort === 'oldest' && <p className="page__note">Ordenados do mais antigo para o mais recente.</p>}
+      {filters.sort === 'priority' && <p className="page__note">Ordem de atendimento: alta, média e baixa prioridade; dentro de cada uma, o mais antigo primeiro.</p>}
       {filters.pending && <p className="page__note">Somente chamados pendentes: abertos ou em andamento.</p>}
 
       {view === 'board' ? (
@@ -310,7 +337,7 @@ export function TicketsPage() {
               <thead>
                 <tr>
                   <th scope="col">Assunto</th>
-                  <th scope="col">Tipo</th>
+                  <th scope="col">Assunto escolhido</th>
                   <th scope="col">Situação</th>
                   <th scope="col">Atendido por</th>
                   <th scope="col">Aberto em</th>
@@ -323,7 +350,7 @@ export function TicketsPage() {
                     <td data-label="Assunto" className="ticket-table__title">
                       <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
                     </td>
-                    <td data-label="Tipo">{CATEGORY_LABELS[ticket.category]}</td>
+                    <td data-label="Assunto escolhido">{SUBJECT_LABELS[ticket.category]}</td>
                     <td data-label="Situação"><StatusBadge status={ticket.status} audience="requester" />{ticket.awaitingConfirmation && <Link to={`/tickets/${ticket.id}`} className="attention-tag">Confirme se resolveu</Link>}</td>
                     <td data-label="Atendido por" className={ticket.assignee ? undefined : 'text-muted'}>{ticket.assignee?.name ?? 'Aguardando a equipe'}</td>
                     <td data-label="Aberto em" className="ticket-table__date">
@@ -356,6 +383,7 @@ export function TicketsPage() {
                 <tr key={ticket.id}>
                   <td data-label="Título" className="ticket-table__title">
                     <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
+                    <OriginTag origin={ticket.dataOrigin} />
                     {ticket.incident && (
                       <span className={`incident-tag${ticket.incident.status === 'closed' ? ' incident-tag--closed' : ''}`}>
                         {ticket.incident.status === 'active' ? `Incidente · ${affectedLabel(ticket.incident.affectedCount)}` : 'Incidente encerrado'}
@@ -459,16 +487,18 @@ type FilterSelectProps = {
   value: string
   options: [string, string][]
   onChange: (value: string) => void
+  /** Text of the empty option (no filter). */
+  allLabel?: string
 }
 
-function FilterSelect({ id, label, value, options, onChange }: FilterSelectProps) {
+function FilterSelect({ id, label, value, options, onChange, allLabel = 'Todos' }: FilterSelectProps) {
   return (
     <div className="filter">
       <label htmlFor={id} className="filter__label">
         {label}
       </label>
       <select id={id} className="field__input field__select" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Todos</option>
+        <option value="">{allLabel}</option>
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>
             {optionLabel}

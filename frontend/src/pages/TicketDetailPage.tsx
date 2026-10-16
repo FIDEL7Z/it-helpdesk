@@ -20,11 +20,16 @@ import {
   getTicket,
   isTicketCategory,
   isTicketPriority,
+  isTicketStatus,
+  STATUS_LABELS,
   listItStaff,
   updateTicket,
   type TicketDetail,
   type TicketStatus,
 } from '../services/tickets'
+
+/** Status names as people read them ("Em andamento"), never the stored code ("em_andamento"). */
+const statusName = (value: unknown) => (typeof value === 'string' && isTicketStatus(value) ? STATUS_LABELS[value] : null)
 import { getErrorMessage } from '../utils/errors'
 import { formatDateTime } from '../utils/format'
 
@@ -214,7 +219,7 @@ export function TicketDetailPage() {
                     {teamView && event.audit && <>
                       <p>Responsável no momento: {event.audit.assigneeSnapshot?.name ?? event.assigneeAtEvent?.name ?? (event.audit.assigneeAtEvent ? `Usuário indisponível (${event.audit.assigneeAtEvent})` : 'Não atribuído')} · Ciclo {event.audit.cycleId}</p>
                       {event.audit.reason && <p>Justificativa: {event.audit.reason}</p>}
-                      {typeof event.audit.from.status === 'string' && typeof event.audit.to.status === 'string' && <p>{event.audit.from.status} → {event.audit.to.status}</p>}
+                      {statusName(event.audit.from.status) && statusName(event.audit.to.status) && <p>Situação: {statusName(event.audit.from.status)} → {statusName(event.audit.to.status)}</p>}
                     </>}
                     {teamView && !event.audit && <p className="field__hint">Registro legado: contexto estruturado indisponível.</p>}
                     <p className="timeline__meta">
@@ -245,8 +250,8 @@ export function TicketDetailPage() {
                 </dd>
               </div>
               <div className="details__row">
-                <dt>Categoria</dt>
-                <dd>{CATEGORY_LABELS[ticket.category]}</dd>
+                <dt>{teamView ? 'Categoria' : 'Assunto'}</dt>
+                <dd>{teamView ? CATEGORY_LABELS[ticket.category] : SUBJECT_LABELS[ticket.category]}</dd>
               </div>
               {teamView ? (
                 <>

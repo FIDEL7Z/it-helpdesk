@@ -10,6 +10,7 @@ import {
   ASSIGNEE_FILTERS,
   ASSIGNEE_FILTER_LABELS,
   CATEGORY_LABELS,
+  SUBJECT_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
   TICKET_CATEGORIES,
@@ -325,7 +326,7 @@ export function TicketsPage() {
               <thead>
                 <tr>
                   <th scope="col">Assunto</th>
-                  <th scope="col">Tipo</th>
+                  <th scope="col">Assunto escolhido</th>
                   <th scope="col">Situação</th>
                   <th scope="col">Atendido por</th>
                   <th scope="col">Aberto em</th>
@@ -338,7 +339,7 @@ export function TicketsPage() {
                     <td data-label="Assunto" className="ticket-table__title">
                       <Link to={`/tickets/${ticket.id}`} state={{ returnTo: location.pathname + location.search }}>{ticket.title}</Link>
                     </td>
-                    <td data-label="Tipo">{CATEGORY_LABELS[ticket.category]}</td>
+                    <td data-label="Assunto escolhido">{SUBJECT_LABELS[ticket.category]}</td>
                     <td data-label="Situação"><StatusBadge status={ticket.status} audience="requester" />{ticket.awaitingConfirmation && <Link to={`/tickets/${ticket.id}`} className="attention-tag">Confirme se resolveu</Link>}</td>
                     <td data-label="Atendido por" className={ticket.assignee ? undefined : 'text-muted'}>{ticket.assignee?.name ?? 'Aguardando a equipe'}</td>
                     <td data-label="Aberto em" className="ticket-table__date">

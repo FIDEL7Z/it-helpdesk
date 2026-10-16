@@ -6,7 +6,7 @@ import { DEMO_MODE } from '../config/demo'
 import { PieChart, TrendLineChart, HorizontalChart, HoursChart } from '../components/ManagerCharts'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getManagerDashboard, type ManagerDashboard, type Count } from '../services/manager'
-import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS, SUBJECT_LABELS } from '../services/tickets'
+import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../services/tickets'
 import { IncidentsOverview } from '../components/IncidentsOverview'
 import { QualityOverview } from '../components/QualityOverview'
 import { OriginNotice } from '../components/TicketBadges'
@@ -157,7 +157,7 @@ function ManagerContent() {
         <section aria-labelledby="manager-demand" className="manager-section">
           <h2 id="manager-demand" className="section-title">Demanda e tendências</h2>
           <div className="dashboard__grid">
-            <Distribution title="Assuntos mais solicitados no período" rows={data.demand.categories} label={id => SUBJECT_LABELS[id as keyof typeof SUBJECT_LABELS] ?? id} />
+            <Distribution title="Categorias mais solicitadas no período" rows={data.demand.categories} label={id => CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ?? id} />
             <section className="card" aria-labelledby="manager-requesters">
               <h3 id="manager-requesters" className="card__title">Solicitantes no período</h3><p className="card__description">Até dez maiores volumes de criação. Pendências pertencem aos chamados criados no período; qualquer perfil pode ser solicitante.</p>
               {data.requesters.length === 0 ? <p className="text-muted">Nenhuma solicitação criada neste período com os filtros selecionados.</p> : <div className="table-scroll" tabIndex={0} role="region" aria-label="Ranking de solicitantes"><table className="manager-table"><thead><tr><th>Solicitante</th><th>Solicitações</th><th>Ainda pendentes</th><th>Categorias mais solicitadas</th></tr></thead><tbody>{data.requesters.map(row => <tr key={row.id}><th scope="row"><Link to={tickets({ requesterId: row.id, createdFrom: data.range.start, createdTo: data.range.end })}>{row.name}</Link></th><td>{row.created}</td><td>{row.pending}</td><td>{row.categories.slice(0, 3).map(c => `${CATEGORY_LABELS[c.category as keyof typeof CATEGORY_LABELS] ?? c.category} (${c.count})`).join(', ')}</td></tr>)}</tbody></table></div>}

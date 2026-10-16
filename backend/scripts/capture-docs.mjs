@@ -189,7 +189,7 @@ async function run() {
         if (!(await evaluate('!!document.getElementById("known-incidents")'))) throw new Error('No active known problem');
         if (!(await evaluate(`!!document.querySelector('a[href="/tickets/new"]')`))) throw new Error('Missing support request action');
       } else {
-        // No operational tickets here: the service desk switches to the demonstration origin and says so.
+        // No operational tickets here: the person chose the demonstration origin (see deskOnDemo).
         const { summary } = await apiGet('/dashboard/summary?dataOrigin=demo');
         if (summary.scope !== 'all' || summary.byStatus.total <= 0) throw new Error('Incorrect dashboard scope or unexpectedly empty data');
         await ready('queue totals match UI', `document.getElementById('dashboard-origin')?.value === 'demo' && document.querySelector('.service-desk .stat-card__value')?.textContent === ${JSON.stringify(String(summary.byStatus.total))}`);
@@ -272,10 +272,17 @@ async function run() {
   // ---------- IT ----------
   await login('ti');
   const tiHome = '!!document.querySelector(".action-card") && document.getElementById("dashboard-origin")?.value === "demo" && !document.querySelector("[aria-busy=true]") && !document.querySelector(".spinner")';
-  await go('/dashboard', tiHome);
+  // The desk always opens on operational data (none here) and only offers the demonstration data.
+  const deskOnDemo = async () => {
+    await go('/dashboard', 'Array.from(document.querySelectorAll(".origin-bar button")).some(el => el.textContent === "Ver dados de demonstração")');
+    if (await evaluate('document.getElementById("dashboard-origin").value') !== 'operational') throw new Error('The desk must not switch origin on its own');
+    await evaluate('Array.from(document.querySelectorAll(".origin-bar button")).find(el => el.textContent === "Ver dados de demonstração").click()');
+    await ready('desk on demo data', tiHome);
+  };
+  await deskOnDemo();
   await capture('dashboard-ti-desktop.png', null, true);
   await setViewport('desktop', 'dark');
-  await go('/dashboard', tiHome);
+  await deskOnDemo();
   await capture('dashboard-ti-escuro-desktop.png', null, true);
   await setViewport('desktop');
   await go('/tickets?dataOrigin=demo', '!!document.querySelector(".ticket-table tbody tr") && !document.querySelector("[aria-busy=true]")');

@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-16T03:14:33.919Z",
+  "capturedAt": "2026-10-16T04:08:41.017Z",
   "timezone": "America/Fortaleza",
   "origin": "demo",
   "mode": "isolated",
@@ -16,7 +16,7 @@
       "path": "/login",
       "title": "Entrar · IT Helpdesk",
       "heading": "Entrar",
-      "capturedAt": "2026-10-16T03:14:21.550Z",
+      "capturedAt": "2026-10-16T04:08:28.471Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -34,11 +34,11 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:22.672Z",
+      "capturedAt": "2026-10-16T04:08:29.785Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
@@ -56,11 +56,11 @@
       "title": "Central de ajuda · IT Helpdesk",
       "heading": "Encontre uma solução",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:23.113Z",
+      "capturedAt": "2026-10-16T04:08:30.216Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -74,15 +74,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/help/6ad1968b15f398da3bd8d88f",
+      "path": "/help/6ad1a33915f398da3bd9bf8e",
       "title": "Como verificar problemas de Wi-Fi · IT Helpdesk",
       "heading": "Como verificar problemas de Wi-Fi",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:23.592Z",
+      "capturedAt": "2026-10-16T04:08:30.799Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -100,11 +100,11 @@
       "title": "Solicitar suporte · IT Helpdesk",
       "heading": "Solicitar suporte",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:24.108Z",
+      "capturedAt": "2026-10-16T04:08:31.228Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -122,11 +122,11 @@
       "title": "Solicitar suporte · IT Helpdesk",
       "heading": "Solicitar suporte",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:24.232Z",
+      "capturedAt": "2026-10-16T04:08:31.327Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -140,15 +140,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/tickets/6ad1968b63940aeeead5568d",
+      "path": "/tickets/6ad1a3398b20b27c6ace3090",
       "title": "Erro ao iniciar o aplicativo de notas fiscais · IT Helpdesk",
       "heading": "Erro ao iniciar o aplicativo de notas fiscais",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:24.551Z",
+      "capturedAt": "2026-10-16T04:08:31.730Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -166,11 +166,11 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:25.082Z",
+      "capturedAt": "2026-10-16T04:08:32.327Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -188,11 +188,11 @@
       "title": "Início · IT Helpdesk",
       "heading": "Como podemos ajudar?",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:25.524Z",
+      "capturedAt": "2026-10-16T04:08:32.814Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
@@ -210,11 +210,11 @@
       "title": "Central de ajuda · IT Helpdesk",
       "heading": "Encontre uma solução",
       "user": {
-        "id": "6ad1968b63940aeeead55687",
+        "id": "6ad1a3398b20b27c6ace308a",
         "name": "Mariana Souza",
         "role": "solicitante"
       },
-      "capturedAt": "2026-10-16T03:14:25.810Z",
+      "capturedAt": "2026-10-16T04:08:33.064Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 390,
@@ -232,15 +232,15 @@
       "title": "Atendimento · IT Helpdesk",
       "heading": "Atendimento",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:26.696Z",
+      "capturedAt": "2026-10-16T04:08:34.081Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
-        "height": 1120
+        "height": 1121
       }
     },
     {
@@ -254,15 +254,15 @@
       "title": "Atendimento · IT Helpdesk",
       "heading": "Atendimento",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:27.303Z",
+      "capturedAt": "2026-10-16T04:08:34.676Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
-        "height": 1120
+        "height": 1121
       }
     },
     {
@@ -276,11 +276,11 @@
       "title": "Chamados · IT Helpdesk",
       "heading": "Chamados",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:27.669Z",
+      "capturedAt": "2026-10-16T04:08:34.957Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -298,11 +298,11 @@
       "title": "Chamados · IT Helpdesk",
       "heading": "Chamados",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:28.206Z",
+      "capturedAt": "2026-10-16T04:08:35.327Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -320,11 +320,11 @@
       "title": "Chamados · IT Helpdesk",
       "heading": "Chamados",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:28.625Z",
+      "capturedAt": "2026-10-16T04:08:35.599Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1920,
@@ -342,11 +342,11 @@
       "title": "Chamados · IT Helpdesk",
       "heading": "Chamados",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:29.008Z",
+      "capturedAt": "2026-10-16T04:08:36.025Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 390,
@@ -360,15 +360,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/tickets/6ad1968b63940aeeead55694",
+      "path": "/tickets/6ad1a33a8b20b27c6ace3097",
       "title": "Planilha de custos não abre no Excel · IT Helpdesk",
       "heading": "Planilha de custos não abre no Excel",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:29.455Z",
+      "capturedAt": "2026-10-16T04:08:36.523Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -382,15 +382,15 @@
         "height": 900
       },
       "theme": "light",
-      "path": "/tickets/6ad1968b63940aeeead55691",
+      "path": "/tickets/6ad1a33a8b20b27c6ace3094",
       "title": "Rede cabeada sem conexão no 2º andar · IT Helpdesk",
       "heading": "Rede cabeada sem conexão no 2º andar",
       "user": {
-        "id": "6ad1968b63940aeeead55688",
+        "id": "6ad1a3398b20b27c6ace308b",
         "name": "Carlos Andrade",
         "role": "ti"
       },
-      "capturedAt": "2026-10-16T03:14:29.899Z",
+      "capturedAt": "2026-10-16T04:08:36.831Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -408,15 +408,15 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:31.288Z",
+      "capturedAt": "2026-10-16T04:08:38.392Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 1440,
-        "height": 4104
+        "height": 4187
       }
     },
     {
@@ -430,11 +430,11 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:31.414Z",
+      "capturedAt": "2026-10-16T04:08:38.493Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -452,11 +452,11 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:31.525Z",
+      "capturedAt": "2026-10-16T04:08:38.594Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -474,11 +474,11 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:31.625Z",
+      "capturedAt": "2026-10-16T04:08:38.693Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,
@@ -496,15 +496,15 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:32.570Z",
+      "capturedAt": "2026-10-16T04:08:39.690Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 768,
-        "height": 5797
+        "height": 6381
       }
     },
     {
@@ -518,15 +518,15 @@
       "title": "Visão gerencial · IT Helpdesk",
       "heading": "Visão gerencial",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:33.514Z",
+      "capturedAt": "2026-10-16T04:08:40.595Z",
       "fullPage": true,
       "imageDimensions": {
         "width": 390,
-        "height": 7170
+        "height": 7823
       }
     },
     {
@@ -540,11 +540,11 @@
       "title": "Gerenciar artigos · IT Helpdesk",
       "heading": "Gerenciar artigos",
       "user": {
-        "id": "6ad1968b63940aeeead55689",
+        "id": "6ad1a3398b20b27c6ace308c",
         "name": "Ana Ribeiro",
         "role": "gestor"
       },
-      "capturedAt": "2026-10-16T03:14:33.919Z",
+      "capturedAt": "2026-10-16T04:08:41.017Z",
       "fullPage": false,
       "imageDimensions": {
         "width": 1440,

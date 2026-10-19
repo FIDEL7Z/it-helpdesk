@@ -21,6 +21,17 @@ services:
       retries: 5
       start_period: 10s
 
+  # Local inbox for the e-mail notifications (EMAIL_PROVIDER=mailpit): every message stays here,
+  # whatever the address. Web inbox and send API on http://localhost:8025 (this machine only).
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8025:8025'
+    environment:
+      # Keep only the latest messages; the inbox is for reading, not an archive.
+      MP_MAX_MESSAGES: '500'
+
 volumes:
   # Named volume: data survives `docker compose down` (removed only with `down -v`).
   mongo-data:

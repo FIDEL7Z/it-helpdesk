@@ -1,3 +1,4 @@
+import { env } from '../config/env';
 import { HttpError } from '../errors/http-error';
 import { OPTIONAL_NOTIFICATIONS, UserModel, type NotificationPreferences, type PublicUser } from '../models/user.model';
 import { comparePassword } from '../utils/password';
@@ -21,7 +22,8 @@ export interface AccountView {
   /** Fictitious demo accounts keep their documented login e-mail. */
   canChangeEmail: boolean;
   preferences: NotificationPreferences;
-  delivery: { enabled: boolean; provider: string };
+  /** localInboxUrl: only with Mailpit, where the messages of this environment can be read. */
+  delivery: { enabled: boolean; provider: string; localInboxUrl: string | null };
   notifications: NotificationView[];
 }
 
@@ -44,7 +46,7 @@ export async function getAccount(actor: PublicUser): Promise<AccountView> {
     pendingEmail: user.pendingEmail ?? null,
     canChangeEmail: !DEMO_EMAILS.has(user.email),
     preferences: Object.fromEntries(OPTIONAL_NOTIFICATIONS.map((key) => [key, stored?.[key] ?? DEFAULT_PREFERENCES[key]])) as NotificationPreferences,
-    delivery: { enabled: settings.enabled, provider: settings.provider.name },
+    delivery: { enabled: settings.enabled, provider: settings.provider.name, localInboxUrl: settings.enabled && settings.provider.name === 'mailpit' ? env.MAILPIT_URL : null },
     notifications: await listOwnNotifications(user.id),
   };
 }

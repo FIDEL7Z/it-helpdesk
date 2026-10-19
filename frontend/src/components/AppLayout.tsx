@@ -58,10 +58,17 @@ export function AppLayout() {
 
           {user && (
             <div className="user-menu">
-              <div className="user-menu__info">
-                <span className="user-menu__name">{user.name}</span>
-                <span className="user-menu__role">{ROLE_LABELS[user.role]}</span>
-              </div>
+              {/* The name opens the account page (e-mail and notifications); on phones, an icon does. */}
+              <NavLink to="/account" className="user-menu__account" aria-label={`Minha conta: ${user.name}`} title="Minha conta">
+                <svg className="user-menu__account-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                </svg>
+                <span className="user-menu__info">
+                  <span className="user-menu__name">{user.name}</span>
+                  <span className="user-menu__role">{ROLE_LABELS[user.role]}</span>
+                </span>
+              </NavLink>
               <ThemeToggle />
               <button type="button" className="button button--nav" onClick={handleLogout}>
                 Sair

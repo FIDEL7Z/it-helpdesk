@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AppLayout } from './components/AppLayout'
+import { AccountPage } from './pages/AccountPage'
+import { ConfirmEmailPage } from './pages/ConfirmEmailPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
@@ -26,6 +28,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Opened from the confirmation e-mail, with or without a session. */}
+        <Route path="/account/confirm-email" element={<ConfirmEmailPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
@@ -46,6 +50,7 @@ function App() {
             <Route path="/inventory/assets/:id" element={<AssetDetailPage />} />
             <Route path="/inventory/movements" element={<MovementsPage />} />
             <Route path="/inventory/organization" element={<OrganizationPage />} />
+            <Route path="/account" element={<AccountPage />} />
           </Route>
         </Route>
 

@@ -24,3 +24,12 @@ export const loginRateLimiter = rateLimit({
 export function resetLoginRateLimit(): Promise<void> {
   return loginAttemptsStore.resetAll();
 }
+
+/** Confirmation links: 20 tries per IP every 15 minutes, against token guessing (tokens have 256 bits). */
+export const emailConfirmationRateLimiter = rateLimit({
+  limit: 20,
+  windowMs: 15 * 60 * 1000,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many confirmation attempts. Try again later' },
+});

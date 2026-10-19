@@ -10,7 +10,11 @@ import { ProductModel, StockMovementModel } from '../src/models/inventory.model'
 import { NotificationModel, NotificationStateModel } from '../src/models/notification.model';
 import { TicketModel } from '../src/models/ticket.model';
 import { UserModel, type UserRole } from '../src/models/user.model';
-import { mailpitProvider, resendProvider, type EmailProvider, type OutgoingEmail, type SendResult } from '../src/services/email/providers';
+import { spawnSync } from 'node:child_process';
+import nodemailer from 'nodemailer';
+import {
+  GMAIL_SMTP, classifySmtpError, gmailProvider, mailpitProvider, resendProvider, type EmailProvider, type OutgoingEmail, type SendResult,
+} from '../src/services/email/providers';
 import { setEmailSettingsForTests } from '../src/services/email/settings';
 import {
   NOTIFICATION_LIMITS, claimNext, ensureActivation, processDueNotifications, processNotification, reconcileNotifications,
@@ -519,5 +523,119 @@ describe('providers', () => {
     } finally {
       await fake.close();
     }
+  });
+});
+
+describe('Gmail provider (fake SMTP transport: no network, no real credentials)', () => {
+  type Json = { [key: string]: any };
+  function fakeGmail(failWith?: unknown) {
+    const created: Json[] = [];
+    const sent: Json[] = [];
+    const provider = gmailProvider('helpdesk.remetente@gmail.com', 'abcdefghijklmnop', 'IT Helpdesk <ignorado@outro-dominio.dev>', (options) => {
+      created.push(options);
+      return { sendMail: async (mail) => { if (failWith) throw failWith; sent.push(mail); return { messageId: '<gmail-1@gmail.com>' }; } };
+    });
+    return { provider, created, sent };
+  }
+  const message: OutgoingEmail = { to: { email: 'pessoa@exemplo.dev', name: 'Pessoa' }, subject: 'Assunto', html: '<p>Oi</p>', text: 'Oi', idempotencyKey: 'ticket-event:abc:123' };
+
+  it('connects to Gmail SMTP over TLS with the app password and sends as the Gmail account', async () => {
+    const { provider, created, sent } = fakeGmail();
+    assert.equal(provider.name, 'gmail');
+    assert.deepEqual(await provider.send(message), { ok: true, id: '<gmail-1@gmail.com>' });
+    assert.equal(created.length, 1, 'one transport, reused');
+    assert.equal(created[0].host, GMAIL_SMTP.host);
+    assert.equal(created[0].port, 465);
+    assert.equal(created[0].secure, true);
+    assert.deepEqual(created[0].auth, { user: 'helpdesk.remetente@gmail.com', pass: 'abcdefghijklmnop' });
+    assert.ok(created[0].connectionTimeout && created[0].socketTimeout, 'timeouts are set');
+    // Gmail sends as the authenticated account: the address comes from GMAIL_USER, the name from EMAIL_FROM.
+    assert.deepEqual(sent[0].from, { name: 'IT Helpdesk', address: 'helpdesk.remetente@gmail.com' });
+    assert.deepEqual(sent[0].to, { name: 'Pessoa', address: 'pessoa@exemplo.dev' });
+    assert.equal(sent[0].subject, 'Assunto');
+    assert.equal(sent[0].html, '<p>Oi</p>');
+    assert.equal(sent[0].text, 'Oi');
+    assert.equal(sent[0].headers['X-Helpdesk-Notification'], 'ticket-event:abc:123');
+    await provider.send(message);
+    assert.equal(sent[1].messageId, sent[0].messageId, 'the same notification keeps its Message-ID on every attempt');
+    await provider.send({ ...message, idempotencyKey: 'ticket-event:other:123' });
+    assert.notEqual(sent[2].messageId, sent[0].messageId);
+  });
+
+  it('retries temporary SMTP and network failures, not refused logins or rejected messages', async () => {
+    const cases: [unknown, boolean, string][] = [
+      [Object.assign(new Error('Invalid login'), { code: 'EAUTH', responseCode: 535 }), false, 'smtp_535'],
+      [Object.assign(new Error('Too many login attempts'), { code: 'EAUTH', responseCode: 454 }), true, 'smtp_454'],
+      [Object.assign(new Error('Service not available'), { responseCode: 421 }), true, 'smtp_421'],
+      [Object.assign(new Error('Mailbox unavailable'), { code: 'EENVELOPE', responseCode: 550 }), false, 'smtp_550'],
+      [Object.assign(new Error('No recipients'), { code: 'EENVELOPE' }), false, 'eenvelope'],
+      [Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNECTION' }), true, 'econnection'],
+      [Object.assign(new Error('Greeting never received'), { code: 'ETIMEDOUT' }), true, 'etimedout'],
+    ];
+    for (const [failure, retryable, reason] of cases) {
+      assert.deepEqual(classifySmtpError(failure), { ok: false, retryable, reason }, reason);
+      assert.deepEqual(await fakeGmail(failure).provider.send(message), { ok: false, retryable, reason });
+    }
+  });
+
+  it('sends the resolution e-mail of the main flow, with the link to confirm or contest in the system', async () => {
+    const { provider, sent } = fakeGmail();
+    const requester = await createUser('Solicitante Gmail', 'solicitante', { email: 'solicitante.gmail@helpdesk-avaliacao.dev', verified: true });
+    useEmail({ provider, allowlist: ['solicitante.gmail@helpdesk-avaliacao.dev'] });
+    const ticket = await openTicket(requester, 'Monitor sem imagem');
+    await setStatus(ticket.id, 'em_andamento');
+    await setStatus(ticket.id, 'resolvido');
+    assert.equal((await processDueNotifications()).sent, 3);
+    const resolved = sent.find((mail) => /resolvido/.test(mail.subject));
+    assert.ok(resolved);
+    assert.equal(resolved.to.address, 'solicitante.gmail@helpdesk-avaliacao.dev', 'the confirmed e-mail stored for the requester');
+    assert.ok(resolved.text.includes(`${APP_URL}/tickets/${ticket.id}`));
+    assert.match(resolved.text, /responda se o problema foi resolvido/);
+    assert.match(resolved.text, /avisar que o problema continua/);
+    const row = await NotificationModel.findOne({ ticket: ticket.id, type: 'ticket_resolved' });
+    assert.equal(row?.provider, 'gmail');
+    assert.equal(row?.sentTo, 'solicitante.gmail@helpdesk-avaliacao.dev');
+  });
+
+  it('keeps the allowlist and reserved domains for Gmail outside production', async () => {
+    const { provider, sent } = fakeGmail();
+    useEmail({ provider, allowlist: [] });
+    await openTicket(maria); // @notifications.test: reserved, never sent by a real provider
+    const outside = await createUser('Fora da Lista', 'solicitante', { email: 'fora.da.lista@helpdesk-avaliacao.dev', verified: true });
+    await openTicket(outside);
+    await processDueNotifications();
+    assert.equal(sent.length, 0);
+    assert.deepEqual((await NotificationModel.find({ status: 'skipped' })).map((row) => row.skipReason).sort(), ['recipient_not_in_allowlist', 'reserved_address']);
+  });
+
+  it('builds a real RFC 822 message with Nodemailer (stream transport, no connection)', async () => {
+    let raw = '';
+    const provider = gmailProvider('helpdesk.remetente@gmail.com', 'abcdefghijklmnop', 'IT Helpdesk <helpdesk@helpdesk.local>', () => {
+      const stream = nodemailer.createTransport({ streamTransport: true, buffer: true, newline: 'unix' });
+      return { sendMail: async (mail) => { const info = await stream.sendMail(mail); raw = (info.message as Buffer).toString(); return { messageId: info.messageId }; } };
+    });
+    const result = await provider.send({ ...message, subject: 'Seu pedido foi resolvido: confirme se deu certo', html: '<p>Olá, Pessoa.</p>', text: 'Olá, Pessoa.' });
+    assert.equal(result.ok, true);
+    assert.match(raw, /^From: IT Helpdesk <helpdesk\.remetente@gmail\.com>$/m);
+    assert.match(raw, /^To: Pessoa <pessoa@exemplo\.dev>$/m);
+    assert.match(raw, /^Message-ID: <[a-f0-9]{32}@it-helpdesk\.notification>$/m);
+    assert.match(raw, /^X-Helpdesk-Notification: ticket-event:abc:123$/m);
+    assert.match(raw, /^Subject: Seu pedido foi resolvido: confirme se deu certo$/m);
+    assert.match(raw, /Content-Type: multipart\/alternative/);
+    assert.match(raw, /Content-Type: text\/plain/);
+    assert.match(raw, /Content-Type: text\/html/);
+    assert.doesNotMatch(raw, /abcdefghijklmnop/, 'the app password never goes into the message');
+  });
+
+  it('refuses to start with EMAIL_PROVIDER=gmail but no Gmail credentials', () => {
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '-e', "import('./src/config/env.ts')"], {
+      cwd: process.cwd(),
+      env: { ...process.env, EMAIL_ENABLED: 'true', EMAIL_PROVIDER: 'gmail', GMAIL_USER: '', GMAIL_APP_PASSWORD: '' },
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /GMAIL_USER is required/);
+    assert.match(result.stderr, /GMAIL_APP_PASSWORD/);
   });
 });

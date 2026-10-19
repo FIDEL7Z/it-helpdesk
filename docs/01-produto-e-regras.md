@@ -84,7 +84,7 @@ Quando várias pessoas sofrem o mesmo problema (Wi-Fi fora, sistema lento), cada
 
 **Auditoria.** Publicação, edição do texto, encerramento e republicação geram eventos com autor, papel, data, revisão, ciclo e valores anteriores/novos. Participações não geram eventos, para não transformar o histórico em um registro de cliques.
 
-**Limites.** Não há notificação ativa (e-mail, push), vínculo de outros chamados ao incidente nem sugestão automática de incidentes parecidos. O número de afetados mede alcance; não indica quantos chamados deixaram de ser abertos.
+**Limites.** Incidentes não avisam ninguém ativamente (nem por e-mail nem push); os e-mails cobrem só o pedido de cada solicitante. Não há vínculo de outros chamados ao incidente nem sugestão automática de incidentes parecidos. O número de afetados mede alcance; não indica quantos chamados deixaram de ser abertos.
 
 Contrato HTTP em [fluxos e API](03-fluxos-e-api.md#incidentes-compartilhados), modelo em [arquitetura e dados](02-arquitetura-e-dados.md#incidentes-e-participações) e indicadores em [métricas](04-metricas-decisoes-e-limites.md#incidentes-compartilhados).
 
@@ -149,8 +149,8 @@ O módulo liga o atendimento ao controle físico do que a TI entrega. O exemplo 
 
 ## Escopo entregue e evolução futura
 
-**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), estoque e patrimônio integrados aos chamados, visão gerencial exclusiva com filtros e métricas comprovadas, tema claro por padrão com opção de tema escuro no cabeçalho e layout responsivo.
+**Implementado:** login, chamados persistidos, filtros/paginação, atalhos operacionais, retorno à fila filtrada, atribuição, triagem, ciclos, auditoria, autoria explícita, página inicial própria por perfil, portal do solicitante, incidentes compartilhados, base de conhecimento, classificação orientada, confirmação e avaliação de resolução, quadro (Kanban), estoque e patrimônio integrados aos chamados, notificações por e-mail do próprio pedido para o solicitante (com confirmação do endereço, preferências e modo local Mailpit), visão gerencial exclusiva com filtros e métricas comprovadas, tema claro por padrão com opção de tema escuro no cabeçalho e layout responsivo.
 
 A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 
-**Ainda não implementado:** inteligência artificial (fica para uma etapa posterior, que poderá usar os dados confiáveis do estoque e dos chamados), compras, fornecedores, custos e notas fiscais, leitor de código de barras, campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.
+**Ainda não implementado:** inteligência artificial (fica para uma etapa posterior, que poderá usar os dados confiáveis do estoque e dos chamados), compras, fornecedores, custos e notas fiscais, leitor de código de barras, campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações push e avisos à equipe, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.

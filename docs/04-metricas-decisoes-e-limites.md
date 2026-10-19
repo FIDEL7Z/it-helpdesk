@@ -155,6 +155,52 @@ Seção da visão gerencial e endpoint `GET /inventory/insights` (só gestão), 
 
 O saldo do almoxarifado é físico: é um só, sem origem. O consumo do período segue a origem escolhida na visão gerencial: movimentações feitas pelas contas fictícias reservadas são de demonstração e só aparecem quando essa origem é escolhida (e nunca fora do modo demonstração). Consumir mais não é chamado de desperdício: depende do tamanho e da atividade de cada setor.
 
+## Notificações por e-mail
+
+O solicitante recebe e-mails sobre o próprio pedido:
+
+| Evento (do histórico do chamado ou do livro-razão) | E-mail | Pode ser desligado |
+|---|---|---|
+| `created` | Recebemos seu pedido | Sim |
+| `status_changed` de Aberto para Em andamento | Seu pedido está em atendimento | Sim |
+| `resolved` | Seu pedido foi resolvido: confirme se deu certo | Não: pede a confirmação |
+| `reopened` feito pela equipe | Seu pedido foi reaberto | Sim |
+| Entrega (`issue` ou `asset_assign`) ligada ao pedido | Material entregue no seu pedido | Sim |
+
+Não geram e-mail: edição, triagem, atribuição, avaliação e as ações do próprio solicitante (contestar uma resolução, confirmar), exceto o recibo de abertura.
+
+**Regras de envio**
+- **Destinatário:** é sempre o solicitante gravado no chamado, com o e-mail confirmado da conta. Sem confirmação, com o aviso desligado, com a entrega estornada antes do envio ou com um endereço fora das regras, o aviso fica registrado como "não enviado", com o motivo.
+- **Conteúdo:** o e-mail traz nome, referência (os 6 últimos caracteres do id, como no quadro), assunto, o que mudou, data e hora no `APP_TIMEZONE` e o link para a página do pedido, que exige login. Justificativas da equipe, anotações e dados de outras pessoas não entram. Na entrega, o número de patrimônio aparece só se a pessoa foi quem recebeu, como na página do pedido.
+- **Confirmação de e-mail:** o token tem 256 bits, vale por 24 horas e serve uma única vez; só o hash fica no banco. A troca de e-mail exige a senha atual, e o login muda apenas depois da confirmação pela nova caixa. As contas de demonstração mantêm o e-mail documentado.
+
+**Fila (outbox) sem transações**
+
+O chamado e a fila são duas gravações separadas, porque o MongoDB local não tem transações entre documentos:
+1. O serviço salva o chamado ou a movimentação, com as regras de sempre.
+2. Em seguida, grava uma linha por evento e destinatário. A chave `ticket-event:<eventId>:<destinatário>` (ou `stock-movement:...`) é única, então repetir a gravação não duplica nada.
+3. Se essa gravação falhar, o erro vai para o log e a requisição continua normalmente.
+4. Uma reconciliação a cada 5 minutos, e na partida da API, refaz as linhas que faltarem a partir do histórico dos chamados e do livro-razão. Ela olha as últimas 24 horas e nunca antes do momento em que o e-mail foi ligado pela primeira vez, para não enviar o histórico antigo.
+
+**Processamento**
+- O processador roda dentro da API, a cada 5 segundos.
+- Ele pega cada linha de forma atômica (`findOneAndUpdate`) e a trava por 60 segundos. Dois processos nunca enviam a mesma linha.
+- Uma trava vencida é retomada, o que cobre a queda da API no meio de um envio.
+- Só quem ainda tem a trava registra o resultado.
+- Falhas temporárias (rede, tempo esgotado, 429, 5xx) voltam para a fila com espera crescente (30 s, 2 min, 10 min, 30 min, mais até 20% de variação), até 5 tentativas. Depois disso, a linha fica como falha.
+- Pedidos que o provedor recusa como inválidos não são repetidos.
+
+**Provedores**
+- **Mailpit:** a caixa local do Compose, usada pela API HTTP de envio, sem biblioteca SMTP. Tudo fica no computador. O Mailpit não tem chave de idempotência: se a API cair entre o envio e o registro, a mensagem pode aparecer duas vezes.
+- **Resend:** usa o SDK oficial, com a chave da linha como `Idempotency-Key`. O Resend descarta repetições por 24 horas.
+- **Proteções do Resend:** fora de produção, ele só envia para a `EMAIL_RECIPIENT_ALLOWLIST`. Domínios reservados (`.local`, `.test`, `.example`, `.invalid`, `example.com`) nunca saem por ele.
+
+**Limites**
+- E-mails só para o solicitante, sem avisos para a equipe nem sobre incidentes.
+- O processador e a reconciliação ficam na mesma instância da API. Várias instâncias funcionam, porque a trava é no banco, mas o intervalo de 5 segundos é o atraso mínimo.
+- O histórico de avisos na página da conta mostra os 10 últimos.
+- Não há descadastro por link no e-mail: as preferências ficam em **Minha conta**.
+
 ## Decisões presentes no código
 
 As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, sem afirmar quais alternativas o autor considerou pessoalmente.
@@ -172,6 +218,8 @@ As justificativas abaixo explicam efeitos e tradeoffs da arquitetura existente, 
 - **Gráficos shadcn/ui adaptados com Recharts:** contêiner e tooltip usam tokens CSS existentes, sem introduzir Tailwind ou reconstruir o frontend. Gráfico gerencial é carregado sob demanda; barras ordenam categorias e pizza mantém a ordem semântica de prioridades.
 - **CSS próprio e Docker só no banco:** preserva a identidade visual e reduz dependências, com manutenção manual de componentes e processos separados.
 - **Paleta corporativa em tokens CSS:** fundo #F5F7FA, superfícies brancas, navegação azul-marinho #17324D, texto #172B3A, texto secundário #526477, bordas #DCE4EA e destaque suave #D9F1EE, definidos uma vez em `:root`, com variante escura equivalente em `:root[data-theme="dark"]`. O tema claro é o padrão, independentemente do sistema; o botão **Tema escuro** do cabeçalho (`aria-pressed`) liga o escuro e guarda a escolha no navegador, aplicada por um script em `index.html` antes da primeira pintura, sem piscar. O primário pedido, #087F8C, mede 4,42:1 como texto sobre o fundo, abaixo do AA; foi escurecido para #067682 (4,99:1 sobre o fundo, 5,36:1 com texto branco). Outros pares medidos: texto 13,56:1, texto secundário 5,67:1, links da navegação 8,51:1; no escuro, texto 14,73:1 e primário 8,03:1. Bordas de campos ficam acima de 3:1 nos dois temas; o E2E confere o contraste dos botões em cada execução. Situação nunca depende só de cor: selos têm texto e o status do incidente tem ponto e rótulo.
+- **E-mail em fila, não na requisição:** o chamado é salvo e respondido sem esperar o provedor; a fila no MongoDB sobrevive a reinícios e dispensa Redis ou um serviço de filas. O custo é um atraso de alguns segundos e duas gravações não atômicas, cobertas pela reconciliação a partir do histórico.
+- **Destinatário e conteúdo decididos no backend:** o endereço vem da conta confirmada do dono do pedido, e o texto é montado campo a campo, como o formato público do chamado; nenhuma rota recebe destinatário nem texto do e-mail.
 - **Containers por perfil:** o cabeçalho e a página usam o mesmo container, definido em tokens: `--container-wide` (1480 px) para TI e gestão, que trabalham com filas, quadro e tabelas; `--container-portal` (1280 px) para o solicitante; `--container-reading` (760 px) para texto corrido, como os artigos. Assim, marca, menu e título começam na mesma linha em qualquer largura. O formulário de suporte usa duas colunas a partir de 960 px. Conjuntos fixos de cartões (os cinco assuntos, as quatro ações da mesa de atendimento, os cinco números do estoque na visão gerencial) têm o número de colunas definido por faixa de largura, para não sobrar um cartão sozinho numa linha; listas de tamanho variável continuam fluidas.
 - **Incidentes em coleções próprias:** a revisão do chamado não é usada para participações, então cliques de muitas pessoas não geram 409 no atendimento. O custo é não ter transação entre chamado e incidente, compensado pela reconciliação na leitura.
 - **Respostas do solicitante no histórico do chamado:** confirmar, avaliar e contestar são eventos do próprio chamado, escritos pelo mesmo `saveChanges` das outras ações. Herdam revisão, ciclo, autor e data do servidor, sem uma coleção paralela com regras próprias. Contestar é uma rota específica, não uma permissão geral de status.
@@ -196,7 +244,7 @@ CORS restringe origens configuradas; autenticação/autorização continuam resp
 
 MongoDB local roda sem autenticação, publicado somente em loopback. Produção exige configuração própria de banco e segredos. `.env` e variantes são ignorados pelo Git; `.env.example` tem apenas configuração e credenciais demonstrativas.
 
-O estoque não tem compras, fornecedores, custos, notas fiscais nem código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois; uma entrega feita a partir de uma reserva é corrigida com devolução, não com estorno. Não há inteligência artificial: ela fica para uma etapa posterior. Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações. Incidentes não avisam ninguém ativamente: o usuário vê o problema ao abrir o sistema; o mesmo vale para a pergunta de confirmação da resolução. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. A escolha de tema fica no navegador, não na conta do usuário.
+O estoque não tem compras, fornecedores, custos, notas fiscais nem código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois; uma entrega feita a partir de uma reserva é corrigida com devolução, não com estorno. Não há inteligência artificial: ela fica para uma etapa posterior. Não há cadastro público, recuperação de senha, administração de perfis na interface, comentários, anexos ou notificações push. Com o e-mail ligado, o solicitante recebe os avisos do próprio pedido, inclusive o que pede a confirmação da resolução (veja [notificações por e-mail](#notificações-por-e-mail)); sem ele, vê tudo ao abrir o sistema. Incidentes não avisam ninguém ativamente. A busca de artigos não ordena por relevância e artigos não têm imagens ou anexos. O catálogo de perguntas do pedido não é editável pela interface. Dashboards não atualizam em tempo real; a visão gerencial possui botão de atualização e filtros por período. Não há SLA ou ranking de qualidade da equipe. A escolha de tema fica no navegador, não na conta do usuário.
 
 O timeout de um E2E antigo permanece sem causa determinada; os scripts/registros daquela execução não estão disponíveis. O E2E atual é reproduzível e registra diagnóstico em falhas, mas uma execução aprovada não prova ausência de intermitência. Requisições do cliente de produção não possuem timeout explícito.
 

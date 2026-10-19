@@ -83,6 +83,14 @@ Com `npm run seed`, `npm run seed:scenarios` e `npm run seed:inventory` executad
 
 Recarregar qualquer página mantém os dados: tudo está no banco.
 
+## Roteiro dos e-mails — cerca de 3 minutos
+
+Com o Docker no ar (`docker compose up -d --wait` sobe também o Mailpit) e `EMAIL_ENABLED=true` em `backend/.env`:
+1. **Solicitante (Mariana).** Clique no nome no cabeçalho para abrir **Minha conta**: o e-mail aparece como **Não confirmado** e o aviso aponta a caixa local. Clique em **Enviar e-mail de confirmação**: a página diz que a mensagem entrou na fila, sem afirmar que já foi enviada.
+2. **Mailpit.** Em http://localhost:8025, abra "Confirme seu e-mail", clique em **Confirmar e-mail** e, na página que abrir, em **Confirmar este e-mail**. Abrir o link de novo mostra que ele já foi usado.
+3. **Pedido.** Abra um pedido: "Recebemos seu pedido" chega em poucos segundos. Como Carlos (TI), inicie o atendimento, entregue um material no pedido e resolva: cada etapa gera um e-mail, sempre para a Mariana, sem a justificativa escrita pela equipe.
+4. **Minha conta.** **Últimos avisos** mostra cada aviso como enviado. Desligue **Início do atendimento** e abra outro pedido: o início aparece como "não enviado: aviso desligado nas preferências".
+
 ## Cenários de demonstração
 
 `npm run seed:scenarios`, em `backend` depois de `npm run seed`, cria pedidos fictícios com títulos específicos, para apresentações e capturas sem textos genéricos. Cada etapa passa pelos mesmos serviços da aplicação (validação, revisão, auditoria e ciclos), agindo como as contas demonstrativas; por isso os pedidos ficam com origem **Demonstração** e o histórico é o que de fato aconteceu com eles, no momento em que o script rodou. Nenhum registro existente é alterado e nenhuma data é retroativa.
@@ -138,6 +146,18 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Patrimônio | `inventory-assets.test.ts`: patrimônio e série únicos; cadastro repetido não duplica; transições permitidas; transferência guarda origem e destino; reserva por chamado; entregas simultâneas do mesmo equipamento resultam em uma; baixa só da gestão e final |
 | Estoque nos chamados | `inventory-tickets.test.ts`: local validado e guardado como era; equipamento só do próprio solicitante; entrega retira exatamente uma unidade, registra quem entregou e quem recebeu e não altera o chamado; resolver não move estoque; troca com patrimônio e com periférico; solicitante vê só as entregas do próprio pedido |
 | Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
+| Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
+- registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
+- entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;
+- com e-mail desligado, nada entra na fila;
+- falha ao enfileirar não derruba o chamado, e a reconciliação refaz a linha, nunca antes da ativação;
+- envio só para o e-mail confirmado, com link e título escapado e sem a justificativa da equipe;
+- preferências, com a resolução sempre enviada; entrega estornada não é enviada;
+- espera crescente e desistência após 5 tentativas; pedido inválido não é repetido; chave de idempotência estável;
+- dois processadores enviam cada linha uma vez; trava vencida é retomada após reinício; quem perdeu a trava não sobrescreve;
+- lista liberada e domínios reservados no provedor real;
+- conta: só os próprios dados, link de confirmação de uso único e com validade, troca com senha que espera a nova caixa, contas de demonstração mantidas;
+- formato das requisições do Mailpit e do Resend e as classes de erro |
 | Troca de perfil | E2E: Solicitante → Sair → TI, TI → Sair → Gestor e Gestor → Sair → Solicitante caem na página inicial do próprio perfil; URL protegida volta após o login; recarregar mantém a página; destino que o perfil não abre cai na página inicial; sessão inválida de outra pessoa não decide o destino; nenhuma resposta 5xx em toda a execução |
 | Privacidade das respostas | `ticket-privacy.test.ts`: chaves exatas e ausência de dados restritos em todas as respostas do solicitante; a equipe mantém o contrato operacional |
 | Mobile e layout | E2E verifica dashboard gerencial em desktop/390 px (inclusive com tabela de incidentes), Início do solicitante em 390 px (busca com altura e ícone preservados) e em 1650 px (alinhado ao cabeçalho), formulário de suporte em duas colunas a 1650 px e em uma coluna, na ordem de leitura, a 768 px, as quatro ações da mesa de atendimento em 2 + 2 a 768 px, texto visível no botão **Solicitar suporte** com o mouse sobre ele, anel de foco visível na barra de navegação do tema escuro, tema claro como padrão mesmo com o sistema em escuro, botão de tema (liga, sobrevive ao recarregamento, desliga), contraste de texto dos botões nos dois temas; não substitui auditoria completa de acessibilidade/responsividade |
@@ -145,6 +165,19 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 O E2E não automatiza toda a abertura e resolução pela UI. A integração cobre essas regras na API; o roteiro acima orienta a conferência visual manual.
 
 ## Registro da verificação documental
+
+Em **19/10/2026**, com as notificações por e-mail:
+- **282 testes backend**, aprovados com `DEMO_MODE=true` e com `DEMO_MODE=false`, entre eles 26 de notificações;
+- **190 verificações E2E**, com o e-mail desligado, passaram em 3 de 4 execuções da versão final; a que falhou parou ao recarregar o painel do gestor, depois que o sistema ocultou a página headless (o mesmo padrão registrado abaixo, causa não comprovada);
+- typecheck, lint sem warnings, builds, `docs:check`, `git diff --check` e `npm audit` sem vulnerabilidades.
+
+O fluxo também foi percorrido de verdade com o Mailpit v1.31.6, numa API, num banco e numa interface temporários (o banco de desenvolvimento não foi usado):
+- confirmação de e-mail pela página, com o segundo uso do link recusado;
+- registro, início, entrega de material, resolução e reabertura, cada um entregue em 2 a 5 segundos, sempre só para a solicitante, com o título escapado e sem as justificativas escritas pela equipe;
+- com o Mailpit parado, o chamado foi criado em 14 ms e o aviso ficou na fila com nova tentativa;
+- com a API reiniciada e o Mailpit de volta, a mensagem saiu uma única vez, na segunda tentativa.
+
+O envio real pelo Resend não foi testado contra a conta de verdade (exige chave e domínio verificado do dono); o formato das chamadas, a chave de idempotência e a classificação dos erros foram conferidos contra um servidor local que imita a API.
 
 Em **16/10/2026**, após a revisão de layout responsivo, as seguintes verificações foram aprovadas:
 - containers por perfil alinhados ao cabeçalho;

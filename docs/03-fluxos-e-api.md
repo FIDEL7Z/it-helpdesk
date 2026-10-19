@@ -15,6 +15,7 @@
 7. **Confirmar ou contestar a solução.** Quando a TI resolve, o pedido mostra **Seu problema foi resolvido?** (e a marca **Confirme se resolveu** na lista). **Sim, foi resolvido.** encerra; **Não, o problema continua.** pede o que continua acontecendo e devolve o pedido à TI.
 8. **Avaliar (opcional).** Depois de confirmar, escolha de 1 a 5 estrelas e, se quiser, escreva um comentário. **Agora não** pula a avaliação.
 9. **Ver o material entregue.** Se a TI entregou algo no seu atendimento, o pedido mostra **Material entregue**: o quê, quanto, quando e por quem.
+10. **Receber avisos por e-mail.** Com o envio ligado no servidor, clique no seu nome no cabeçalho (no celular, no ícone de pessoa) para abrir **Minha conta**. Clique em **Enviar e-mail de confirmação** e abra o link recebido: a partir daí, chegam os avisos do seu pedido (registro, início, resolução, reabertura e entrega). Em **Avisos por e-mail**, desligue os que não quiser; o de resolução, que pede a sua confirmação, é sempre enviado. **Últimos avisos** mostra se cada um está na fila, foi enviado ou não foi enviado e por quê.
 
 ### Suporte TI
 
@@ -103,6 +104,12 @@ Base local: `http://localhost:3000/api`. Rotas autenticadas exigem `Authorizatio
 | POST | `/tickets/:id/resolution/confirm` | Só o dono; `{ cycleId }`; repetir não cria outro evento |
 | POST | `/tickets/:id/resolution/contest` | Só o dono; `{ cycleId, reason }` (5–1000); reabre em novo ciclo |
 | POST | `/tickets/:id/resolution/rating` | Só o dono, depois de confirmar; `{ cycleId, rating (1–5), comment? (até 500) }` |
+| GET | `/account` | Própria conta: e-mail, confirmação, troca pendente, preferências, envio ligado ou não e os 10 últimos avisos → `{ account }` |
+| PATCH | `/account/notification-preferences` | Própria conta; `{ ticketCreated?, ticketStarted?, ticketReopened?, materialDelivered? }` (booleanos) |
+| POST | `/account/email/verification` | Própria conta; põe na fila a confirmação do e-mail atual (ou do pendente) → 202 `{ queuedFor }`; 409 `EMAIL_DISABLED` / `ALREADY_VERIFIED`; 429 `VERIFICATION_COOLDOWN` (1 minuto) |
+| PUT | `/account/email` | Própria conta; `{ email, currentPassword }` → 202; o login só muda depois da confirmação; 403 `INVALID_PASSWORD` / `DEMO_ACCOUNT`; 409 `EMAIL_UNAVAILABLE` |
+| DELETE | `/account/email/pending` | Própria conta; cancela a troca pendente |
+| POST | `/account/email/confirm` | Público, limitado a 20 tentativas por IP em 15 minutos; `{ token }` do link → `{ email }`; token inválido, vencido ou usado responde 400 `INVALID_TOKEN` |
 
 Lista aceita `dataOrigin` (`operational`/`demo`/`legacy`; veja a [política de origem](04-metricas-decisoes-e-limites.md#origem-dos-dados)), `sort` (`newest`, padrão; `oldest`; `priority` = alta, média e baixa, e o mais antigo primeiro dentro de cada uma, com páginas estáveis), `status`, `priority`, `category`, `assignee` (`none`/`me`), `search` por título, `page` (padrão 1) e `limit` (padrão 10, máximo 50). Pesquisa tem limite de 100 caracteres. O frontend oferece filtro de responsável para TI e gestor. IDs inválidos retornam 400. `assigneeId` permite consultar responsável específico para TI/gestor; `requesterId` filtra solicitante sem ampliar o escopo autorizado. Solicitante não pode consultar outros IDs. `pending=true` restringe a abertos/em andamento; combinado com status resolvido retorna fila vazia.
 

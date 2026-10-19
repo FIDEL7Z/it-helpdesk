@@ -14,9 +14,21 @@ export interface User {
   department?: Types.ObjectId | null;
   room?: Types.ObjectId | null;
   jobTitle?: string | null;
+  /** Set when the person proved they read the current address. Notifications go only to confirmed addresses. */
+  emailVerifiedAt?: Date | null;
+  /** A new address waiting for confirmation; the login e-mail changes only after it is confirmed. */
+  pendingEmail?: string | null;
+  /** Hash of the single-use confirmation token, the address it confirms and its expiry. Never selected by default. */
+  emailVerification?: { tokenHash: string; email: string; expiresAt: Date } | null;
+  /** Optional ticket e-mails. The resolution e-mail (it asks for a confirmation) is always sent. */
+  notificationPreferences?: NotificationPreferences;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export const OPTIONAL_NOTIFICATIONS = ['ticketCreated', 'ticketStarted', 'ticketReopened', 'materialDelivered'] as const;
+export type OptionalNotification = (typeof OPTIONAL_NOTIFICATIONS)[number];
+export type NotificationPreferences = Record<OptionalNotification, boolean>;
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -39,11 +51,23 @@ const userSchema = new Schema<User>(
     department: { type: Schema.Types.ObjectId, ref: 'Department', default: null },
     room: { type: Schema.Types.ObjectId, ref: 'Room', default: null },
     jobTitle: { type: String, trim: true, maxlength: 80, default: null },
+    emailVerifiedAt: { type: Date, default: null },
+    pendingEmail: { type: String, trim: true, lowercase: true, default: null },
+    emailVerification: {
+      type: new Schema({ tokenHash: { type: String, required: true }, email: { type: String, required: true }, expiresAt: { type: Date, required: true } }, { _id: false }),
+      default: null,
+      select: false,
+    },
+    notificationPreferences: {
+      type: new Schema(Object.fromEntries(OPTIONAL_NOTIFICATIONS.map((key) => [key, { type: Boolean, default: true }])), { _id: false }),
+      default: () => ({}),
+    },
   },
   { timestamps: true },
 );
 
 userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ 'emailVerification.tokenHash': 1 }, { sparse: true });
 
 export const UserModel = model<User>('User', userSchema);
 

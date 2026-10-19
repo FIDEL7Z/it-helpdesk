@@ -1,5 +1,5 @@
 import { env } from '../../config/env';
-import { mailpitProvider, resendProvider, type EmailProvider } from './providers';
+import { gmailProvider, mailpitProvider, resendProvider, type EmailProvider } from './providers';
 
 export interface EmailSettings {
   enabled: boolean;
@@ -18,7 +18,9 @@ let override: Partial<EmailSettings> | null = null;
 function build(): EmailSettings {
   const provider = env.EMAIL_PROVIDER === 'resend'
     ? resendProvider(env.RESEND_API_KEY ?? 'missing', env.EMAIL_FROM)
-    : mailpitProvider(env.MAILPIT_URL, env.EMAIL_FROM);
+    : env.EMAIL_PROVIDER === 'gmail'
+      ? gmailProvider(env.GMAIL_USER ?? 'missing@gmail.com', env.GMAIL_APP_PASSWORD ?? 'missing', env.EMAIL_FROM)
+      : mailpitProvider(env.MAILPIT_URL, env.EMAIL_FROM);
   return {
     enabled: env.EMAIL_ENABLED,
     provider,

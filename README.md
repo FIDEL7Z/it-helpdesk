@@ -106,7 +106,26 @@ EMAIL_FROM=IT Helpdesk <helpdesk@seu-dominio-verificado.com>
 EMAIL_RECIPIENT_ALLOWLIST=voce@empresa.com
 ```
 
-Fora de produção, o Resend só envia para endereços (ou `@domínios`) da `EMAIL_RECIPIENT_ALLOWLIST`; os outros ficam registrados como "não enviado". As contas de demonstração (`@helpdesk.local`) nunca recebem por um provedor real. A chave fica só no `.env` do backend, nunca no repositório nem no navegador. Detalhes e limites em [decisões e limitações](docs/04-metricas-decisoes-e-limites.md#notificações-por-e-mail).
+Fora de produção, o Resend e o Gmail só enviam para endereços (ou `@domínios`) da `EMAIL_RECIPIENT_ALLOWLIST`; os outros ficam registrados como "não enviado". As contas de demonstração (`@helpdesk.local`) nunca recebem por um provedor real. A chave fica só no `.env` do backend, nunca no repositório nem no navegador. Detalhes e limites em [decisões e limitações](docs/04-metricas-decisoes-e-limites.md#notificações-por-e-mail).
+
+### Envio real pelo Gmail (opcional)
+
+Para demonstrar um e-mail chegando de verdade, sem domínio próprio. Uma conta Gmail é configurada uma única vez como remetente; nenhum outro usuário entra com conta Google.
+
+1. Na conta Google remetente, ative a **verificação em duas etapas** e crie uma **senha de app** em https://myaccount.google.com/apppasswords. São 16 letras; os espaços que o Google mostra podem ficar.
+2. Em `backend/.env`:
+
+   ```bash
+   EMAIL_ENABLED=true
+   EMAIL_PROVIDER=gmail
+   GMAIL_USER=remetente@gmail.com
+   GMAIL_APP_PASSWORD=sua senha de app
+   EMAIL_RECIPIENT_ALLOWLIST=quem-vai-receber@gmail.com
+   ```
+
+3. Reinicie a API. A pessoa que vai receber confirma o e-mail em **Minha conta** e abre um pedido. Quando a TI resolve, chega "Seu pedido foi resolvido: confirme se deu certo", com o link para confirmar ou contestar no sistema.
+
+O e-mail sai sempre do endereço `GMAIL_USER`, com o nome dado em `EMAIL_FROM`. A senha de app fica só no `.env` local, que não é versionado, e pode ser revogada na mesma página do Google. A confirmação do e-mail também é enviada pelo Gmail; para testar o envio real com um único e-mail, confirme antes pelo Mailpit ou desligue os avisos opcionais em **Minha conta**.
 
 ## Os três perfis
 
@@ -192,12 +211,13 @@ Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`V
 | `SEED_SOLICITANTE_EMAIL` / `SEED_SOLICITANTE_PASSWORD` | Obrigatórias para seed; mesmos requisitos |
 | `SEED_GESTOR_EMAIL` / `SEED_GESTOR_PASSWORD` | Opcionais para seed; preencher ambas ou nenhuma; senha com pelo menos 8 caracteres |
 | `EMAIL_ENABLED` | Opcional; padrão `false`; `true` liga as [notificações por e-mail](#notificações-por-e-mail) |
-| `EMAIL_PROVIDER` | Opcional; `mailpit` (padrão, caixa local) ou `resend` (envio real) |
+| `EMAIL_PROVIDER` | Opcional; `mailpit` (padrão, caixa local), `resend` ou `gmail` (envio real) |
 | `EMAIL_FROM` | Opcional; remetente, padrão `IT Helpdesk <helpdesk@helpdesk.local>`; com Resend, um endereço de domínio verificado |
 | `APP_PUBLIC_URL` | Opcional; padrão `http://localhost:5173`; endereço da interface usado nos links dos e-mails |
 | `MAILPIT_URL` | Opcional; padrão `http://127.0.0.1:8025`; API do Mailpit |
 | `RESEND_API_KEY` | Obrigatória só com `EMAIL_PROVIDER=resend` e e-mail ligado; nunca versionar |
-| `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend só envia para estes endereços ou `@domínios`, separados por vírgula |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Obrigatórias só com `EMAIL_PROVIDER=gmail` e e-mail ligado; conta Gmail remetente e sua senha de app; nunca versionar |
+| `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend e o Gmail só enviam para estes endereços ou `@domínios`, separados por vírgula |
 
 No frontend, **VITE_API_URL** é a URL da API com `/api` (`http://localhost:3000/api`, também o padrão do cliente) e **VITE_DEMO_MODE** mostra os seletores de origem (padrão `false`). As variáveis do backend são validadas com Zod na inicialização. Arquivos `.env` são ignorados pelo Git; só os `.env.example` são versionados.
 

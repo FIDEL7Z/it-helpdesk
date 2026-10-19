@@ -193,7 +193,8 @@ O chamado e a fila são duas gravações separadas, porque o MongoDB local não 
 **Provedores**
 - **Mailpit:** a caixa local do Compose, usada pela API HTTP de envio, sem biblioteca SMTP. Tudo fica no computador. O Mailpit não tem chave de idempotência: se a API cair entre o envio e o registro, a mensagem pode aparecer duas vezes.
 - **Resend:** usa o SDK oficial, com a chave da linha como `Idempotency-Key`. O Resend descarta repetições por 24 horas.
-- **Proteções do Resend:** fora de produção, ele só envia para a `EMAIL_RECIPIENT_ALLOWLIST`. Domínios reservados (`.local`, `.test`, `.example`, `.invalid`, `example.com`) nunca saem por ele.
+- **Gmail (opcional):** usa o SMTP do Gmail com o Nodemailer, por TLS na porta 465, com uma conta configurada uma vez pelo dono e uma senha de app, as duas só no `.env`. O e-mail sai como `GMAIL_USER`. Respostas SMTP 4xx e falhas de rede são repetidas; respostas 5xx e login recusado, não. O SMTP não tem chave de idempotência: cada aviso mantém o mesmo Message-ID em todas as tentativas, mas uma queda entre o envio e o registro ainda pode repetir a mensagem.
+- **Proteções do Resend e do Gmail:** fora de produção, eles só enviam para a `EMAIL_RECIPIENT_ALLOWLIST`. Domínios reservados (`.local`, `.test`, `.example`, `.invalid`, `example.com`) nunca saem por eles.
 
 **Limites**
 - E-mails só para o solicitante, sem avisos para a equipe nem sobre incidentes.

@@ -7,7 +7,11 @@ export type AssistantReply = {
   /** ai: generative answer (answer service connected). demo: identified demonstration, no AI. */
   mode: 'ai' | 'demo'
   notice: string | null
+  /** not_configured, or why the answer service did not answer (AI_DISABLED, QUOTA_EXCEEDED...). */
+  demoReason: string | null
   model: string | null
+  /** AI mode only: token counts reported by the model (used to estimate consumption). */
+  usage: { inputTokens: number | null; outputTokens: number | null } | null
   sources: { id: string; kind: AssistantSourceKind; title: string; link: string | null }[]
 }
 

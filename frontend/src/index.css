@@ -4629,3 +4629,17 @@ textarea.field__input.assistant-panel__input {
   height: 4.5em;
   resize: none;
 }
+
+.assistant-message__origin {
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.assistant-message__origin--ai {
+  color: var(--color-success);
+}
+
+.assistant-message__origin--demo {
+  color: var(--color-warning);
+}

@@ -144,6 +144,10 @@ export function AssistantPanel() {
                 {message.role === 'error' && <p role="alert">{message.text}</p>}
                 {message.role === 'assistant' && (
                   <>
+                    {/* Every reply says where it came from: a demonstration never passes for an AI answer. */}
+                    <p className={`assistant-message__origin assistant-message__origin--${message.reply.mode}`}>
+                      {message.reply.mode === 'ai' ? `Resposta da IA${message.reply.model ? ` · ${message.reply.model.split('/').pop()}` : ''}` : 'Modo demonstrativo · sem IA'}
+                    </p>
                     {message.reply.notice && <p className="assistant-message__notice">{message.reply.notice}</p>}
                     <p className="assistant-message__answer">{message.reply.answer}</p>
                     {message.reply.sources.length > 0 && (

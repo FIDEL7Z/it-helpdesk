@@ -111,6 +111,15 @@ describe('what each profile may receive', () => {
     assert.ok(result.body.reply.sources.some((s: Json) => s.link?.startsWith('/help/')));
   });
 
+  it('does not pull unrelated guidance through generic words ("parou", "funcionar")', async () => {
+    await api('POST', '/articles', ana, { title: 'Como descrever um problema de acesso', category: 'acesso', status: 'published', summary: 'O que informar quando não consegue entrar em um sistema.', body: 'Informe o sistema, a mensagem de erro e desde quando o acesso parou de funcionar.' });
+    const provider = new RecordingProvider();
+    setAssistantProviderForTests(provider);
+    await ask(maria, 'Meu teclado parou de funcionar, o que eu faço?');
+    const titles = provider.calls[0].sources.filter((s) => s.kind === 'article').map((s) => s.title);
+    assert.deepEqual(titles, ['Teclado ou mouse sem resposta']);
+  });
+
   it('2. IT gets the real keyboard availability, the same numbers as the stock API', async () => {
     const provider = new RecordingProvider();
     setAssistantProviderForTests(provider);

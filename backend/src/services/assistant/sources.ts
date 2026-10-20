@@ -33,7 +33,11 @@ const STATUS: Record<TicketStatus, string> = { aberto: 'aguardando atendimento',
 const SUBJECT: Record<TicketCategory, string> = {
   hardware: 'Computador ou equipamento', software: 'Programas e aplicativos', rede: 'Internet e conexão', acesso: 'Contas e permissões', outros: 'Outro problema',
 };
-const STOP = new Set('a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais quanto quantos quantas como onde quando meu minha meus minhas seu sua isso esse essa este esta tem temos ter ser estar esta estao foi pra pro nao sim mais menos muito muita hoje agora ainda sobre entre ate pelo pela pelos pelas eu voce voces nos ele ela eles elas favor preciso precisa queria quero gostaria posso pode ajuda ajudar'.split(' '));
+const STOP = new Set([
+  ...'a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais quanto quantos quantas como onde quando meu minha meus minhas seu sua isso esse essa este esta tem temos ter ser estar esta estao foi pra pro nao sim mais menos muito muita hoje agora ainda sobre entre ate pelo pela pelos pelas eu voce voces nos ele ela eles elas favor preciso precisa queria quero gostaria posso pode ajuda ajudar'.split(' '),
+  // Generic verbs and nouns that appear in every guide and would pull unrelated articles.
+  ...'parou funciona funcionar funcionando faco fazer feito problema problemas consigo conseguir consegue saber acontece aconteceu ultimo ultima algum alguma'.split(' '),
+]);
 
 /** Portuguese plural to singular, enough for "contains" searches: teclados → teclado, botoes → botao. */
 export function singular(word: string): string {
@@ -152,7 +156,7 @@ async function consumption(normalized: string): Promise<Draft[]> {
   const insights = await inventoryInsights({ period: chosen, dataOrigin: 'operational' });
   const list = (rows: { name: string; units: number }[]) => rows.length ? rows.map((row) => `${row.name}: ${row.units}`).join('; ') : 'nenhum registro';
   return [
-    { kind: 'metric', title: `Consumo de materiais por setor (${PERIOD_LABEL[chosen]})`, text: `Unidades entregues no período: ${insights.period.deliveredUnits}. Por departamento: ${list(insights.period.byDepartment)}. Materiais mais entregues: ${list(insights.period.topProducts)}. Dados operacionais; entregas estornadas não contam.`, link: '/manager' },
+    { kind: 'metric', title: `Consumo de materiais por setor (${PERIOD_LABEL[chosen]})`, text: `Unidades entregues no período: ${insights.period.deliveredUnits}. Por departamento: ${list(insights.period.byDepartment)}. Materiais mais entregues: ${list(insights.period.topProducts)}. Dados operacionais, como a visão gerencial abre: registros de demonstração e entregas estornadas não contam.`, link: '/manager' },
     { kind: 'metric', title: 'Estoque abaixo do mínimo', text: insights.stock.belowMinimum.length ? insights.stock.belowMinimum.map((row) => `${row.name}: ${row.available} disponível(is), mínimo ${row.minStock}`).join('; ') : 'Nenhum material abaixo do mínimo.', link: '/inventory' },
   ];
 }

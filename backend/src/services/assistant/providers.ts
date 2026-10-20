@@ -1,0 +1,87 @@
+import type { UserRole } from '../../models/user.model';
+import type { AssistantSource } from './sources';
+
+export interface AnswerInput {
+  question: string;
+  profile: UserRole;
+  sources: AssistantSource[];
+}
+
+export interface AnswerOutput {
+  answer: string;
+  citedSources: string[];
+  model: string | null;
+}
+
+export interface AssistantProvider {
+  /** worker: generative AI (Cloudflare Workers AI). demo: no AI, built from the same sources. */
+  readonly mode: 'ai' | 'demo';
+  answer(input: AnswerInput): Promise<AnswerOutput>;
+}
+
+/** The answer service could not answer (down, timeout, refused key, quota). */
+export class AssistantUnavailable extends Error {
+  constructor(readonly reason: string) {
+    super(`Assistant service unavailable: ${reason}`);
+  }
+}
+
+const WORKER_TIMEOUT_MS = 30_000;
+
+/**
+ * The Cloudflare Worker in ai-worker/: the backend sends only the question, the profile and the
+ * sources it already authorized; the Worker has no access to the database or to anything else.
+ */
+export function workerProvider(baseUrl: string, key: string): AssistantProvider {
+  const url = `${baseUrl.replace(/\/+$/, '')}/v1/answer`;
+  return {
+    mode: 'ai',
+    async answer({ question, profile, sources }) {
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(WORKER_TIMEOUT_MS),
+          body: JSON.stringify({ question, profile, sources: sources.map(({ id, kind, title, text }) => ({ id, kind, title, text })) }),
+        });
+      } catch (error) {
+        throw new AssistantUnavailable(error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network');
+      }
+      const body = (await response.json().catch(() => null)) as { answer?: unknown; citedSources?: unknown; model?: unknown; error?: { code?: string } } | null;
+      if (!response.ok) throw new AssistantUnavailable(body?.error?.code ?? `http_${response.status}`);
+      if (typeof body?.answer !== 'string' || !body.answer.trim()) throw new AssistantUnavailable('empty_answer');
+      return {
+        answer: body.answer,
+        citedSources: Array.isArray(body.citedSources) ? body.citedSources.filter((id): id is string => typeof id === 'string') : [],
+        model: typeof body.model === 'string' ? body.model : null,
+      };
+    },
+  };
+}
+
+/**
+ * No generative AI: lists what the authorized sources say, with the same citations. Used when no
+ * answer service is configured, and as the fallback when it fails. Always shown as a demonstration.
+ */
+export const demoProvider: AssistantProvider = {
+  mode: 'demo',
+  async answer({ sources }) {
+    if (sources.length === 0) {
+      return {
+        answer: 'Não encontrei informações que você possa ver sobre isso. Tente outras palavras ou, se precisar de ajuda, abra um pedido de suporte.',
+        citedSources: [],
+        model: null,
+      };
+    }
+    const lines = sources.map((source) => {
+      const first = source.text.split(/(?<=[.!?])\s+/)[0] ?? source.text;
+      return `• ${source.title}: ${first} [${source.id}]`;
+    });
+    return {
+      answer: ['Encontrei estas informações para você:', ...lines].join('\n'),
+      citedSources: sources.map((source) => source.id),
+      model: null,
+    };
+  },
+};

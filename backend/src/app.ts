@@ -11,6 +11,7 @@ import userRoutes from './routes/user.routes';
 import organizationRoutes from './routes/organization.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import accountRoutes from './routes/account.routes';
+import assistantRoutes from './routes/assistant.routes';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/organization', organizationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/account', accountRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

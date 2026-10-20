@@ -12,6 +12,7 @@ import {
 import type { PublicUser } from '../models/user.model';
 import { findProduct } from './catalog.service';
 import { actorFields, duplicateKeyOf, isDuplicateKey, replayOf, requestHash, resolveReferences, type ReferenceInput } from './ledger';
+import { enqueueMovement, notifySafely } from './notification.service';
 
 /**
  * Stock counted by quantity.
@@ -100,6 +101,7 @@ export async function recordQuantity(input: RecordInput): Promise<{ movement: St
       continue; // Someone else took this sequence: read the new levels and decide again.
     }
     await ProductModel.updateOne({ _id: product._id, 'stock.version': { $lt: movement.sequence } }, { $set: { stock: { ...plan.after, version: movement.sequence } } });
+    await notifySafely(() => enqueueMovement(movement), 'stock movement');
     return { movement, replayed: false };
   }
   throw new HttpError(409, 'The stock of this product is changing right now. Try again', 'STOCK_BUSY');

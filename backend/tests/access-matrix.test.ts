@@ -56,6 +56,9 @@ const AUTHENTICATED: [string, string][] = [
   ['GET', `/tickets/${ID}/materials`], ['GET', '/organization'], ['POST', '/organization/departments'], ['PATCH', `/organization/departments/${ID}`],
   ['POST', '/organization/rooms'], ['PATCH', `/organization/rooms/${ID}`], ['GET', '/organization/people'], ['PATCH', `/organization/people/${ID}`],
   ...INVENTORY_ROUTES, ['GET', '/inventory/assets/mine'],
+  // Own account only (POST /account/email/confirm is public: the token in the e-mail is the proof).
+  ['GET', '/account'], ['PATCH', '/account/notification-preferences'], ['POST', '/account/email/verification'],
+  ['PUT', '/account/email'], ['DELETE', '/account/email/pending'],
 ];
 
 // Team or management only: a requester must get 403 before any data is read.

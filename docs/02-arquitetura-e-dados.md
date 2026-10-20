@@ -55,6 +55,8 @@ erDiagram
   ASSETS o|--o{ STOCK_MOVEMENTS : asset
   TICKETS o|--o{ STOCK_MOVEMENTS : ticket
   USERS ||--o{ STOCK_MOVEMENTS : "autor"
+  USERS ||--o{ NOTIFICATIONS : "destinatário"
+  TICKETS o|--o{ NOTIFICATIONS : ticket
   USERS {
     ObjectId _id
     String name
@@ -175,7 +177,11 @@ Os schemas incluem ainda campos internos gerenciados pelo Mongoose, como `__v`; 
 
 ### Users
 
-`name`, `email`, `passwordHash` e `role` são obrigatórios. E-mail é normalizado para minúsculas e sem espaços nas extremidades; nome também é aparado. Papéis aceitos: `solicitante`, `ti`, `gestor`. `passwordHash` fica excluído das consultas comuns e nunca integra a representação pública. `active` tem padrão true; desativados não autenticam nem recebem atribuições. `createdAt` e `updatedAt` são timestamps do Mongoose.
+`name`, `email`, `passwordHash` e `role` são obrigatórios. E-mail é normalizado para minúsculas e sem espaços nas extremidades; nome também é aparado. Papéis aceitos: `solicitante`, `ti`, `gestor`. `passwordHash` fica excluído das consultas comuns e nunca integra a representação pública. `active` tem padrão true; desativados não autenticam nem recebem atribuições. `createdAt` e `updatedAt` são timestamps do Mongoose. Para os e-mails, há quatro campos:
+- `emailVerifiedAt`: confirmação do endereço atual;
+- `pendingEmail`: troca aguardando confirmação;
+- `emailVerification`: hash do token, endereço e validade, fora das consultas comuns, como a senha;
+- `notificationPreferences`: quatro avisos opcionais, todos ligados por padrão.
 
 ### Tickets e histórico
 
@@ -217,9 +223,23 @@ Cada movimentação leva o estado anterior e o posterior, o autor e seu snapshot
 
 Se o ambiente tiver réplica, transações poderiam substituir a projeção reparada, mas não são necessárias para estas garantias.
 
+### Notificações
+
+`notifications` é a fila dos e-mails (outbox), com uma linha por evento e destinatário. Campos:
+- `key`, única: `ticket-event:<eventId>:<destinatário>`, `stock-movement:<movimentação>:<destinatário>` ou `email-verification:<pessoa>:<uuid>`;
+- `type`, `recipient`, `ticket`, `source` e `occurredAt`;
+- `status`: `pending`, `sending`, `sent`, `failed` ou `skipped`;
+- `attempts` e `nextAttemptAt`;
+- a trava: `lockedUntil` e `lockedBy`;
+- o resultado: `provider`, `providerMessageId`, `sentTo` e `sentAt`;
+- o motivo curto: `lastError` ou `skipReason`.
+
+O texto do e-mail não é guardado: é montado na hora do envio. `notificationstates` guarda só a data em que os e-mails foram ligados pela primeira vez, que é o limite da reconciliação. Fluxo e garantias em [notificações por e-mail](04-metricas-decisoes-e-limites.md#notificações-por-e-mail).
+
 ### Índices explícitos
 
-- `users`: `{ email: 1 }`, único.
+- `users`: `{ email: 1 }`, único; `{ 'emailVerification.tokenHash': 1 }`, esparso, para o link de confirmação.
+- `notifications`: `{ key: 1 }`, único (idempotência por evento e destinatário); `{ status: 1, nextAttemptAt: 1 }` e `{ status: 1, lockedUntil: 1 }` para o processador; `{ recipient: 1, createdAt: -1 }` para os últimos avisos da conta.
 - `tickets`: `{ requester: 1, createdAt: -1 }` para consulta por solicitante.
 - `tickets`: `{ status: 1, createdAt: -1 }` para consulta por status.
 - `tickets`: `{ dataOrigin: 1, createdAt: -1 }` para consultas gerenciais por origem e criação.

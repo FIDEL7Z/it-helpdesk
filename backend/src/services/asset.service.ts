@@ -14,6 +14,7 @@ import { TicketModel } from '../models/ticket.model';
 import type { PublicUser } from '../models/user.model';
 import { findProduct } from './catalog.service';
 import { actorFields, duplicateKeyOf, isDuplicateKey, replayOf, requestHash, resolveReferences, type ReferenceInput } from './ledger';
+import { enqueueMovement, notifySafely } from './notification.service';
 import { toLocationView, type LocationView } from './organization.service';
 
 /**
@@ -93,6 +94,7 @@ async function recordAsset(input: {
       continue;
     }
     await AssetModel.updateOne({ _id: asset._id, version: { $lt: movement.sequence } }, { $set: { ...plan.after, version: movement.sequence } });
+    await notifySafely(() => enqueueMovement(movement), 'asset movement');
     return { movement, replayed: false };
   }
   throw new HttpError(409, 'This asset is changing right now. Try again', 'STOCK_BUSY');

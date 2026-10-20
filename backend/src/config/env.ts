@@ -18,6 +18,33 @@ const envSchema = z.object({
     .string()
     .default('http://localhost:5173')
     .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
+
+  // ---------- E-mail notifications (off by default: the helpdesk never depends on them) ----------
+  EMAIL_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  // mailpit: local inbox for development and evaluation (nothing leaves the machine). resend: real delivery.
+  // gmail: real delivery through Gmail SMTP, from the owner's account (app password).
+  EMAIL_PROVIDER: z.enum(['mailpit', 'resend', 'gmail']).default('mailpit'),
+  EMAIL_FROM: z.string().min(3).default('IT Helpdesk <helpdesk@helpdesk.local>'),
+  // Base of the links in e-mails (the frontend). Pages still require login.
+  APP_PUBLIC_URL: z.url().default('http://localhost:5173').transform(value => value.replace(/\/+$/, '')),
+  MAILPIT_URL: z.url().default('http://127.0.0.1:8025').transform(value => value.replace(/\/+$/, '')),
+  RESEND_API_KEY: z.string().optional(),
+  // The Gmail account that sends, and its 16-letter app password (Google shows it with spaces).
+  GMAIL_USER: z.preprocess((value) => (value === '' ? undefined : value), z.email().optional()),
+  GMAIL_APP_PASSWORD: z.string().optional().transform((value) => value?.replace(/\s+/g, '') || undefined),
+  // Outside production, Resend only delivers to these addresses or @domains (comma-separated).
+  EMAIL_RECIPIENT_ALLOWLIST: z
+    .string()
+    .default('')
+    .transform((value) => value.split(',').map((entry) => entry.trim().toLowerCase()).filter(Boolean)),
+}).superRefine((value, context) => {
+  if (value.EMAIL_ENABLED && value.EMAIL_PROVIDER === 'resend' && !value.RESEND_API_KEY) {
+    context.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'RESEND_API_KEY is required when EMAIL_PROVIDER=resend' });
+  }
+  if (value.EMAIL_ENABLED && value.EMAIL_PROVIDER === 'gmail') {
+    if (!value.GMAIL_USER) context.addIssue({ code: 'custom', path: ['GMAIL_USER'], message: 'GMAIL_USER is required when EMAIL_PROVIDER=gmail' });
+    if (!value.GMAIL_APP_PASSWORD) context.addIssue({ code: 'custom', path: ['GMAIL_APP_PASSWORD'], message: 'GMAIL_APP_PASSWORD (a Google app password) is required when EMAIL_PROVIDER=gmail' });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

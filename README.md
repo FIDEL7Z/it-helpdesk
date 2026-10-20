@@ -17,6 +17,7 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Confirmação de resolução:** "Seu problema foi resolvido?", com contestação que reabre o pedido e avaliação opcional.
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
 - **Estoque e Patrimônio:** departamentos e salas, materiais por quantidade e equipamentos por número de patrimônio, cada entrada, entrega, troca e transferência registrada e ligada ao chamado.
+- **Notificações por e-mail:** o solicitante recebe avisos do próprio pedido (registro, início, resolução que pede confirmação, reabertura e material entregue), no e-mail confirmado da conta, com preferências em **Minha conta**. Testável sem conta externa, numa caixa local (Mailpit).
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
 - **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados, tema claro por padrão e botão **Tema escuro** no cabeçalho (escolha guardada no navegador), contraste AA nos dois temas e layout para celular.
 
@@ -75,6 +76,57 @@ Maria, do Financeiro, sala 203, abre um chamado porque o teclado parou. No próp
 
 Regras em [produto e regras](docs/01-produto-e-regras.md#estoque-e-patrimônio); como a consistência é garantida sem transações, em [arquitetura e dados](docs/02-arquitetura-e-dados.md#estoque-patrimônio-e-livro-razão).
 
+## Notificações por e-mail
+
+O solicitante recebe um e-mail quando o pedido é registrado, quando o atendimento começa, quando a TI o marca como resolvido (pedindo a confirmação), quando a TI o reabre e quando um material ou equipamento é entregue no pedido. Edições, atribuições e as respostas do próprio solicitante não geram e-mail.
+
+- **Destinatário:** sempre o dono do pedido, com o e-mail **confirmado** da conta. Nenhuma rota aceita um endereço vindo da tela.
+- **Conteúdo:** o e-mail mostra só o que a pessoa já vê no pedido: assunto, referência, data e o link para a página, que continua exigindo login. Justificativas da equipe e anotações internas não entram.
+- **Minha conta:** clique no seu nome no cabeçalho (no celular, no ícone de pessoa). A página mostra o e-mail, permite confirmá-lo, trocá-lo (com a senha atual; o novo endereço só vale depois de confirmado), ligar ou desligar os avisos opcionais e ver o estado real dos últimos avisos. "Na fila" não aparece como "enviado".
+- **Nunca trava o atendimento:** o pedido é salvo primeiro, e o envio acontece em segundo plano, com novas tentativas e recuperação após reinício. Com o provedor fora do ar, o chamado continua sendo criado normalmente.
+
+### Testar sem conta externa (Mailpit)
+
+O `docker compose up -d --wait` também sobe o **Mailpit**, uma caixa de e-mail local em **http://localhost:8025**: nenhuma mensagem sai do computador, seja qual for o endereço.
+
+1. Em `backend/.env`, mude `EMAIL_ENABLED=true` (o `EMAIL_PROVIDER` de exemplo já é `mailpit`) e reinicie a API.
+2. Entre como Mariana (solicitante), abra **Minha conta** e clique em **Enviar e-mail de confirmação**.
+3. Em http://localhost:8025, abra a mensagem "Confirme seu e-mail", clique em **Confirmar e-mail** e, na página que abrir, em **Confirmar este e-mail**.
+4. Abra um pedido: em poucos segundos chega "Recebemos seu pedido". Entre como Carlos (TI), inicie, entregue um material e resolva o pedido: cada etapa gera um e-mail na mesma caixa.
+
+### Envio real (Resend)
+
+Com uma conta no [Resend](https://resend.com), uma chave de API e um remetente num domínio verificado lá:
+
+```bash
+EMAIL_ENABLED=true
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_sua_chave
+EMAIL_FROM=IT Helpdesk <helpdesk@seu-dominio-verificado.com>
+EMAIL_RECIPIENT_ALLOWLIST=voce@empresa.com
+```
+
+Fora de produção, o Resend e o Gmail só enviam para endereços (ou `@domínios`) da `EMAIL_RECIPIENT_ALLOWLIST`; os outros ficam registrados como "não enviado". As contas de demonstração (`@helpdesk.local`) nunca recebem por um provedor real. A chave fica só no `.env` do backend, nunca no repositório nem no navegador. Detalhes e limites em [decisões e limitações](docs/04-metricas-decisoes-e-limites.md#notificações-por-e-mail).
+
+### Envio real pelo Gmail (opcional)
+
+Para demonstrar um e-mail chegando de verdade, sem domínio próprio. Uma conta Gmail é configurada uma única vez como remetente; nenhum outro usuário entra com conta Google.
+
+1. Na conta Google remetente, ative a **verificação em duas etapas** e crie uma **senha de app** em https://myaccount.google.com/apppasswords. São 16 letras; os espaços que o Google mostra podem ficar.
+2. Em `backend/.env`:
+
+   ```bash
+   EMAIL_ENABLED=true
+   EMAIL_PROVIDER=gmail
+   GMAIL_USER=remetente@gmail.com
+   GMAIL_APP_PASSWORD=sua senha de app
+   EMAIL_RECIPIENT_ALLOWLIST=quem-vai-receber@gmail.com
+   ```
+
+3. Reinicie a API. A pessoa que vai receber confirma o e-mail em **Minha conta** e abre um pedido. Quando a TI resolve, chega "Seu pedido foi resolvido: confirme se deu certo", com o link para confirmar ou contestar no sistema.
+
+O e-mail sai sempre do endereço `GMAIL_USER`, com o nome dado em `EMAIL_FROM`. A senha de app fica só no `.env` local, que não é versionado, e pode ser revogada na mesma página do Google. A confirmação do e-mail também é enviada pelo Gmail; para testar o envio real com um único e-mail, confirme antes pelo Mailpit ou desligue os avisos opcionais em **Minha conta**.
+
 ## Os três perfis
 
 Telas reais, com dados fictícios de demonstração. A página do solicitante está em [Portal do Solicitante](#portal-do-solicitante).
@@ -112,7 +164,7 @@ Controllers validam a entrada; services aplicam escopo, propriedade e regras; mo
 - Node.js **22.22 ou superior** e npm.
 - Docker Desktop (ou Docker Engine) com Docker Compose, para o MongoDB local. Dispensável se houver outro MongoDB disponível; nesse caso ajuste `MONGODB_URI`.
 - Edge ou Chrome instalado, apenas para o teste E2E e as capturas.
-- Portas livres: 27017 (MongoDB), 3000 (API) e 5173 (interface).
+- Portas livres: 27017 (MongoDB), 8025 (caixa de e-mail local Mailpit), 3000 (API) e 5173 (interface).
 
 > **Se a execução local utilizar Docker para o MongoDB, é necessário iniciar o Docker Desktop antes de subir os serviços ou executar testes de integração.**
 
@@ -158,6 +210,14 @@ Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`V
 | `SEED_TI_EMAIL` / `SEED_TI_PASSWORD` | Obrigatórias para seed; valores demonstrativos no exemplo; senha com pelo menos 8 caracteres |
 | `SEED_SOLICITANTE_EMAIL` / `SEED_SOLICITANTE_PASSWORD` | Obrigatórias para seed; mesmos requisitos |
 | `SEED_GESTOR_EMAIL` / `SEED_GESTOR_PASSWORD` | Opcionais para seed; preencher ambas ou nenhuma; senha com pelo menos 8 caracteres |
+| `EMAIL_ENABLED` | Opcional; padrão `false`; `true` liga as [notificações por e-mail](#notificações-por-e-mail) |
+| `EMAIL_PROVIDER` | Opcional; `mailpit` (padrão, caixa local), `resend` ou `gmail` (envio real) |
+| `EMAIL_FROM` | Opcional; remetente, padrão `IT Helpdesk <helpdesk@helpdesk.local>`; com Resend, um endereço de domínio verificado |
+| `APP_PUBLIC_URL` | Opcional; padrão `http://localhost:5173`; endereço da interface usado nos links dos e-mails |
+| `MAILPIT_URL` | Opcional; padrão `http://127.0.0.1:8025`; API do Mailpit |
+| `RESEND_API_KEY` | Obrigatória só com `EMAIL_PROVIDER=resend` e e-mail ligado; nunca versionar |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Obrigatórias só com `EMAIL_PROVIDER=gmail` e e-mail ligado; conta Gmail remetente e sua senha de app; nunca versionar |
+| `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend e o Gmail só enviam para estes endereços ou `@domínios`, separados por vírgula |
 
 No frontend, **VITE_API_URL** é a URL da API com `/api` (`http://localhost:3000/api`, também o padrão do cliente) e **VITE_DEMO_MODE** mostra os seletores de origem (padrão `false`). As variáveis do backend são validadas com Zod na inicialização. Arquivos `.env` são ignorados pelo Git; só os `.env.example` são versionados.
 
@@ -262,8 +322,8 @@ npm run lint -- --deny-warnings
 npm run build
 ```
 
-- **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit, incidentes compartilhados, privacidade das respostas, base de conhecimento, classificação orientada e confirmação de resolução, departamentos e salas, catálogo, saldo, concorrência, idempotência, estornos, patrimônio, entregas ligadas a chamados e indicadores de estoque. Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
-- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390, 768 e 1650 px (container alinhado ao cabeçalho, formulário de suporte em duas colunas, grades sem cartão isolado e texto do botão principal visível com o mouse sobre ele) e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução, quadro (incluindo teclado, justificativa, conflito 409 e filtros recolhidos no celular) e estoque (o teclado do Financeiro de ponta a ponta, com o saldo conferido na API, cadastro de material, entrada, estoque insuficiente, transferência de patrimônio, 390 px, permissões e consumo na visão gerencial). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
+- **Integração (`npm test`):** autenticação, isolamento, permissões dos três perfis, validação, transições, histórico, concorrência, dashboards, visão gerencial, rate limit, incidentes compartilhados, privacidade das respostas, base de conhecimento, classificação orientada e confirmação de resolução, departamentos e salas, catálogo, saldo, concorrência, idempotência, estornos, patrimônio, entregas ligadas a chamados, indicadores de estoque e notificações por e-mail (fila, destinatário, conteúdo, preferências, novas tentativas, concorrência, reinício, confirmação e troca de e-mail, com provedores simulados). Usa bancos `it-helpdesk-test*`, apagados ao final; o banco de desenvolvimento não é tocado.
+- **E2E (`npm run test:e2e`):** sobe API e Vite em portas livres com banco e usuários temporários, abre o Edge/Chrome headless e percorre login/logout, páginas iniciais dos três perfis, isolamento, operações do gestor, conflito por revisão, filtros, estados de carregamento e erro, layout em 390, 768 e 1650 px (container alinhado ao cabeçalho, formulário de suporte em duas colunas, grades sem cartão isolado e texto do botão principal visível com o mouse sobre ele) e os fluxos completos de incidente compartilhado, artigo de ajuda, pedido guiado, confirmação e contestação de resolução, quadro (incluindo teclado, justificativa, conflito 409 e filtros recolhidos no celular) e estoque (o teclado do Financeiro de ponta a ponta, com o saldo conferido na API, cadastro de material, entrada, estoque insuficiente, transferência de patrimônio, 390 px, permissões e consumo na visão gerencial) e a página Minha conta com o e-mail desligado (aviso, preferência salva e botão de conta no celular). Se o navegador não for encontrado, defina `E2E_BROWSER_PATH`. Diagnósticos de falha ficam em `backend/e2e-results/`, ignorado pelo Git.
 - **Documentação (`npm run docs:check`):** links, âncoras, imagens, viewport e tema de cada captura, scripts npm citados, variáveis dos exemplos e credenciais demonstrativas.
 
 O que cada teste cobre: [o que os testes verificam](docs/05-demonstracao.md#o-que-os-testes-verificam).
@@ -288,13 +348,14 @@ frontend/
   src/components/   Interface, incidentes, quadro, artigos e gráficos
   src/services/     Cliente HTTP e contratos
 docs/               Documentação técnica e capturas
-docker-compose.yml  MongoDB local
+docker-compose.yml  MongoDB e caixa de e-mail (Mailpit) locais
 ```
 
 ## Limitações conhecidas
 
 - JWT fica no localStorage: um XSS poderia expor o token, e o logout só limpa a sessão local. Login limita 10 tentativas por IP a cada 15 minutos, com contador em memória.
-- Sem notificações (e-mail, push), anexos, comentários, recuperação de senha ou administração de usuários pela interface.
+- Sem notificações push, anexos, comentários, recuperação de senha ou administração de usuários pela interface.
+- E-mails só para o solicitante e só sobre o próprio pedido; nada para a equipe nem sobre incidentes. O envio roda no mesmo processo da API, a cada 5 segundos, sem fila externa. O Mailpit não tem chave de idempotência: se a API cair entre o envio e o registro, a caixa local pode mostrar a mensagem duas vezes (o Resend descarta a repetição por 24 horas).
 - Estoque sem compras, fornecedores, custos, notas fiscais ou código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois. Sem inteligência artificial nesta etapa: ela poderá usar depois os dados do estoque e dos chamados.
 - Incidentes não avisam ativamente; o usuário vê o problema ao abrir o sistema. Não há vínculo de outros chamados ao incidente nem sugestão automática de problemas parecidos.
 - A busca de artigos compara palavras (sem acento) por expressão regular e ordena pela atualização mais recente, sem ranking de relevância; atende o volume de demonstração, não uma base grande. Artigos não têm imagens nem anexos.

@@ -112,6 +112,8 @@ async function run() {
   process.env.DEMO_MODE = 'true';
   process.env.VITE_DEMO_MODE = 'true';
   process.env.JWT_SECRET = randomUUID();
+  // E-mail off whatever the local .env says: the browser checks cover the page without delivery.
+  process.env.EMAIL_ENABLED = 'false';
   const [{ default: app }, { env }, { UserModel }, { TicketModel }, { hashPassword }, { signAccessToken }] =
     await Promise.all([
       import('../src/app.ts'), import('../src/config/env.ts'),
@@ -521,18 +523,24 @@ async function run() {
       await waitDom('dark theme chosen', 'document.documentElement.dataset.theme === "dark"');
       await delay(200);
       check(await contrast(), 'Dark theme action buttons meet 4.5:1 text contrast');
-      // Keyboard focus on the dark navigation bar: the ring must stand out from the bar (3:1).
-      // Start from the last menu link and press Tab: the next stop is the theme switch, reached by keyboard.
-      await evaluate('Array.from(document.querySelectorAll(".app-nav a")).at(-1).focus(); true');
-      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
-      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
-      check(await evaluate(`(() => {
+      // Keyboard focus on the dark navigation bar: from the last menu link, Tab reaches the account link
+      // and then the theme switch; each ring must stand out from the bar (3:1).
+      const tab = async () => {
+        await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+        await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+      };
+      const ringOn = (selector) => evaluate(`(() => {
         const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 });
         const luminance = value => { const [r,g,b] = rgb(value); return .2126*r + .7152*g + .0722*b; };
-        const toggle = document.activeElement; const ring = getComputedStyle(toggle); const bar = getComputedStyle(document.querySelector('.app-header'));
+        const focused = document.activeElement; const ring = getComputedStyle(focused); const bar = getComputedStyle(document.querySelector('.app-header'));
         const a = luminance(ring.outlineColor), b = luminance(bar.backgroundColor);
-        return toggle.classList.contains('theme-toggle') && toggle.matches(':focus-visible') && ring.outlineStyle !== 'none' && (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 3;
-      })()`), 'Dark theme keyboard focus on the navigation bar has a visible ring (3:1)');
+        return focused.matches(${JSON.stringify(selector)}) && focused.matches(':focus-visible') && ring.outlineStyle !== 'none' && (Math.max(a,b) + .05) / (Math.min(a,b) + .05) >= 3;
+      })()`);
+      await evaluate('Array.from(document.querySelectorAll(".app-nav a")).at(-1).focus(); true');
+      await tab();
+      const accountRing = await ringOn('.user-menu__account');
+      await tab();
+      check(accountRing && await ringOn('.theme-toggle'), 'Dark theme keyboard focus on the navigation bar has a visible ring (3:1)');
       await evaluate('document.activeElement?.blur(); true');
       await snap(join(output, 'manager-mobile-dark.png'));
       check(await evaluate('getComputedStyle(document.documentElement).colorScheme === "dark" && document.querySelector(".theme-toggle").getAttribute("aria-pressed") === "true" && localStorage.getItem("it-helpdesk:theme") === "dark"'), 'The header switch turns the dark theme on and remembers it');
@@ -685,6 +693,26 @@ async function run() {
   check(await evaluate(`(() => { const button = document.querySelector('.portal-hero__actions .button--primary'); const style = getComputedStyle(button);
     return button.matches(':hover') && style.color !== style.backgroundColor; })()`), 'The "Solicitar suporte" button keeps a visible label on hover');
   await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  await command('Emulation.clearDeviceMetricsOverride');
+
+  // Account: e-mail and notification preferences. E-mail delivery is off on this test server (the
+  // default): the page must say so instead of promising messages, and everything else still works.
+  const accountEmail = (await browserApi('GET', '/auth/me')).body.user.email;
+  await go('/account');
+  await waitDom('account page', '!!document.querySelector(".account-grid") && !document.querySelector(".spinner")');
+  check(await evaluate(`document.querySelector('.account-email').textContent.includes(${JSON.stringify(accountEmail)}) && document.querySelector('.account-email .badge').textContent === 'Não confirmado'`),
+    'The account page shows the account e-mail and that it is not confirmed');
+  check(await evaluate('document.body.textContent.includes("O envio de e-mails está desligado") && !Array.from(document.querySelectorAll("button")).some(el => el.textContent.includes("Enviar e-mail de confirmação"))'),
+    'With e-mail off, the account page says so and offers no confirmation e-mail');
+  await evaluate('document.getElementById("preference-ticketStarted").click()');
+  await waitDom('preference saved', 'document.querySelector("[role=status].alert--success")?.textContent === "Preferência salva."');
+  check((await browserApi('GET', '/account')).body.account.preferences.ticketStarted === false, 'A notification preference saved on the page is stored for this account');
+  await evaluate('document.getElementById("preference-ticketStarted").click()');
+  await waitDom('preference restored', '!!document.getElementById("preference-ticketStarted")?.checked');
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  check(await evaluate(`(() => { const link = document.querySelector('.user-menu__account'); const box = link.getBoundingClientRect();
+    return link.getAttribute('href') === '/account' && link.getAttribute('aria-label').startsWith('Minha conta') && box.width >= 40 && box.height >= 40
+      && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()`), 'On a phone, the header keeps a 40px "Minha conta" button and the page fits 390px');
   await command('Emulation.clearDeviceMetricsOverride');
 
   await go('/help?q=teclado');

@@ -20,6 +20,7 @@ import {
 import { UserModel, toPublicUser, type PublicUser } from '../models/user.model';
 import { KnowledgeArticleModel } from '../models/article.model';
 import { buildIntakeAnswers, type IntakeAnswerInput } from './intake';
+import { enqueueTicketEvents, notifySafely } from './notification.service';
 
 // Labels used in history messages, which are shown to users in Portuguese.
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -471,6 +472,8 @@ export async function createTicket(input: CreateTicketInput, actor: PublicUser):
       audit: auditEvent(actor, 'created', at, 0, 1, {}, { status: 'aberto', ...fields }, null, origin, randomUUID(), 0) }],
   });
 
+  // After the ticket is saved; queueing never fails the request (see notification.service).
+  await notifySafely(() => enqueueTicketEvents(ticket), 'ticket created');
   return toTicketDetail(ticket, actor);
 }
 
@@ -588,6 +591,8 @@ async function saveChanges(
     throw new HttpError(409, 'Ticket was changed by someone else. Reload and try again');
   }
 
+  // Only the events written by this operation; which of them become e-mails is decided there.
+  await notifySafely(() => enqueueTicketEvents(updated, (event) => event.audit?.operationId === operationId), 'ticket update');
   return toTicketDetail(updated, actor);
 }
 

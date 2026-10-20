@@ -24,3 +24,7 @@ Thumbs.db
 
 # Local backups written by maintenance scripts
 backups/
+
+# Cloudflare Worker local secrets and build state
+.dev.vars
+.wrangler/

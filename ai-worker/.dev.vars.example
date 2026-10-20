@@ -1,0 +1,5 @@
+# Copy to .dev.vars (ignored by Git) for `wrangler dev`. Never commit real keys.
+# One key per line or comma: label:key:expiresAt (ISO date). Keys: 24 to 128 characters of A-Z a-z 0-9 _ -
+# Generate one with: node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+ACCESS_KEYS=local-dev:replace-with-a-generated-key-000000:2026-12-31T23:59:59Z
+DEMO_ENABLED=true

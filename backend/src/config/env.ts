@@ -32,6 +32,16 @@ const envSchema = z.object({
   // The Gmail account that sends, and its 16-letter app password (Google shows it with spaces).
   GMAIL_USER: z.preprocess((value) => (value === '' ? undefined : value), z.email().optional()),
   GMAIL_APP_PASSWORD: z.string().optional().transform((value) => value?.replace(/\s+/g, '') || undefined),
+  // ---------- Assistant (optional). Never blocks startup: a missing or invalid setting makes the ----------
+  // assistant answer in an identified demonstration mode (checked in services/assistant/assistant.service.ts).
+  // demo | gemini | cloudflare. Unset: cloudflare when AI_WORKER_* is set (older setups), demo otherwise.
+  AI_PROVIDER: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().toLowerCase().optional()),
+  // Gemini API, called directly by the backend. The key never leaves the backend.
+  GEMINI_API_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  GEMINI_MODEL: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  // The Cloudflare Worker in ai-worker/.
+  AI_WORKER_URL: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  AI_WORKER_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
   // Outside production, Resend only delivers to these addresses or @domains (comma-separated).
   EMAIL_RECIPIENT_ALLOWLIST: z
     .string()

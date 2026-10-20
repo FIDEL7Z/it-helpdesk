@@ -59,6 +59,8 @@ const AUTHENTICATED: [string, string][] = [
   // Own account only (POST /account/email/confirm is public: the token in the e-mail is the proof).
   ['GET', '/account'], ['PATCH', '/account/notification-preferences'], ['POST', '/account/email/verification'],
   ['PUT', '/account/email'], ['DELETE', '/account/email/pending'],
+  // Assistant: any profile, answers only from what that profile may read.
+  ['POST', '/assistant/ask'],
 ];
 
 // Team or management only: a requester must get 403 before any data is read.

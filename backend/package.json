@@ -5,7 +5,8 @@
   "description": "IT Helpdesk REST API",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node scripts/dev.mjs",
+    "dev:ai-sandbox": "tsx scripts/ai-sandbox.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
@@ -19,12 +20,14 @@
     "seed:manager": "tsx src/scripts/seed-manager.ts",
     "seed:inventory": "tsx src/scripts/seed-inventory.ts",
     "docs:capture": "tsx scripts/capture-docs.mjs",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "assistant:check": "tsx scripts/assistant-check.ts"
   },
   "engines": {
     "node": ">=22.22.0"
   },
   "dependencies": {
+    "@google/genai": "2.27.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",

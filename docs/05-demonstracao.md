@@ -146,6 +146,31 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Patrimônio | `inventory-assets.test.ts`: patrimônio e série únicos; cadastro repetido não duplica; transições permitidas; transferência guarda origem e destino; reserva por chamado; entregas simultâneas do mesmo equipamento resultam em uma; baixa só da gestão e final |
 | Estoque nos chamados | `inventory-tickets.test.ts`: local validado e guardado como era; equipamento só do próprio solicitante; entrega retira exatamente uma unidade, registra quem entregou e quem recebeu e não altera o chamado; resolver não move estoque; troca com patrimônio e com periférico; solicitante vê só as entregas do próprio pedido |
 | Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
+| Assistente | `assistant.test.ts`, com o serviço de respostas simulado e dados persistidos:
+- o solicitante com teclado quebrado recebe o artigo publicado e o próprio pedido, nunca rascunhos nem pedidos de outras pessoas;
+- palavras genéricas não trazem artigos sem relação; quem pergunta como pedir suporte recebe o guia do sistema com os nomes reais da tela (Solicitar suporte, Meus pedidos; Abrir chamado para a equipe);
+- a TI recebe o saldo de teclados igual ao da API de estoque;
+- o gestor recebe o consumo por setor igual aos indicadores do mesmo período;
+- o solicitante que pede dados da gestão, estoque ou chamados de todos (mesmo com "ignore as regras") não recebe nada disso; a TI nunca recebe indicadores da gestão;
+- citações desconhecidas são removidas; sem serviço, a resposta é demonstrativa e identificada; com o serviço fora do ar ou recusando a chave, a resposta cai para o modo demonstrativo e os chamados seguem funcionando;
+- o pedido ao Worker leva a chave e só a pergunta, o perfil e trechos curtos; a resposta da IA traz o modelo e os tokens usados;
+- cada falha do serviço (desligado, cota esgotada, chave inválida ou vencida, limite, modelo do plano pago) vira um aviso próprio, sempre como demonstração; a etiqueta de IA só aparece quando o serviço respondeu;
+- um chamado escrito como instrução não amplia o que é lido;
+- pergunta validada, perfil vindo do token e limite de 20 perguntas por pessoa.
+
+No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos e a etiqueta "Modo demonstrativo · sem IA", devolve o foco depois da resposta e fecha com Esc. O Worker tem testes próprios (`ai-worker`, `npm test`): chaves recusadas antes da inferência, configuração publicada desligada, erros de cota e de plano pago, fontes cercadas e tokens.
+
+`assistant-gemini.test.ts`, com o Gemini **simulado** (cliente falso ou o SDK real com `fetch` falso; nenhuma cota gasta):
+- os três perfis com as perguntas de teclado, estoque e consumo por setor, e os números das fontes iguais aos da API;
+- solicitante sem dados da gestão, sem estoque e sem pedido de outra pessoa;
+- citações inexistentes e agrupadas (`[S1, S9]`) conferidas uma a uma; HTML removido da resposta;
+- instrução escondida em artigo e em chamado fica dentro do bloco de dados;
+- sem ferramentas, temperatura baixa, saída limitada e em JSON; a chave só no cabeçalho, nunca na URL nem na resposta;
+- chave ausente, chave inválida, cota diária, limite por minuto, modelo inexistente ou sobrecarregado, timeout, rede, resposta malformada, vazia ou bloqueada: sempre demonstração com aviso próprio e uma única chamada (sem novas tentativas);
+- escolha e troca de provedor só pelo ambiente; uma pergunta por vez, sem repetir em 30 s, até 3 chamadas simultâneas;
+- nenhum arquivo do frontend menciona a chave.
+
+Com chamadas **reais** (fora do `npm test`): `npm run assistant:check`, num banco temporário com dados fictícios. Resultado de 20/10/2026 no Free tier: 8 de 8 respostas do Gemini e todas as verificações aprovadas |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
 - entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;

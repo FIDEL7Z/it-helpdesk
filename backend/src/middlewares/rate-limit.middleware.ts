@@ -33,3 +33,16 @@ export const emailConfirmationRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Too many confirmation attempts. Try again later' },
 });
+
+/**
+ * Assistant questions: 20 per person every 10 minutes (after requireAuth, keyed by the user, so
+ * people behind one IP do not share it). Protects the answer service quota from one session.
+ */
+export const assistantRateLimiter = rateLimit({
+  limit: 20,
+  windowMs: 10 * 60 * 1000,
+  keyGenerator: (req) => `assistant:${req.user?.id ?? 'anonymous'}`,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many questions. Try again in a few minutes', code: 'ASSISTANT_RATE_LIMITED' },
+});

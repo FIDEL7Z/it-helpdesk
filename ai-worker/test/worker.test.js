@@ -120,6 +120,13 @@ describe('input limits', () => {
     const big = Array.from({ length: 6 }, (_, i) => ({ ...source(i + 1), text: 'a'.repeat(1_100) }));
     await rejects({ ...body, sources: big });
   });
+
+  it('accepts every kind of source the backend sends', async () => {
+    const kinds = ['article', 'guide', 'incident', 'ticket', 'stock', 'metric'];
+    const env = setup();
+    const response = await call(env, { payload: { ...body, sources: kinds.map((kind, i) => ({ id: `S${i + 1}`, kind, title: `T${i + 1}`, text: 'texto' })) } });
+    assert.equal(response.status, 200);
+  });
 });
 
 describe('answers', () => {

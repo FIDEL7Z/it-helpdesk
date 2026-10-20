@@ -120,6 +120,31 @@ describe('what each profile may receive', () => {
     assert.deepEqual(titles, ['Teclado ou mouse sem resposta']);
   });
 
+  it('explains how to ask for support with the system guide, not with unrelated articles', async () => {
+    await api('POST', '/articles', ana, { title: 'O que fazer quando a impressora não responde', category: 'hardware', status: 'published', summary: 'Verificações simples antes de pedir suporte para uma impressora parada.', body: 'Confira o papel e a energia antes de solicitar suporte.' });
+    const requester = await createUser('Rita Guia', 'solicitante');
+    const provider = new RecordingProvider();
+    setAssistantProviderForTests(provider);
+    await ask(requester, 'Meu teclado parou de funcionar. Como solicito suporte?');
+    const sent = provider.calls[0].sources;
+    const guide = sent.find((s) => s.kind === 'guide');
+    assert.ok(guide, JSON.stringify(sent.map((s) => s.title)));
+    assert.match(guide.text, /Solicitar suporte/);
+    assert.match(guide.text, /Meus pedidos/);
+    assert.equal(guide.link, '/tickets/new');
+    assert.ok(!sent.some((s) => /impressora/i.test(s.title)), 'no printer article for a keyboard question');
+
+    const team = new RecordingProvider();
+    setAssistantProviderForTests(team);
+    await ask(carlos, 'Como abrir um chamado para um usuário?');
+    assert.match(team.calls[0].sources.find((s) => s.kind === 'guide')?.text ?? '', /Abrir chamado/);
+
+    const unrelated = new RecordingProvider();
+    setAssistantProviderForTests(unrelated);
+    await ask(requester, 'O programa de notas não abre');
+    assert.ok(!unrelated.calls[0].sources.some((s) => s.kind === 'guide'), 'a program that does not open is not a question about requests');
+  });
+
   it('2. IT gets the real keyboard availability, the same numbers as the stock API', async () => {
     const provider = new RecordingProvider();
     setAssistantProviderForTests(provider);

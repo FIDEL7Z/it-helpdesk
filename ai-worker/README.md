@@ -157,18 +157,18 @@ npx wrangler@4 deploy --var DEMO_ENABLED:true
 curl -s https://it-helpdesk-ai.<subdominio>.workers.dev/health   # {"ok":true,"enabled":true}
 ```
 
-**4. Medir.** Com o backend reiniciado (ele lê `AI_WORKER_*` ao subir):
+**4. Medir.** Com `AI_PROVIDER=cloudflare` em `backend/.env` (o backend lê a configuração ao subir):
 
 ```bash
 node --env-file=../backend/.env scripts/poc.mjs            # direto no Worker: chave inválida, 5 respostas
-cd ../backend && node scripts/measure-assistant.mjs --expect-ai   # pelo backend, 3 perfis: 5 respostas
+cd ../backend && npm run assistant:check   # pelo backend, 3 perfis, banco temporário fictício: 8 respostas
 ```
 
-Os dois scripts mostram a origem de cada resposta (IA real ou demonstração), a latência, os tokens e os Neurons estimados, e conferem as fontes. Juntos, gastam cerca de 10 respostas, bem abaixo de 10% da cota diária.
+Os dois scripts mostram a origem de cada resposta (IA real ou demonstração), a latência e os tokens, e conferem as fontes; o `poc.mjs` também estima os Neurons. Juntos, gastam cerca de 13 respostas, bem abaixo de 10% da cota diária.
 
 Falhas, sem gastar cota:
-- **chave inválida:** o `poc.mjs` já testa (401). Pelo backend: suba-o com `AI_WORKER_KEY=chave-invalida-000000000000000000 npm run dev` e rode `node scripts/measure-assistant.mjs`; as respostas saem em modo demonstrativo com o aviso de chave inválida;
-- **serviço fora do ar:** suba o backend com `AI_WORKER_URL=http://127.0.0.1:9 npm run dev`; o aviso é "IA indisponível";
+- **chave inválida:** o `poc.mjs` já testa (401). Pelo backend: `AI_WORKER_KEY=chave-invalida-000000000000000000 npm run assistant:check` mostra todas as respostas em modo demonstrativo, com o aviso de chave inválida;
+- **serviço fora do ar:** `AI_WORKER_URL=http://127.0.0.1:9 npm run assistant:check`; o aviso é "IA indisponível";
 - **serviço desligado:** depois do passo 5, a mesma medição mostra o aviso "A IA está desligada";
 - **cota esgotada:** não é provocada de propósito, porque isso gastaria a cota do dia inteiro. O mapeamento do erro 3036 está coberto nos testes do Worker e do backend.
 

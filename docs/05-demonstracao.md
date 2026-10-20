@@ -158,7 +158,19 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 - um chamado escrito como instrução não amplia o que é lido;
 - pergunta validada, perfil vindo do token e limite de 20 perguntas por pessoa.
 
-No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos e a etiqueta "Modo demonstrativo · sem IA", devolve o foco depois da resposta e fecha com Esc. O Worker tem testes próprios (`ai-worker`, `npm test`): chaves recusadas antes da inferência, configuração publicada desligada, erros de cota e de plano pago, fontes cercadas e tokens |
+No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos e a etiqueta "Modo demonstrativo · sem IA", devolve o foco depois da resposta e fecha com Esc. O Worker tem testes próprios (`ai-worker`, `npm test`): chaves recusadas antes da inferência, configuração publicada desligada, erros de cota e de plano pago, fontes cercadas e tokens.
+
+`assistant-gemini.test.ts`, com o Gemini **simulado** (cliente falso ou o SDK real com `fetch` falso; nenhuma cota gasta):
+- os três perfis com as perguntas de teclado, estoque e consumo por setor, e os números das fontes iguais aos da API;
+- solicitante sem dados da gestão, sem estoque e sem pedido de outra pessoa;
+- citações inexistentes e agrupadas (`[S1, S9]`) conferidas uma a uma; HTML removido da resposta;
+- instrução escondida em artigo e em chamado fica dentro do bloco de dados;
+- sem ferramentas, temperatura baixa, saída limitada e em JSON; a chave só no cabeçalho, nunca na URL nem na resposta;
+- chave ausente, chave inválida, cota diária, limite por minuto, modelo inexistente ou sobrecarregado, timeout, rede, resposta malformada, vazia ou bloqueada: sempre demonstração com aviso próprio e uma única chamada (sem novas tentativas);
+- escolha e troca de provedor só pelo ambiente; uma pergunta por vez, sem repetir em 30 s, até 3 chamadas simultâneas;
+- nenhum arquivo do frontend menciona a chave.
+
+Com chamadas **reais** (fora do `npm test`): `npm run assistant:check`, num banco temporário com dados fictícios. Resultado de 20/10/2026 no Free tier: 8 de 8 respostas do Gemini e todas as verificações aprovadas |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
 - entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;

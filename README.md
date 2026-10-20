@@ -18,7 +18,7 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
 - **Estoque e Patrimônio:** departamentos e salas, materiais por quantidade e equipamentos por número de patrimônio, cada entrada, entrega, troca e transferência registrada e ligada ao chamado.
 - **Notificações por e-mail:** o solicitante recebe avisos do próprio pedido (registro, início, resolução que pede confirmação, reabertura e material entregue), no e-mail confirmado da conta, com preferências em **Minha conta**. Testável sem conta externa, numa caixa local (Mailpit).
-- **Assistente:** um chat consultivo em todas as páginas responde com o que cada perfil já pode ver (artigos, problemas conhecidos, chamados, estoque e indicadores), citando as fontes. Usa IA generativa (Cloudflare Workers AI) quando configurada; sem ela, responde em um modo demonstrativo identificado.
+- **Assistente:** um chat consultivo em todas as páginas responde com o que cada perfil já pode ver (artigos, problemas conhecidos, chamados, estoque e indicadores), citando as fontes. Usa IA generativa (Google Gemini ou Cloudflare Workers AI) quando configurada; sem ela, responde em um modo demonstrativo identificado.
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
 - **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados, tema claro por padrão e botão **Tema escuro** no cabeçalho (escolha guardada no navegador), contraste AA nos dois temas e layout para celular.
 
@@ -139,34 +139,99 @@ O botão **Assistente**, no canto inferior direito de todas as páginas, abre um
 | Gestor | Tudo acima, mais consumo de materiais por setor, situação dos chamados, equipe e qualidade |
 
 - **Quem decide é o backend.** Ele confere o JWT e as permissões e lê os dados pelos mesmos serviços das páginas. A pergunta só escolhe o que é relevante entre o que já é permitido; pedir no chat não libera nada.
-- **A IA não acessa o banco.** O modelo recebe apenas a pergunta e até 8 trechos curtos já autorizados, e citações de fontes que não foram enviadas são descartadas.
+- **A IA não acessa o banco.** O modelo recebe apenas a pergunta e até 8 trechos curtos já autorizados. Citações de fontes que não foram enviadas são descartadas, inclusive dentro de colchetes agrupados como `[S1, S9]`.
 - **É só consultivo.** O assistente não altera chamados nem estoque; ele aponta a página onde a ação é feita. A conversa não é guardada.
-- **Limite:** 20 perguntas por pessoa a cada 10 minutos.
 
-**Sem configuração** (o padrão), o assistente funciona em **modo demonstrativo**: sem IA generativa, ele lista as informações encontradas para o perfil, com um aviso claro. Se o serviço de IA configurado falhar, a resposta também cai nesse modo, e o resto do Helpdesk segue normal. O aviso diz o motivo: IA desligada, cota diária gratuita esgotada, chave inválida ou vencida, muitas perguntas no minuto, ou IA indisponível.
+### Quem responde
 
-Cada resposta mostra a sua origem logo abaixo do texto: **"Resposta da IA · nome do modelo"** ou **"Modo demonstrativo · sem IA"**. Uma resposta demonstrativa nunca aparece como se fosse da IA.
+O provedor é escolhido só no backend, por `AI_PROVIDER` em `backend/.env`; o navegador não escolhe nada.
 
-**Com IA real**, as respostas vêm de um modelo do Cloudflare Workers AI, no plano gratuito, por meio do serviço em `ai-worker/`. Quem avalia não instala modelo nem conhece as credenciais da Cloudflare.
+| `AI_PROVIDER` | Quem responde | Precisa de |
+|---|---|---|
+| `demo` (padrão) | Modo demonstrativo, sem IA: lista as informações encontradas para o perfil | Nada |
+| `gemini` | Google Gemini API, chamada diretamente pelo backend | Uma chave própria do Google AI Studio (`GEMINI_API_KEY`) |
+| `cloudflare` | O Worker do Cloudflare Workers AI em `ai-worker/` | Endereço e chave temporária do dono (`AI_WORKER_URL`, `AI_WORKER_KEY`) |
 
-### Testar a IA real numa instalação local
+Sem `AI_PROVIDER`, instalações antigas continuam iguais: usa o Cloudflare se `AI_WORKER_*` estiver preenchido; senão, o modo demonstrativo. Uma configuração incompleta ou inválida nunca impede o backend de subir: o assistente responde em modo demonstrativo e avisa que a IA escolhida não está configurada.
 
-1. Peça ao dono um acesso temporário. Ele gera uma chave **só sua**, com validade curta (alguns dias), e envia o endereço e a chave por um canal privado.
-2. Coloque os dois em `backend/.env` e reinicie o backend:
+Cada resposta mostra a origem logo abaixo do texto:
+- **"Resposta da IA · Gemini · gemini-3.5-flash-lite"** (ou "Cloudflare Workers AI" e o modelo dele);
+- **"Modo demonstrativo · sem IA"**, quando nenhuma IA está configurada;
+- **"Modo demonstrativo · IA indisponível"**, quando a IA configurada não respondeu. O aviso diz o motivo: desligada, cota diária gratuita esgotada, chave inválida ou vencida, muitas perguntas no minuto ou ao mesmo tempo, ou indisponível. O resto do Helpdesk segue normal.
+
+Uma resposta demonstrativa nunca aparece como se fosse da IA.
+
+**Limites de uso, para qualquer provedor:**
+- 20 perguntas por pessoa a cada 10 minutos;
+- uma pergunta por vez por pessoa, e a mesma pergunta não se repete em 30 segundos;
+- até 3 chamadas ao modelo ao mesmo tempo no backend (a próxima pessoa recebe a demonstração, com aviso);
+- nenhuma nova tentativa automática quando o provedor falha;
+- a IA só é chamada quando alguém envia uma pergunta, nunca ao abrir uma página.
+
+### Gemini (Google AI Studio)
+
+1. Em [aistudio.google.com](https://aistudio.google.com), abra **Get API key** e crie uma chave num projeto **sem faturamento**. Na lista de chaves, o projeto deve aparecer como **Free tier**.
+2. Em `backend/.env`:
 
    ```bash
+   AI_PROVIDER=gemini
+   GEMINI_API_KEY=sua-chave-do-ai-studio
+   GEMINI_MODEL=
+   ```
+
+   `GEMINI_MODEL` vazio usa `gemini-3.5-flash-lite`.
+3. Reinicie o backend. O terminal mostra `[assistant] provider: gemini` (nunca a chave).
+
+**Modelo:** `gemini-3.5-flash-lite`. É estável, tem camada gratuita, não tem data de desligamento (consulta de 20/10/2026) e é o indicado pelo Google para respostas rápidas e de alto volume; usa raciocínio mínimo por padrão. Configuração:
+- temperatura 0,2;
+- até 1.024 tokens de saída, contando o raciocínio;
+- 20 segundos de limite por chamada;
+- resposta em JSON (`answer`, `citedSources`), validada de novo no backend;
+- nenhuma ferramenta: sem busca do Google, execução de código ou chamada de funções.
+
+**Cotas.** O Google não publica números fixos para a camada gratuita: os limites são por projeto e aparecem no AI Studio (Rate limits e Usage). A cota diária zera à meia-noite do horário do Pacífico. Quando ela acaba, a resposta vira demonstração com o aviso de cota. Sem faturamento ativo, não há cobrança. Confirmado neste projeto em 20/10/2026: o modelo está na camada gratuita da tabela de preços e as chamadas reais funcionaram no Free tier. Os números de limite do projeto não são expostos pela API e ficam no AI Studio.
+
+**Privacidade no Free.** Na camada gratuita, o Google pode usar perguntas e respostas para melhorar os seus produtos, e revisores humanos podem lê-las (termos da Gemini API, "Unpaid Services"). O que sai do backend é a pergunta e até 8 trechos já autorizados: títulos e situação de chamados, nome do responsável, saldo de estoque e indicadores. Nunca saem e-mails, senhas, tokens nem a descrição dos chamados. Mesmo assim:
+- use **só dados fictícios**, como os dos seeds de demonstração;
+- dados reais da empresa exigiriam o nível pago (em que os dados não são usados para melhorar produtos) e uma decisão explícita de privacidade.
+
+**Testar com chamadas reais:** `cd backend && npm run assistant:check`. O script sobe a API num banco temporário, só com dados fictícios, e apaga o banco no fim. Ele faz 8 perguntas:
+- os três perfis;
+- o solicitante pedindo dados da gestão e o pedido de outra pessoa;
+- uma fonte inexistente;
+- uma instrução escondida num chamado e num artigo.
+
+Também confere a chave inválida e o modelo inexistente, que o Google recusa sem gastar cota. Para cada resposta, mostra origem, latência, tokens e fontes. Os testes automatizados (`npm test`) usam o Gemini simulado e não gastam cota.
+
+**Medição real (20/10/2026, Free tier, dados fictícios):** 8 respostas, mediana de 1,4 s (de 1,1 a 3,5 s), cerca de 510 tokens por resposta (460 de entrada e 55 de saída).
+
+**Revogar a chave:** em AI Studio → API keys, exclua a chave (ou no Google Cloud Console → APIs e serviços → Credenciais). **Voltar ao modo demonstrativo:** `AI_PROVIDER=demo` (ou apague a linha) e reinicie o backend.
+
+### Cloudflare Workers AI
+
+Para usar o serviço publicado pelo dono em `ai-worker/`:
+
+1. Peça ao dono um acesso temporário. Ele gera uma chave **só sua**, com validade curta (alguns dias), e envia o endereço e a chave por um canal privado.
+2. Em `backend/.env`, coloque `AI_PROVIDER=cloudflare` e os dois valores, e reinicie o backend:
+
+   ```bash
+   AI_PROVIDER=cloudflare
    AI_WORKER_URL=https://endereco-do-servico.workers.dev
    AI_WORKER_KEY=chave-recebida-do-dono
    ```
 
-3. Abra o **Assistente** com cada perfil. Perguntas de exemplo: "Meu teclado parou de funcionar. Como solicito suporte?" (solicitante), "Temos teclados disponíveis para atender um chamado?" (TI) e "Quais departamentos mais consumiram periféricos?" (gestor). Para ver origem, latência, tokens e fontes de uma vez: `cd backend && node scripts/measure-assistant.mjs`.
-
 Sobre essa chave:
 - **Ela fica visível para você.** Como o backend roda no seu computador, a chave no `.env` pode ser lida por quem usa a máquina. Por isso ela é pessoal, vence sozinha, pode ser revogada a qualquer momento sem afetar outras pessoas e tem limite de uso.
 - **Ela nunca vai para o repositório nem para o navegador.** Não há chave compartilhada no código; o React só fala com o backend.
-- **Limites:** cerca de 10 respostas por minuto por chave (aproximado), 20 perguntas por pessoa a cada 10 minutos no backend e a cota gratuita diária da Cloudflare, que zera às 21h (horário de Brasília). Quando algo disso acaba, as respostas voltam ao modo demonstrativo com aviso, sem cobrança.
+- **Limites:** cerca de 10 respostas por minuto por chave (aproximado) e a cota gratuita diária da Cloudflare, que zera às 21h (horário de Brasília). Quando algo disso acaba, as respostas voltam ao modo demonstrativo com aviso, sem cobrança.
 
-Sem a chave, tudo continua funcionando em modo demonstrativo. Como o serviço é publicado e protegido: [ai-worker/README.md](ai-worker/README.md).
+Como o serviço é publicado e protegido: [ai-worker/README.md](ai-worker/README.md).
+
+### Avaliar sem chave nenhuma
+
+Não é preciso chave para rodar o projeto: com `AI_PROVIDER=demo` (o padrão do `.env.example`), o assistente funciona nos três perfis, com as mesmas permissões e fontes, e cada resposta aparece como "Modo demonstrativo · sem IA". Para ver a IA real, a forma mais simples é criar a sua própria chave gratuita do Gemini (passos acima). Nenhuma chave do desenvolvedor está no repositório.
+
+Perguntas de exemplo: "Meu teclado parou de funcionar. Como solicito ajuda?" (solicitante), "Temos teclados disponíveis no estoque?" (TI) e "Quais departamentos consumiram mais periféricos neste mês?" (gestor).
 
 ## Os três perfis
 
@@ -257,7 +322,9 @@ Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`V
 | `APP_PUBLIC_URL` | Opcional; padrão `http://localhost:5173`; endereço da interface usado nos links dos e-mails |
 | `MAILPIT_URL` | Opcional; padrão `http://127.0.0.1:8025`; API do Mailpit |
 | `RESEND_API_KEY` | Obrigatória só com `EMAIL_PROVIDER=resend` e e-mail ligado; nunca versionar |
-| `AI_WORKER_URL` / `AI_WORKER_KEY` | Opcionais; preencher ambas ou nenhuma; endereço do serviço de respostas e a chave de acesso recebida do dono. Sem elas, o [assistente](#assistente) responde em modo demonstrativo |
+| `AI_PROVIDER` | Quem responde no [assistente](#assistente): `demo` (padrão, sem IA), `gemini` ou `cloudflare`. Configuração incompleta ou inválida cai no modo demonstrativo, com aviso, sem impedir o backend de subir |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Com `AI_PROVIDER=gemini`: a sua chave do Google AI Studio (só o backend lê) e o modelo (vazio usa `gemini-3.5-flash-lite`) |
+| `AI_WORKER_URL` / `AI_WORKER_KEY` | Com `AI_PROVIDER=cloudflare`: endereço do Worker e a chave temporária recebida do dono |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Obrigatórias só com `EMAIL_PROVIDER=gmail` e e-mail ligado; conta Gmail remetente e sua senha de app; nunca versionar |
 | `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend e o Gmail só enviam para estes endereços ou `@domínios`, separados por vírgula |
 

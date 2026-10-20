@@ -153,6 +153,6 @@ O módulo liga o atendimento ao controle físico do que a TI entrega. O exemplo 
 
 A visão gerencial separa situação atual, criação no período e ações do autor no período. Inclui operadores com zero chamados, gestores operadores e referências históricas indisponíveis. Nenhuma contagem isolada representa qualidade do atendimento.
 
-**Assistente:** chat consultivo para os três perfis, com as respostas montadas só a partir do que cada perfil pode ver; IA generativa via Cloudflare Workers AI quando configurada, modo demonstrativo identificado sem ela. Detalhes no [README](../README.md#assistente).
+**Assistente:** chat consultivo para os três perfis, com as respostas montadas só a partir do que cada perfil pode ver; IA generativa via Google Gemini ou Cloudflare Workers AI quando configurada (`AI_PROVIDER`), modo demonstrativo identificado sem ela. Detalhes no [README](../README.md#assistente).
 
 **Ainda não implementado:** busca semântica no assistente, compras, fornecedores, custos e notas fiscais, leitor de código de barras, campo de impacto, intervalo personalizado, SLA/tempos úteis, evolução histórica do backlog, notificações push e avisos à equipe, anexos, administração de contas e protótipos Figma. Não há campo `impact` no schema atual. Essas propostas não são apresentadas como telas ou comandos disponíveis.

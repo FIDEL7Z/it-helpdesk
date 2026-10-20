@@ -225,7 +225,7 @@ Se o ambiente tiver réplica, transações poderiam substituir a projeção repa
 
 ### Assistente
 
-O assistente não tem coleção: não guarda conversas. Cada pergunta passa pelo `requireAuth`, e `services/assistant/sources.ts` lê os dados pelos serviços existentes, com o escopo de quem pergunta (`searchPublished`, `listActive`, `listTickets`, `listProducts`, `inventoryInsights`, `getManagerDashboard`). O texto vai para o serviço de respostas em `ai-worker/` (Cloudflare Workers AI) ou para o modo demonstrativo. O serviço de respostas não tem acesso ao MongoDB.
+O assistente não tem coleção: não guarda conversas. Cada pergunta passa pelo `requireAuth`, e `services/assistant/sources.ts` lê os dados pelos serviços existentes, com o escopo de quem pergunta (`searchPublished`, `listActive`, `listTickets`, `listProducts`, `inventoryInsights`, `getManagerDashboard`). O texto vai para o provedor escolhido em `AI_PROVIDER`: a Gemini API, chamada pelo próprio backend (`gemini.provider.ts`, SDK `@google/genai`), o serviço de respostas em `ai-worker/` (Cloudflare Workers AI) ou o modo demonstrativo. Todos recebem o mesmo contexto autorizado e devolvem a mesma resposta normalizada. Nenhum provedor tem acesso ao MongoDB.
 
 ### Notificações
 

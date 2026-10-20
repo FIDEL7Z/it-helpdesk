@@ -32,10 +32,16 @@ const envSchema = z.object({
   // The Gmail account that sends, and its 16-letter app password (Google shows it with spaces).
   GMAIL_USER: z.preprocess((value) => (value === '' ? undefined : value), z.email().optional()),
   GMAIL_APP_PASSWORD: z.string().optional().transform((value) => value?.replace(/\s+/g, '') || undefined),
-  // ---------- Assistant (optional): the answer service (Cloudflare Worker in ai-worker/) ----------
-  // Without both, the assistant answers in an identified demonstration mode, without generative AI.
-  AI_WORKER_URL: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
-  AI_WORKER_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().regex(/^[A-Za-z0-9_-]{24,128}$/, 'AI_WORKER_KEY must have 24 to 128 letters, digits, _ or -').optional()),
+  // ---------- Assistant (optional). Never blocks startup: a missing or invalid setting makes the ----------
+  // assistant answer in an identified demonstration mode (checked in services/assistant/assistant.service.ts).
+  // demo | gemini | cloudflare. Unset: cloudflare when AI_WORKER_* is set (older setups), demo otherwise.
+  AI_PROVIDER: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().toLowerCase().optional()),
+  // Gemini API, called directly by the backend. The key never leaves the backend.
+  GEMINI_API_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  GEMINI_MODEL: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  // The Cloudflare Worker in ai-worker/.
+  AI_WORKER_URL: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
+  AI_WORKER_KEY: z.preprocess((value) => (value === '' ? undefined : value), z.string().trim().optional()),
   // Outside production, Resend only delivers to these addresses or @domains (comma-separated).
   EMAIL_RECIPIENT_ALLOWLIST: z
     .string()
@@ -44,9 +50,6 @@ const envSchema = z.object({
 }).superRefine((value, context) => {
   if (value.EMAIL_ENABLED && value.EMAIL_PROVIDER === 'resend' && !value.RESEND_API_KEY) {
     context.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'RESEND_API_KEY is required when EMAIL_PROVIDER=resend' });
-  }
-  if (Boolean(value.AI_WORKER_URL) !== Boolean(value.AI_WORKER_KEY)) {
-    context.addIssue({ code: 'custom', path: ['AI_WORKER_KEY'], message: 'Set both AI_WORKER_URL and AI_WORKER_KEY, or neither' });
   }
   if (value.EMAIL_ENABLED && value.EMAIL_PROVIDER === 'gmail') {
     if (!value.GMAIL_USER) context.addIssue({ code: 'custom', path: ['GMAIL_USER'], message: 'GMAIL_USER is required when EMAIL_PROVIDER=gmail' });

@@ -20,9 +20,12 @@ export interface AnswerOutput {
   usage?: AnswerUsage | null;
 }
 
+export type ProviderName = 'gemini' | 'cloudflare' | 'demo';
+
 export interface AssistantProvider {
-  /** worker: generative AI (Cloudflare Workers AI). demo: no AI, built from the same sources. */
+  /** ai: generative answer (Gemini or the Cloudflare Worker). demo: no AI, built from the same sources. */
   readonly mode: 'ai' | 'demo';
+  readonly name: ProviderName;
   answer(input: AnswerInput): Promise<AnswerOutput>;
 }
 
@@ -43,6 +46,7 @@ export function workerProvider(baseUrl: string, key: string): AssistantProvider 
   const url = `${baseUrl.replace(/\/+$/, '')}/v1/answer`;
   return {
     mode: 'ai',
+    name: 'cloudflare',
     async answer({ question, profile, sources }) {
       let response: Response;
       try {
@@ -74,6 +78,7 @@ export function workerProvider(baseUrl: string, key: string): AssistantProvider 
  */
 export const demoProvider: AssistantProvider = {
   mode: 'demo',
+  name: 'demo',
   async answer({ sources }) {
     if (sources.length === 0) {
       return {

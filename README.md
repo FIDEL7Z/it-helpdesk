@@ -180,7 +180,23 @@ Uma resposta demonstrativa nunca aparece como se fosse da IA.
    ```
 
    `GEMINI_MODEL` vazio usa `gemini-3.5-flash-lite`.
-3. Reinicie o backend. O terminal mostra `[assistant] provider: gemini` (nunca a chave).
+3. Salve o arquivo. Com `npm run dev`, o backend reinicia sozinho quando o `.env` muda, e o terminal mostra `[assistant] provider: gemini (gemini-3.5-flash-lite)` (nunca a chave).
+
+**Se o navegador continuar em "Modo demonstrativo":** veja a linha `[assistant]` no terminal do backend.
+- `provider: demo (AI_PROVIDER is not set: a GEMINI_API_KEY alone does not turn Gemini on...)`: falta `AI_PROVIDER=gemini`. A chave sozinha não liga a IA, de propósito.
+- `AI_PROVIDER is not usable (GEMINI_NOT_CONFIGURED)`: falta a chave ou o `GEMINI_MODEL` é inválido.
+- `gemini unavailable (UNAUTHORIZED | QUOTA_EXCEEDED | RATE_LIMITED | MODEL_UNAVAILABLE | timeout | network)`: o Gemini foi chamado e falhou; a resposta aparece como "Modo demonstrativo · IA indisponível", com o motivo no aviso.
+
+### Gemini no navegador só com dados fictícios
+
+O banco de desenvolvimento pode ter contas e chamados reais, e no nível gratuito o Google pode usar o que recebe. Para usar o Gemini no navegador sem enviar esses dados, use o sandbox:
+
+```bash
+# pare o backend normal (Ctrl+C) e, em backend/:
+npm run dev:ai-sandbox
+```
+
+O sandbox recria o banco separado `it-helpdesk-ai-sandbox` só com dados fictícios e sobe o backend nele, na mesma porta, com `AI_PROVIDER=gemini` (a chave vem do `backend/.env`). O frontend (`npm run dev`) não muda. Entre com as contas fictícias do sandbox, que o terminal lista: `bia@sandbox.local` (solicitante), `caio@sandbox.local` (TI) e `lara@sandbox.local` (gestor), todas com a senha `Sandbox@2026`. Elas são diferentes das contas de demonstração dos seeds, porque os chamados destas contam como dados de demonstração, e o assistente lê os dados operacionais. Para voltar ao banco normal, pare o sandbox e rode `npm run dev`. `AI_PROVIDER=demo npm run dev:ai-sandbox` mostra o mesmo sandbox sem IA.
 
 **Modelo:** `gemini-3.5-flash-lite`. É estável, tem camada gratuita, não tem data de desligamento (consulta de 20/10/2026) e é o indicado pelo Google para respostas rápidas e de alto volume; usa raciocínio mínimo por padrão. Configuração:
 - temperatura 0,2;
@@ -205,7 +221,7 @@ Também confere a chave inválida e o modelo inexistente, que o Google recusa se
 
 **Medição real (20/10/2026, Free tier, dados fictícios):** 8 respostas, mediana de 1,4 s (de 1,1 a 3,5 s), cerca de 510 tokens por resposta (460 de entrada e 55 de saída).
 
-**Revogar a chave:** em AI Studio → API keys, exclua a chave (ou no Google Cloud Console → APIs e serviços → Credenciais). **Voltar ao modo demonstrativo:** `AI_PROVIDER=demo` (ou apague a linha) e reinicie o backend.
+**Revogar a chave:** em AI Studio → API keys, exclua a chave (ou no Google Cloud Console → APIs e serviços → Credenciais). **Voltar ao modo demonstrativo:** `AI_PROVIDER=demo` (ou apague a linha) e salve o `.env`.
 
 ### Cloudflare Workers AI
 

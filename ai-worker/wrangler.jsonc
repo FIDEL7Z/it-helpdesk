@@ -1,0 +1,27 @@
+// Cloudflare Worker configuration. No account id and no secrets here: Wrangler takes the account
+// from the owner's login, and ACCESS_KEYS is set with `wrangler secret put ACCESS_KEYS`.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "it-helpdesk-ai",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  // Free-plan Workers AI: 10,000 Neurons a day; beyond that calls fail instead of being billed.
+  "ai": { "binding": "AI" },
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      // Any positive integer unique in the owner's account.
+      "namespace_id": "41001",
+      // Per access key and Cloudflare location: 10 answers a minute.
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+  "vars": {
+    // Kill switch: anything but "true" answers 503 to every request, keys or not.
+    "DEMO_ENABLED": "true",
+    // Must be one of the models listed in src/index.js; anything else falls back to the default.
+    "MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  // Requests carry questions and context: no request logs or traces are kept.
+  "observability": { "enabled": false }
+}

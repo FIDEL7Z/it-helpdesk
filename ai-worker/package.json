@@ -1,0 +1,14 @@
+{
+  "name": "it-helpdesk-ai-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker that phrases answers from context the IT Helpdesk backend already authorized",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/worker.test.js",
+    "poc": "node scripts/poc.mjs"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

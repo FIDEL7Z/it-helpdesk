@@ -5,6 +5,9 @@
   "name": "it-helpdesk-ai",
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
+  // One public address (<name>.<subdomain>.workers.dev); no per-version preview URLs.
+  "workers_dev": true,
+  "preview_urls": false,
   // Free-plan Workers AI: 10,000 Neurons a day; beyond that calls fail instead of being billed.
   "ai": { "binding": "AI" },
   "ratelimits": [
@@ -17,8 +20,10 @@
     }
   ],
   "vars": {
-    // Kill switch: anything but "true" answers 503 to every request, keys or not.
-    "DEMO_ENABLED": "true",
+    // Kill switch: anything but "true" answers 503 to every request, keys or not, before any
+    // model call. Published OFF; turned on for controlled tests with
+    // `wrangler deploy --var DEMO_ENABLED:true`, and off again with a plain `wrangler deploy`.
+    "DEMO_ENABLED": "false",
     // Must be one of the models listed in src/index.js; anything else falls back to the default.
     "MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
   },

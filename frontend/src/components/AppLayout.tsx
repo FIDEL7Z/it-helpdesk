@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { can } from '../auth/permissions'
 import { useAuth } from '../auth/useAuth'
 import { ROLE_LABELS } from '../services/auth'
+import { AssistantPanel } from './AssistantPanel'
 import { BrandMark } from './BrandMark'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -81,6 +82,9 @@ export function AppLayout() {
       <main className="app-main">
         <Outlet />
       </main>
+
+      {/* Advisory assistant on every page; it only reads what this profile may already see. */}
+      <AssistantPanel />
     </div>
   )
 }

@@ -4437,3 +4437,195 @@ a:where(:not(.button)):hover {
     align-items: baseline;
   }
 }
+
+/* ---------- Assistant (advisory chat on every page) ---------- */
+
+/* Room under the last content so the floating button never covers it. */
+.app-main {
+  padding-bottom: 96px;
+}
+
+.assistant-launcher {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font: inherit;
+  font-weight: 650;
+  box-shadow: 0 4px 16px rgba(23, 43, 58, 0.25);
+  cursor: pointer;
+}
+
+.assistant-launcher:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-contrast);
+}
+
+.assistant-launcher:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.assistant-panel {
+  position: fixed;
+  right: var(--space-5);
+  bottom: calc(var(--space-5) + 60px);
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(420px, calc(100vw - 2 * var(--space-5)));
+  height: min(600px, calc(100vh - 160px));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 12px 40px rgba(23, 43, 58, 0.25);
+}
+
+@media (max-width: 560px) {
+  .assistant-launcher {
+    right: var(--space-4);
+    bottom: var(--space-4);
+  }
+
+  /* Below the two-row phone header (about 104px), above the button. */
+  .assistant-panel {
+    right: var(--space-2);
+    bottom: calc(var(--space-4) + 60px);
+    width: calc(100vw - 2 * var(--space-2));
+    height: calc(100dvh - 200px);
+  }
+}
+
+.assistant-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.assistant-panel__title {
+  font-size: 1.0625rem;
+}
+
+.assistant-panel__subtitle {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.assistant-panel__messages {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.assistant-panel__empty {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.assistant-panel__suggestions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.assistant-panel__suggestion {
+  justify-content: flex-start;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.assistant-panel__suggestion:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.assistant-message {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 92%;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.assistant-message--person {
+  justify-self: end;
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.assistant-message--assistant,
+.assistant-message--error {
+  justify-self: start;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.assistant-message--error {
+  border-color: var(--color-danger);
+}
+
+.assistant-message__answer {
+  white-space: pre-line;
+}
+
+.assistant-message__notice {
+  padding: var(--space-2);
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-warning-bg);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+}
+
+.assistant-message__sources {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.assistant-message__source-id {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.assistant-panel__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Two lines, not the 140px of a form textarea (textarea.field__input). */
+textarea.field__input.assistant-panel__input {
+  min-height: 0;
+  height: 4.5em;
+  resize: none;
+}

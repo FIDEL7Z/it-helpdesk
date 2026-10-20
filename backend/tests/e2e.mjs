@@ -115,6 +115,8 @@ async function run() {
   // E-mail off whatever the local .env says: the browser checks cover the page without delivery.
   process.env.EMAIL_ENABLED = 'false';
   // No answer service: the assistant must run in its identified demonstration mode.
+  process.env.AI_PROVIDER = 'demo';
+  process.env.GEMINI_API_KEY = '';
   process.env.AI_WORKER_URL = '';
   process.env.AI_WORKER_KEY = '';
   const [{ default: app }, { env }, { UserModel }, { TicketModel }, { hashPassword }, { signAccessToken }] =

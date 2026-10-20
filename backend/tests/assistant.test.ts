@@ -46,6 +46,7 @@ const ask = (user: TestUser, question: string) => api('POST', '/assistant/ask', 
 /** Records what the backend sends; answers like a model would, citing every source plus an unknown one. */
 class RecordingProvider implements AssistantProvider {
   readonly mode = 'ai' as const;
+  readonly name = 'cloudflare' as const;
   calls: AnswerInput[] = [];
   async answer(input: AnswerInput) {
     this.calls.push(input);
@@ -243,6 +244,7 @@ describe('answers and failures', () => {
       setAssistantProviderForTests(workerProvider(`http://127.0.0.1:${(fake.address() as AddressInfo).port}/`, key));
       const ok = (await ask(maria, 'Meu teclado parou, o que eu faço?')).body.reply;
       assert.equal(ok.mode, 'ai');
+      assert.equal(ok.provider, 'cloudflare');
       assert.equal(ok.model, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
       assert.deepEqual(ok.usage, { inputTokens: 700, outputTokens: 80 });
       assert.equal(calls[0].path, '/v1/answer');
@@ -250,7 +252,7 @@ describe('answers and failures', () => {
       assert.deepEqual(Object.keys(calls[0].body).sort(), ['profile', 'question', 'sources']);
       assert.ok(calls[0].body.sources.every((s: Json) => Object.keys(s).sort().join() === 'id,kind,text,title' && s.text.length <= 1200));
       reply = { status: 401, body: { error: { code: 'UNAUTHORIZED' } } };
-      const refused = (await ask(maria, 'Meu teclado parou, o que eu faço?')).body.reply;
+      const refused = (await ask(maria, 'O teclado continua parado, e agora?')).body.reply;
       assert.equal(refused.mode, 'demo');
       assert.match(refused.notice, /inválida ou venceu/);
     } finally {
@@ -259,9 +261,9 @@ describe('answers and failures', () => {
   });
 
   it('treats unknown provider failures as errors, not as demonstrations', async () => {
-    setAssistantProviderForTests({ mode: 'ai', answer: async () => { throw new AssistantUnavailable('quota'); } });
+    setAssistantProviderForTests({ mode: 'ai', name: 'cloudflare', answer: async () => { throw new AssistantUnavailable('quota'); } });
     assert.equal((await ask(maria, 'Meu teclado parou?')).body.reply.mode, 'demo');
-    setAssistantProviderForTests({ mode: 'ai', answer: async () => { throw new TypeError('bug'); } });
+    setAssistantProviderForTests({ mode: 'ai', name: 'cloudflare', answer: async () => { throw new TypeError('bug'); } });
     assert.equal((await ask(maria, 'Meu teclado parou?')).status, 500);
   });
 });

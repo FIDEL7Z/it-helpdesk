@@ -143,16 +143,30 @@ O botão **Assistente**, no canto inferior direito de todas as páginas, abre um
 - **É só consultivo.** O assistente não altera chamados nem estoque; ele aponta a página onde a ação é feita. A conversa não é guardada.
 - **Limite:** 20 perguntas por pessoa a cada 10 minutos.
 
-**Sem configuração** (o padrão), o assistente funciona em **modo demonstrativo**: sem IA generativa, ele lista as informações encontradas para o perfil, com um aviso claro. Se o serviço de IA configurado falhar, a resposta também cai nesse modo, com aviso, e o resto do Helpdesk segue normal.
+**Sem configuração** (o padrão), o assistente funciona em **modo demonstrativo**: sem IA generativa, ele lista as informações encontradas para o perfil, com um aviso claro. Se o serviço de IA configurado falhar, a resposta também cai nesse modo, e o resto do Helpdesk segue normal. O aviso diz o motivo: IA desligada, cota diária gratuita esgotada, chave inválida ou vencida, muitas perguntas no minuto, ou IA indisponível.
 
-**Com IA real**, as respostas vêm de um modelo do Cloudflare Workers AI, por meio do serviço em `ai-worker/`. Quem avalia não instala modelo nem conhece as credenciais da Cloudflare: basta receber do dono o endereço do serviço e uma chave de acesso temporária e colocá-los em `backend/.env`:
+Cada resposta mostra a sua origem logo abaixo do texto: **"Resposta da IA · nome do modelo"** ou **"Modo demonstrativo · sem IA"**. Uma resposta demonstrativa nunca aparece como se fosse da IA.
 
-```bash
-AI_WORKER_URL=https://endereco-do-servico.workers.dev
-AI_WORKER_KEY=chave-recebida-do-dono
-```
+**Com IA real**, as respostas vêm de um modelo do Cloudflare Workers AI, no plano gratuito, por meio do serviço em `ai-worker/`. Quem avalia não instala modelo nem conhece as credenciais da Cloudflare.
 
-Como o serviço é publicado e protegido (chave por pessoa com validade, limite por chave, botão de desligar, cota gratuita): [ai-worker/README.md](ai-worker/README.md).
+### Testar a IA real numa instalação local
+
+1. Peça ao dono um acesso temporário. Ele gera uma chave **só sua**, com validade curta (alguns dias), e envia o endereço e a chave por um canal privado.
+2. Coloque os dois em `backend/.env` e reinicie o backend:
+
+   ```bash
+   AI_WORKER_URL=https://endereco-do-servico.workers.dev
+   AI_WORKER_KEY=chave-recebida-do-dono
+   ```
+
+3. Abra o **Assistente** com cada perfil. Perguntas de exemplo: "Meu teclado parou de funcionar. Como solicito suporte?" (solicitante), "Temos teclados disponíveis para atender um chamado?" (TI) e "Quais departamentos mais consumiram periféricos?" (gestor). Para ver origem, latência, tokens e fontes de uma vez: `cd backend && node scripts/measure-assistant.mjs`.
+
+Sobre essa chave:
+- **Ela fica visível para você.** Como o backend roda no seu computador, a chave no `.env` pode ser lida por quem usa a máquina. Por isso ela é pessoal, vence sozinha, pode ser revogada a qualquer momento sem afetar outras pessoas e tem limite de uso.
+- **Ela nunca vai para o repositório nem para o navegador.** Não há chave compartilhada no código; o React só fala com o backend.
+- **Limites:** cerca de 10 respostas por minuto por chave (aproximado), 20 perguntas por pessoa a cada 10 minutos no backend e a cota gratuita diária da Cloudflare, que zera às 21h (horário de Brasília). Quando algo disso acaba, as respostas voltam ao modo demonstrativo com aviso, sem cobrança.
+
+Sem a chave, tudo continua funcionando em modo demonstrativo. Como o serviço é publicado e protegido: [ai-worker/README.md](ai-worker/README.md).
 
 ## Os três perfis
 

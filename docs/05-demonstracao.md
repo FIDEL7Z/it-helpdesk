@@ -148,15 +148,17 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
 | Assistente | `assistant.test.ts`, com o serviço de respostas simulado e dados persistidos:
 - o solicitante com teclado quebrado recebe o artigo publicado e o próprio pedido, nunca rascunhos nem pedidos de outras pessoas;
-- palavras genéricas não trazem artigos sem relação;
+- palavras genéricas não trazem artigos sem relação; quem pergunta como pedir suporte recebe o guia do sistema com os nomes reais da tela (Solicitar suporte, Meus pedidos; Abrir chamado para a equipe);
 - a TI recebe o saldo de teclados igual ao da API de estoque;
 - o gestor recebe o consumo por setor igual aos indicadores do mesmo período;
 - o solicitante que pede dados da gestão, estoque ou chamados de todos (mesmo com "ignore as regras") não recebe nada disso; a TI nunca recebe indicadores da gestão;
 - citações desconhecidas são removidas; sem serviço, a resposta é demonstrativa e identificada; com o serviço fora do ar ou recusando a chave, a resposta cai para o modo demonstrativo e os chamados seguem funcionando;
-- o pedido ao Worker leva a chave e só a pergunta, o perfil e trechos curtos;
+- o pedido ao Worker leva a chave e só a pergunta, o perfil e trechos curtos; a resposta da IA traz o modelo e os tokens usados;
+- cada falha do serviço (desligado, cota esgotada, chave inválida ou vencida, limite, modelo do plano pago) vira um aviso próprio, sempre como demonstração; a etiqueta de IA só aparece quando o serviço respondeu;
+- um chamado escrito como instrução não amplia o que é lido;
 - pergunta validada, perfil vindo do token e limite de 20 perguntas por pessoa.
 
-No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos, devolve o foco depois da resposta e fecha com Esc |
+No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos e a etiqueta "Modo demonstrativo · sem IA", devolve o foco depois da resposta e fecha com Esc. O Worker tem testes próprios (`ai-worker`, `npm test`): chaves recusadas antes da inferência, configuração publicada desligada, erros de cota e de plano pago, fontes cercadas e tokens |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
 - entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;

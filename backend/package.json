@@ -19,7 +19,8 @@
     "seed:manager": "tsx src/scripts/seed-manager.ts",
     "seed:inventory": "tsx src/scripts/seed-inventory.ts",
     "docs:capture": "tsx scripts/capture-docs.mjs",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "assistant:check": "tsx scripts/assistant-check.ts"
   },
   "engines": {
     "node": ">=22.22.0"

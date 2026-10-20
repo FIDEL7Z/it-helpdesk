@@ -728,7 +728,8 @@ async function run() {
     const badge = document.querySelector('.assistant-panel__subtitle .badge')?.textContent;
     const notice = document.querySelector('.assistant-message__notice')?.textContent ?? '';
     const links = [...document.querySelectorAll('.assistant-message__sources a')].map((a) => a.getAttribute('href'));
-    return badge === 'Modo demonstrativo' && notice.includes('nenhuma IA generativa') && links.every((href) => href.startsWith('/'));
+    const origin = document.querySelector('.assistant-message__origin')?.textContent;
+    return badge === 'Modo demonstrativo' && origin === 'Modo demonstrativo · sem IA' && notice.includes('nenhuma IA generativa') && links.every((href) => href.startsWith('/'));
   })()`), 'Without an answer service the assistant says it is a demonstration and links only to app pages');
   await waitDom('focus back on the question', 'document.activeElement?.classList.contains("assistant-panel__input")');
   check(true, 'After an answer, the focus returns to the question field');

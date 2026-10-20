@@ -18,6 +18,7 @@ A equipe de TI fica sobrecarregada: pedidos chegam por vários canais, muitos t�
 - **Kanban:** a fila da TI em **Lista** ou **Quadro**, com os mesmos filtros e regras.
 - **Estoque e Patrimônio:** departamentos e salas, materiais por quantidade e equipamentos por número de patrimônio, cada entrada, entrega, troca e transferência registrada e ligada ao chamado.
 - **Notificações por e-mail:** o solicitante recebe avisos do próprio pedido (registro, início, resolução que pede confirmação, reabertura e material entregue), no e-mail confirmado da conta, com preferências em **Minha conta**. Testável sem conta externa, numa caixa local (Mailpit).
+- **Assistente:** um chat consultivo em todas as páginas responde com o que cada perfil já pode ver (artigos, problemas conhecidos, chamados, estoque e indicadores), citando as fontes. Usa IA generativa (Cloudflare Workers AI) quando configurada; sem ela, responde em um modo demonstrativo identificado.
 - **Visão gerencial:** alertas, carga da equipe, resoluções comprovadas por autor, incidentes e qualidade do atendimento.
 - **Base comum:** permissões por perfil no backend, histórico auditável com revisão e ciclos, identidade visual com tokens centralizados, tema claro por padrão e botão **Tema escuro** no cabeçalho (escolha guardada no navegador), contraste AA nos dois temas e layout para celular.
 
@@ -127,6 +128,32 @@ Para demonstrar um e-mail chegando de verdade, sem domínio próprio. Uma conta 
 
 O e-mail sai sempre do endereço `GMAIL_USER`, com o nome dado em `EMAIL_FROM`. A senha de app fica só no `.env` local, que não é versionado, e pode ser revogada na mesma página do Google. A confirmação do e-mail também é enviada pelo Gmail; para testar o envio real com um único e-mail, confirme antes pelo Mailpit ou desligue os avisos opcionais em **Minha conta**.
 
+## Assistente
+
+O botão **Assistente**, no canto inferior direito de todas as páginas, abre um chat consultivo. Ele responde com o que a pessoa já pode ver no sistema e cita as fontes, com links para as páginas que as mostram.
+
+| Perfil | O que o assistente pode usar |
+|---|---|
+| Solicitante | Artigos publicados, problemas conhecidos e os próprios pedidos |
+| TI | Os mesmos, os chamados da equipe e o saldo do estoque |
+| Gestor | Tudo acima, mais consumo de materiais por setor, situação dos chamados, equipe e qualidade |
+
+- **Quem decide é o backend.** Ele confere o JWT e as permissões e lê os dados pelos mesmos serviços das páginas. A pergunta só escolhe o que é relevante entre o que já é permitido; pedir no chat não libera nada.
+- **A IA não acessa o banco.** O modelo recebe apenas a pergunta e até 8 trechos curtos já autorizados, e citações de fontes que não foram enviadas são descartadas.
+- **É só consultivo.** O assistente não altera chamados nem estoque; ele aponta a página onde a ação é feita. A conversa não é guardada.
+- **Limite:** 20 perguntas por pessoa a cada 10 minutos.
+
+**Sem configuração** (o padrão), o assistente funciona em **modo demonstrativo**: sem IA generativa, ele lista as informações encontradas para o perfil, com um aviso claro. Se o serviço de IA configurado falhar, a resposta também cai nesse modo, com aviso, e o resto do Helpdesk segue normal.
+
+**Com IA real**, as respostas vêm de um modelo do Cloudflare Workers AI, por meio do serviço em `ai-worker/`. Quem avalia não instala modelo nem conhece as credenciais da Cloudflare: basta receber do dono o endereço do serviço e uma chave de acesso temporária e colocá-los em `backend/.env`:
+
+```bash
+AI_WORKER_URL=https://endereco-do-servico.workers.dev
+AI_WORKER_KEY=chave-recebida-do-dono
+```
+
+Como o serviço é publicado e protegido (chave por pessoa com validade, limite por chave, botão de desligar, cota gratuita): [ai-worker/README.md](ai-worker/README.md).
+
 ## Os três perfis
 
 Telas reais, com dados fictícios de demonstração. A página do solicitante está em [Portal do Solicitante](#portal-do-solicitante).
@@ -216,6 +243,7 @@ Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`V
 | `APP_PUBLIC_URL` | Opcional; padrão `http://localhost:5173`; endereço da interface usado nos links dos e-mails |
 | `MAILPIT_URL` | Opcional; padrão `http://127.0.0.1:8025`; API do Mailpit |
 | `RESEND_API_KEY` | Obrigatória só com `EMAIL_PROVIDER=resend` e e-mail ligado; nunca versionar |
+| `AI_WORKER_URL` / `AI_WORKER_KEY` | Opcionais; preencher ambas ou nenhuma; endereço do serviço de respostas e a chave de acesso recebida do dono. Sem elas, o [assistente](#assistente) responde em modo demonstrativo |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Obrigatórias só com `EMAIL_PROVIDER=gmail` e e-mail ligado; conta Gmail remetente e sua senha de app; nunca versionar |
 | `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend e o Gmail só enviam para estes endereços ou `@domínios`, separados por vírgula |
 
@@ -355,8 +383,9 @@ docker-compose.yml  MongoDB e caixa de e-mail (Mailpit) locais
 
 - JWT fica no localStorage: um XSS poderia expor o token, e o logout só limpa a sessão local. Login limita 10 tentativas por IP a cada 15 minutos, com contador em memória.
 - Sem notificações push, anexos, comentários, recuperação de senha ou administração de usuários pela interface.
+- O assistente escolhe as informações por palavras da pergunta (sem busca semântica): perguntas muito genéricas podem trazer poucas fontes. Os indicadores do gestor usam dados operacionais, como a visão gerencial abre; o assistente não troca de origem.
 - E-mails só para o solicitante e só sobre o próprio pedido; nada para a equipe nem sobre incidentes. O envio roda no mesmo processo da API, a cada 5 segundos, sem fila externa. O Mailpit não tem chave de idempotência: se a API cair entre o envio e o registro, a caixa local pode mostrar a mensagem duas vezes (o Resend descarta a repetição por 24 horas).
-- Estoque sem compras, fornecedores, custos, notas fiscais ou código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois. Sem inteligência artificial nesta etapa: ela poderá usar depois os dados do estoque e dos chamados.
+- Estoque sem compras, fornecedores, custos, notas fiscais ou código de barras; reservas são entregues ou canceladas por inteiro; o local informado na abertura do chamado não é editado depois.
 - Incidentes não avisam ativamente; o usuário vê o problema ao abrir o sistema. Não há vínculo de outros chamados ao incidente nem sugestão automática de problemas parecidos.
 - A busca de artigos compara palavras (sem acento) por expressão regular e ordena pela atualização mais recente, sem ranking de relevância; atende o volume de demonstração, não uma base grande. Artigos não têm imagens nem anexos.
 - As perguntas do pedido guiado são fixas no código (um catálogo por categoria), não configuráveis pela interface.

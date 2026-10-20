@@ -223,6 +223,10 @@ Cada movimentação leva o estado anterior e o posterior, o autor e seu snapshot
 
 Se o ambiente tiver réplica, transações poderiam substituir a projeção reparada, mas não são necessárias para estas garantias.
 
+### Assistente
+
+O assistente não tem coleção: não guarda conversas. Cada pergunta passa pelo `requireAuth`, e `services/assistant/sources.ts` lê os dados pelos serviços existentes, com o escopo de quem pergunta (`searchPublished`, `listActive`, `listTickets`, `listProducts`, `inventoryInsights`, `getManagerDashboard`). O texto vai para o serviço de respostas em `ai-worker/` (Cloudflare Workers AI) ou para o modo demonstrativo. O serviço de respostas não tem acesso ao MongoDB.
+
 ### Notificações
 
 `notifications` é a fila dos e-mails (outbox), com uma linha por evento e destinatário. Campos:

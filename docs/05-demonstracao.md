@@ -146,6 +146,17 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 | Patrimônio | `inventory-assets.test.ts`: patrimônio e série únicos; cadastro repetido não duplica; transições permitidas; transferência guarda origem e destino; reserva por chamado; entregas simultâneas do mesmo equipamento resultam em uma; baixa só da gestão e final |
 | Estoque nos chamados | `inventory-tickets.test.ts`: local validado e guardado como era; equipamento só do próprio solicitante; entrega retira exatamente uma unidade, registra quem entregou e quem recebeu e não altera o chamado; resolver não move estoque; troca com patrimônio e com periférico; solicitante vê só as entregas do próprio pedido |
 | Indicadores de estoque | `inventory-insights.test.ts` e `demo-inventory.test.ts`: só a gestão; abaixo do mínimo; unidades separadas de tipos; consumo operacional sem estornos; demonstração só quando escolhida; seed idempotente que recusa contas reais |
+| Assistente | `assistant.test.ts`, com o serviço de respostas simulado e dados persistidos:
+- o solicitante com teclado quebrado recebe o artigo publicado e o próprio pedido, nunca rascunhos nem pedidos de outras pessoas;
+- palavras genéricas não trazem artigos sem relação;
+- a TI recebe o saldo de teclados igual ao da API de estoque;
+- o gestor recebe o consumo por setor igual aos indicadores do mesmo período;
+- o solicitante que pede dados da gestão, estoque ou chamados de todos (mesmo com "ignore as regras") não recebe nada disso; a TI nunca recebe indicadores da gestão;
+- citações desconhecidas são removidas; sem serviço, a resposta é demonstrativa e identificada; com o serviço fora do ar ou recusando a chave, a resposta cai para o modo demonstrativo e os chamados seguem funcionando;
+- o pedido ao Worker leva a chave e só a pergunta, o perfil e trechos curtos;
+- pergunta validada, perfil vindo do token e limite de 20 perguntas por pessoa.
+
+No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos, devolve o foco depois da resposta e fecha com Esc |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
 - entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;

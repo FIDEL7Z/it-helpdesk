@@ -16,6 +16,21 @@ const KIND_LABELS: Record<AssistantReply['sources'][number]['kind'], string> = {
   article: 'Artigo', incident: 'Problema conhecido', ticket: 'Chamado', stock: 'Estoque', metric: 'Indicador', guide: 'Guia do sistema',
 }
 
+const PROVIDER_LABELS: Record<NonNullable<AssistantReply['provider']>, string> = { gemini: 'Gemini', cloudflare: 'Cloudflare Workers AI' }
+
+/** Every reply says where it came from: a demonstration never passes for an AI answer. */
+function originLabel(reply: AssistantReply): string {
+  if (reply.mode === 'ai') {
+    return ['Resposta da IA', reply.provider && PROVIDER_LABELS[reply.provider], reply.model?.split('/').pop()].filter(Boolean).join(' · ')
+  }
+  return reply.demoReason === 'not_configured' ? 'Modo demonstrativo · sem IA' : 'Modo demonstrativo · IA indisponível'
+}
+
+const TOO_MANY: Record<string, string> = {
+  ASSISTANT_BUSY: 'Aguarde a resposta da pergunta anterior.',
+  ASSISTANT_REPEATED: 'Você acabou de fazer essa pergunta. Aguarde alguns segundos antes de repetir.',
+}
+
 type Message = { id: number; role: 'person'; text: string } | { id: number; role: 'assistant'; reply: AssistantReply } | { id: number; role: 'error'; text: string }
 
 /**
@@ -77,7 +92,7 @@ export function AssistantPanel() {
       setMessages((list) => [...list, { id: nextId.current++, role: 'assistant', reply }])
     } catch (error) {
       const text = error instanceof ApiError && error.status === 429
-        ? 'Muitas perguntas em pouco tempo. Aguarde alguns minutos e tente de novo.'
+        ? TOO_MANY[error.code ?? ''] ?? 'Muitas perguntas em pouco tempo. Aguarde alguns minutos e tente de novo.'
         : getErrorMessage(error)
       setMessages((list) => [...list, { id: nextId.current++, role: 'error', text }])
     } finally {
@@ -144,9 +159,8 @@ export function AssistantPanel() {
                 {message.role === 'error' && <p role="alert">{message.text}</p>}
                 {message.role === 'assistant' && (
                   <>
-                    {/* Every reply says where it came from: a demonstration never passes for an AI answer. */}
                     <p className={`assistant-message__origin assistant-message__origin--${message.reply.mode}`}>
-                      {message.reply.mode === 'ai' ? `Resposta da IA${message.reply.model ? ` · ${message.reply.model.split('/').pop()}` : ''}` : 'Modo demonstrativo · sem IA'}
+                      {originLabel(message.reply)}
                     </p>
                     {message.reply.notice && <p className="assistant-message__notice">{message.reply.notice}</p>}
                     <p className="assistant-message__answer">{message.reply.answer}</p>

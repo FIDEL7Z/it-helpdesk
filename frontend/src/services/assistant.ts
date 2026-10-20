@@ -6,6 +6,8 @@ export type AssistantReply = {
   answer: string
   /** ai: generative answer (answer service connected). demo: identified demonstration, no AI. */
   mode: 'ai' | 'demo'
+  /** Which generative provider answered (AI mode only). */
+  provider: 'gemini' | 'cloudflare' | null
   notice: string | null
   /** not_configured, or why the answer service did not answer (AI_DISABLED, QUOTA_EXCEEDED...). */
   demoReason: string | null

@@ -1,6 +1,6 @@
 import { apiRequest } from './api'
 
-export type AssistantSourceKind = 'article' | 'incident' | 'ticket' | 'stock' | 'metric'
+export type AssistantSourceKind = 'article' | 'incident' | 'ticket' | 'stock' | 'metric' | 'guide'
 
 export type AssistantReply = {
   answer: string

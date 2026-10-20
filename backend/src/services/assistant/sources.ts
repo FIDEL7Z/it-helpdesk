@@ -16,7 +16,7 @@ import { listTickets } from '../ticket.service';
  * WHICH of the allowed data is relevant; it never widens what can be read.
  */
 
-export type SourceKind = 'article' | 'incident' | 'ticket' | 'stock' | 'metric';
+export type SourceKind = 'article' | 'incident' | 'ticket' | 'stock' | 'metric' | 'guide';
 
 export interface AssistantSource {
   id: string;
@@ -37,6 +37,8 @@ const STOP = new Set([
   ...'a o e de da do das dos em no na nos nas um uma uns umas para por com sem que qual quais quanto quantos quantas como onde quando meu minha meus minhas seu sua isso esse essa este esta tem temos ter ser estar esta estao foi pra pro nao sim mais menos muito muita hoje agora ainda sobre entre ate pelo pela pelos pelas eu voce voces nos ele ela eles elas favor preciso precisa queria quero gostaria posso pode ajuda ajudar'.split(' '),
   // Generic verbs and nouns that appear in every guide and would pull unrelated articles.
   ...'parou funciona funcionar funcionando faco fazer feito problema problemas consigo conseguir consegue saber acontece aconteceu ultimo ultima algum alguma'.split(' '),
+  // How to ask for help is answered by the system guide, not by every article that mentions support.
+  ...'suporte solicito solicitar solicitacao pedir peco abrir abro registrar'.split(' '),
 ]);
 
 /** Portuguese plural to singular, enough for "contains" searches: teclados → teclado, botoes → botao. */
@@ -60,6 +62,7 @@ const STOCK_WORDS = /estoque|saldo|disponiv|teclad|mouse|monitor|notebook|headse
 const CONSUMPTION_WORDS = /consumo|consumid|setor|departament|entreg|repor|reposic|minimo|defeit/;
 const MANAGEMENT_WORDS = /equipe|analista|carga|qualidade|avaliac|confirm|contest|indicador|backlog|pendent|metric|resolvid|resoluc|desempenho|produtiv|fila/;
 const TICKET_WORDS = /chamado|pedido|status|andamento|aberto|resolvid|meu|minha/;
+const HOW_TO_REQUEST = /solicit|\babrir\b|\babro\b|\bpedir\b|\bpeco\b|suporte|registr|novo (pedido|chamado)/;
 
 function period(normalized: string): ManagerFilters['period'] {
   if (/\bhoje\b/.test(normalized)) return 'today';
@@ -73,6 +76,24 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 const date = (value: Date | null | undefined) => (value ? new Date(value).toLocaleDateString('pt-BR') : 'sem data');
 
 type Draft = Omit<AssistantSource, 'id'>;
+
+/** How to open a request, in the words of the screens the person sees (NewTicketPage, TicketsPage). */
+function guide(actor: PublicUser): Draft {
+  if (!can(actor.role, 'tickets:view-all')) {
+    return {
+      kind: 'guide',
+      title: 'Como pedir suporte no IT Helpdesk',
+      text: 'Na página Início, clique em Solicitar suporte. Escolha com o que você precisa de ajuda (Computador ou equipamento, Programas e aplicativos, Internet e conexão, Contas e permissões ou Outro problema) e veja as orientações que podem resolver. Se o problema continuar, preencha Assunto e O que aconteceu?; onde está o problema e a prioridade sugerida são opcionais. Envie com Enviar solicitação. A equipe de TI recebe o pedido e define a prioridade; você acompanha cada etapa em Meus pedidos e, quando a TI resolver, confirma se deu certo ou avisa que o problema continua.',
+      link: '/tickets/new',
+    };
+  }
+  return {
+    kind: 'guide',
+    title: 'Como registrar um chamado',
+    text: 'Em Chamados (ou na página Atendimento), clique em Abrir chamado. Escolha o assunto, preencha Assunto e O que aconteceu? e, se quiser, onde está o problema, o equipamento envolvido e a prioridade sugerida. Confirme com Abrir chamado; ele entra na fila da equipe.',
+    link: '/tickets/new',
+  };
+}
 
 async function articles(actor: PublicUser, words: string[]): Promise<Draft[]> {
   const hits = new Map<string, { score: number; title: string }>();
@@ -186,6 +207,7 @@ export async function gatherSources(actor: PublicUser, question: string): Promis
   if (can(actor.role, 'inventory:insights') && mentions(normalized, CONSUMPTION_WORDS)) drafts.push(...await consumption(normalized));
   if (can(actor.role, 'inventory:read') && mentions(normalized, STOCK_WORDS)) drafts.push(...await stock(words));
   if (can(actor.role, 'incidents:follow')) drafts.push(...await incidents(actor, words));
+  if (mentions(normalized, HOW_TO_REQUEST)) drafts.push(guide(actor));
   if (can(actor.role, 'kb:read')) drafts.push(...await articles(actor, words));
   drafts.push(...await tickets(actor, words, mentions(normalized, TICKET_WORDS)));
 

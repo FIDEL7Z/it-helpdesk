@@ -33,7 +33,7 @@ export const DEFAULT_MODEL = MODELS[0];
 
 const PROFILES = new Set(['solicitante', 'ti', 'gestor']);
 const SOURCE_ID = /^S\d{1,2}$/;
-const SOURCE_KINDS = new Set(['article', 'incident', 'ticket', 'stock', 'asset', 'movement', 'metric', 'organization']);
+const SOURCE_KINDS = new Set(['article', 'guide', 'incident', 'ticket', 'stock', 'asset', 'movement', 'metric', 'organization']);
 
 const json = (status, body, extra = {}) => new Response(JSON.stringify(body), {
   status,

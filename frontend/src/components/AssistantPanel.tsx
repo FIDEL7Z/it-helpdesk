@@ -13,7 +13,7 @@ const SUGGESTIONS: Record<UserRole, string[]> = {
 }
 
 const KIND_LABELS: Record<AssistantReply['sources'][number]['kind'], string> = {
-  article: 'Artigo', incident: 'Problema conhecido', ticket: 'Chamado', stock: 'Estoque', metric: 'Indicador',
+  article: 'Artigo', incident: 'Problema conhecido', ticket: 'Chamado', stock: 'Estoque', metric: 'Indicador', guide: 'Guia do sistema',
 }
 
 type Message = { id: number; role: 'person'; text: string } | { id: number; role: 'assistant'; reply: AssistantReply } | { id: number; role: 'error'; text: string }

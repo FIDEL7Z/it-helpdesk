@@ -114,6 +114,9 @@ async function run() {
   process.env.JWT_SECRET = randomUUID();
   // E-mail off whatever the local .env says: the browser checks cover the page without delivery.
   process.env.EMAIL_ENABLED = 'false';
+  // No answer service: the assistant must run in its identified demonstration mode.
+  process.env.AI_WORKER_URL = '';
+  process.env.AI_WORKER_KEY = '';
   const [{ default: app }, { env }, { UserModel }, { TicketModel }, { hashPassword }, { signAccessToken }] =
     await Promise.all([
       import('../src/app.ts'), import('../src/config/env.ts'),
@@ -714,6 +717,27 @@ async function run() {
     return link.getAttribute('href') === '/account' && link.getAttribute('aria-label').startsWith('Minha conta') && box.width >= 40 && box.height >= 40
       && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()`), 'On a phone, the header keeps a 40px "Minha conta" button and the page fits 390px');
   await command('Emulation.clearDeviceMetricsOverride');
+
+  // Assistant without an answer service: an identified demonstration built from what this requester may see.
+  await evaluate('document.querySelector(".assistant-launcher").click(); true');
+  await waitDom('assistant open', '!!document.querySelector(".assistant-panel__suggestion") && document.activeElement?.classList.contains("assistant-panel__input")');
+  check(true, 'The assistant opens from any page with the question field focused');
+  await evaluate('document.querySelector(".assistant-panel__suggestion").click(); true');
+  await waitDom('assistant reply', '!!document.querySelector(".assistant-message--assistant .assistant-message__answer")');
+  check(await evaluate(`(() => {
+    const badge = document.querySelector('.assistant-panel__subtitle .badge')?.textContent;
+    const notice = document.querySelector('.assistant-message__notice')?.textContent ?? '';
+    const links = [...document.querySelectorAll('.assistant-message__sources a')].map((a) => a.getAttribute('href'));
+    return badge === 'Modo demonstrativo' && notice.includes('nenhuma IA generativa') && links.every((href) => href.startsWith('/'));
+  })()`), 'Without an answer service the assistant says it is a demonstration and links only to app pages');
+  await waitDom('focus back on the question', 'document.activeElement?.classList.contains("assistant-panel__input")');
+  check(true, 'After an answer, the focus returns to the question field');
+  check((await browserApi('POST', '/assistant/ask', { question: 'Qual a carga da equipe e o consumo de teclados por setor?' })).body.reply.sources.every((source) => ['article', 'incident', 'ticket'].includes(source.kind)),
+    'A requester asking the assistant for team or stock data receives none of it');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await waitDom('assistant closed', '!document.querySelector(".assistant-panel") && document.activeElement?.classList.contains("assistant-launcher")');
+  check(true, 'Escape closes the assistant and returns focus to its button');
 
   await go('/help?q=teclado');
   await waitDom('help search results', 'document.querySelectorAll(".article-card").length === 1');

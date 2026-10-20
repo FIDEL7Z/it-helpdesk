@@ -63,6 +63,16 @@ export function resolveProvider(settings: ProviderSettings = env): ResolvedProvi
   return { provider: demoProvider, reason: 'INVALID_PROVIDER' };
 }
 
+/** Says why the demonstration was chosen, the usual surprise being a Gemini key without AI_PROVIDER. */
+function providerDetail(name: string): string {
+  if (name === 'gemini') return ` (${env.GEMINI_MODEL ?? GEMINI_DEFAULT_MODEL})`;
+  if (name !== 'demo') return '';
+  if (env.AI_PROVIDER) return ` (AI_PROVIDER=${env.AI_PROVIDER})`;
+  return env.GEMINI_API_KEY
+    ? ' (AI_PROVIDER is not set: a GEMINI_API_KEY alone does not turn Gemini on; set AI_PROVIDER=gemini)'
+    : ' (AI_PROVIDER is not set)';
+}
+
 let override: ResolvedProvider | null = null;
 let configured: ResolvedProvider | null = null;
 
@@ -73,9 +83,14 @@ function provider(): ResolvedProvider {
     // Names only: keys and addresses are never logged.
     console.log(configured.reason
       ? `[assistant] AI_PROVIDER is not usable (${configured.reason}); answering in demonstration mode`
-      : `[assistant] provider: ${configured.provider.name}`);
+      : `[assistant] provider: ${configured.provider.name}${providerDetail(configured.provider.name)}`);
   }
   return configured;
+}
+
+/** Logs the chosen provider at startup, so a demonstration by configuration is visible at once. */
+export function announceAssistantProvider(): void {
+  provider();
 }
 
 /** Tests swap the answer provider without touching the environment. */

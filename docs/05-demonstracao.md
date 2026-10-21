@@ -170,6 +170,14 @@ No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com
 - escolha e troca de provedor só pelo ambiente; uma pergunta por vez, sem repetir em 30 s, até 3 perguntas com o modelo ao mesmo tempo;
 - nenhum arquivo do frontend menciona a chave.
 
+`assistant-analytics.test.ts`, com o Gemini **simulado** sobre os mesmos dados fictícios do sandbox:
+- períodos no fuso da aplicação (hoje, ontem, últimos 7 dias, 7 anteriores, mês passado, datas), inclusive na troca de horário de verão; datas inválidas, invertidas, futuras ou com mais de 366 dias recusadas;
+- variação calculada no backend, sem percentual sobre base zero;
+- produtividade (7 resoluções: Caio 5, Rita 2), comparação com a semana anterior (+16,7%; Caio +66,7%, Rita −33,3%; material +57,1%), consumo por departamento e produto, e pontos de atenção (alta prioridade sem responsável, antigos, parados, assuntos, estoque);
+- pergunta composta: três análises numa só rodada, todas citadas; "e ontem?" vira uma nova consulta validada; ausência de dados dita, não inventada;
+- TI lê estoque crítico e assuntos recorrentes, nunca análises da gestão; o solicitante não recebe nenhuma análise; operadores, pipelines e filtros livres recusados;
+- citação que nenhuma ferramenta devolveu é removida; a memória expira depois do tempo sem uso e não passa entre pessoas.
+
 Com chamadas **reais** (fora do `npm test`): `npm run assistant:check`, num banco temporário com dados fictícios, e a conversa no navegador com `npm run dev:ai-sandbox`. Em 20/10/2026, no Free tier, o Gemini conversou e usou as ferramentas como esperado (saudação, acompanhamento, último chamado com fonte, acesso negado às métricas); sob carga do Google, parte das respostas caiu no modo demonstrativo identificado (veja a medição no [README](../README.md#gemini-google-ai-studio)) |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;

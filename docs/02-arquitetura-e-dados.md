@@ -226,7 +226,7 @@ Se o ambiente tiver réplica, transações poderiam substituir a projeção repa
 ### Assistente
 
 O assistente não tem coleção. Cada pergunta passa pelo `requireAuth`. As leituras ficam em `services/assistant/sources.ts`, que usa os serviços existentes com o escopo de quem pergunta (`searchPublished`, `listActive`, `listTickets`, `getTicket`, `listProducts`, `inventoryInsights`, `getManagerDashboard`), e servem aos dois modos:
-- **conversa (Gemini, `gemini.provider.ts`, SDK `@google/genai`):** o modelo recebe as declarações das ferramentas de leitura do perfil (`tools.ts`) e pede as que precisa; o backend confere perfil e argumentos a cada chamada e devolve só o resultado. O histórico curto da conversa fica em memória (`conversation.ts`), por pessoa, e não vai para o banco;
+- **conversa (Gemini, `gemini.provider.ts`, SDK `@google/genai`):** o modelo recebe as declarações das ferramentas de leitura do perfil (`tools.ts`) e pede as que precisa; o backend confere perfil e argumentos a cada chamada e devolve só o resultado. As análises (produtividade, comparação de períodos, pontos de atenção, consumo, estoque crítico, assuntos recorrentes) ficam em `analytics.ts` e reaproveitam `getManagerDashboard` e `inventoryInsights`, que aceitam um intervalo explícito; os períodos são resolvidos em `periods.ts`, no fuso `APP_TIMEZONE`. O histórico curto da conversa fica em memória (`conversation.ts`), por pessoa, e não vai para o banco;
 - **recuperação (Cloudflare Worker em `ai-worker/`, modo demonstrativo):** o backend escolhe até 8 fontes pelas palavras da pergunta e o provedor responde com base nelas.
 
 Nenhum provedor tem acesso ao MongoDB.

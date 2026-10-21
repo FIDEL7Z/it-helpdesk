@@ -1,5 +1,7 @@
 import type { UserRole } from '../../models/user.model';
+import type { Turn } from './conversation';
 import type { AssistantSource } from './sources';
+import type { ToolDeclaration } from './tools';
 
 export interface AnswerInput {
   question: string;
@@ -20,13 +22,33 @@ export interface AnswerOutput {
   usage?: AnswerUsage | null;
 }
 
+export interface ConverseInput {
+  profile: UserRole;
+  /** Earlier messages of this conversation (kept by the backend, never sent by the client). */
+  history: Turn[];
+  message: string;
+  /** Only the tools this person's role allows. */
+  tools: ToolDeclaration[];
+  /** Runs a tool for the authenticated person; the backend checks role and arguments again. */
+  runTool(name: string, args: unknown): Promise<Record<string, unknown>>;
+}
+
+export interface ConverseOutput {
+  answer: string;
+  model: string | null;
+  usage: AnswerUsage | null;
+}
+
 export type ProviderName = 'gemini' | 'cloudflare' | 'demo';
 
 export interface AssistantProvider {
   /** ai: generative answer (Gemini or the Cloudflare Worker). demo: no AI, built from the same sources. */
   readonly mode: 'ai' | 'demo';
   readonly name: ProviderName;
-  answer(input: AnswerInput): Promise<AnswerOutput>;
+  /** Retrieval: answers from the sources the backend picked for the question (Cloudflare Worker, demo). */
+  answer?(input: AnswerInput): Promise<AnswerOutput>;
+  /** Conversation: talks freely and asks the backend's read-only tools when it needs data (Gemini). */
+  converse?(input: ConverseInput): Promise<ConverseOutput>;
 }
 
 /** The answer service could not answer (down, timeout, refused key, quota). */
@@ -42,7 +64,7 @@ const WORKER_TIMEOUT_MS = 30_000;
  * The Cloudflare Worker in ai-worker/: the backend sends only the question, the profile and the
  * sources it already authorized; the Worker has no access to the database or to anything else.
  */
-export function workerProvider(baseUrl: string, key: string): AssistantProvider {
+export function workerProvider(baseUrl: string, key: string): AssistantProvider & Required<Pick<AssistantProvider, 'answer'>> {
   const url = `${baseUrl.replace(/\/+$/, '')}/v1/answer`;
   return {
     mode: 'ai',
@@ -76,7 +98,7 @@ export function workerProvider(baseUrl: string, key: string): AssistantProvider 
  * No generative AI: lists what the authorized sources say, with the same citations. Used when no
  * answer service is configured, and as the fallback when it fails. Always shown as a demonstration.
  */
-export const demoProvider: AssistantProvider = {
+export const demoProvider: AssistantProvider & Required<Pick<AssistantProvider, 'answer'>> = {
   mode: 'demo',
   name: 'demo',
   async answer({ sources }) {

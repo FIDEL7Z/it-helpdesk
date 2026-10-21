@@ -3,13 +3,19 @@ import { HttpError } from '../../errors/http-error';
 import type { PublicUser } from '../../models/user.model';
 import { GEMINI_DEFAULT_MODEL, geminiProvider } from './gemini.provider';
 import { AssistantUnavailable, demoProvider, workerProvider, type AnswerUsage, type AssistantProvider } from './providers';
-import { gatherSources, type SourceKind } from './sources';
+import { openConversation, remember, type Turn } from './conversation';
+import { gatherSources, type AssistantSource, type SourceKind } from './sources';
+import { SourceCollector, runTool, toolDeclarationsFor, toolLabel } from './tools';
 
 /*
- * Advisory assistant. The backend authenticates the person, decides which data they may see
- * (sources.ts), sends only that to the answer provider and checks the citations that come back.
- * It never changes tickets or stock, never stores conversations and never lets the model reach
- * the database. Without a working provider it says so: the reply is an identified demonstration.
+ * Advisory assistant, in two ways:
+ * - conversation (Gemini): the model talks freely and asks for the backend's read-only tools when
+ *   it needs data (tools.ts); each call is checked against the person's role and runs with their scope;
+ * - retrieval (Cloudflare Worker, demonstration): the backend picks the sources for the question
+ *   (sources.ts) and the provider answers from them.
+ * Either way the backend checks every citation, never changes tickets or stock, keeps no conversation
+ * beyond a short in-memory history (conversation.ts) and never lets the model reach the database.
+ * Without a working provider it says so: the reply is an identified demonstration.
  */
 
 export interface AssistantReply {
@@ -25,7 +31,13 @@ export interface AssistantReply {
   /** AI mode only: token counts reported by the model. */
   usage: AnswerUsage | null;
   sources: { id: string; kind: SourceKind; title: string; link: string | null }[];
+  /** What the assistant looked up in the system for this answer (empty for general advice). */
+  toolsUsed: string[];
+  /** Send it back with the next question to continue the conversation. */
+  conversationId: string;
 }
+
+type ReplyBody = Omit<AssistantReply, 'conversationId'>;
 
 type ProviderSettings = Pick<typeof env, 'AI_PROVIDER' | 'GEMINI_API_KEY' | 'GEMINI_MODEL' | 'AI_WORKER_URL' | 'AI_WORKER_KEY'>;
 interface ResolvedProvider {
@@ -110,6 +122,8 @@ const FALLBACK_NOTICES: Record<string, string> = {
   QUOTA_EXCEEDED: `A cota diária gratuita da IA acabou; ela volta no dia seguinte. ${DEMO_SUFFIX}`,
   UNAUTHORIZED: `A chave de acesso à IA deste ambiente é inválida ou venceu. ${DEMO_SUFFIX}`,
   RATE_LIMITED: `Muitas perguntas à IA neste minuto. ${DEMO_SUFFIX}`,
+  MODEL_BUSY: `A IA gratuita está sobrecarregada agora; tente de novo em instantes. ${DEMO_SUFFIX}`,
+  timeout: `A IA demorou demais para responder; tente de novo em instantes. ${DEMO_SUFFIX}`,
   BUSY: `Muitas perguntas à IA ao mesmo tempo. ${DEMO_SUFFIX}`,
   MODEL_REQUIRES_PAID_PLAN: `O modelo configurado não está disponível no plano gratuito. ${DEMO_SUFFIX}`,
   GEMINI_NOT_CONFIGURED: MISCONFIGURED,
@@ -142,57 +156,118 @@ function claimAiTurn(personId: string, question: string): void {
   inFlight.add(personId);
 }
 
-export async function ask(actor: PublicUser, question: string): Promise<AssistantReply> {
+async function withModelSlot<T>(run: () => Promise<T>): Promise<T> {
+  if (running >= ASSISTANT_USE_LIMITS.maxConcurrent) throw new AssistantUnavailable('BUSY');
+  running += 1;
+  try {
+    return await run();
+  } finally {
+    running -= 1;
+  }
+}
+
+/**
+ * Only sources found for this question count; any other [S..] marker is removed from the text.
+ * Grouped markers ([S1, S9]) are split and checked one by one. The answer is plain text: tags go.
+ */
+function checkCitations(text: string, sources: AssistantSource[]): { answer: string; cited: AssistantSource[] } {
+  const known = new Map(sources.map((source) => [source.id, source]));
+  const answer = text
+    .replace(/<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/gi, '')
+    .replace(/\[(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\]/g, (_marker, list: string) =>
+      list.split(/\s*[,;]\s*/).filter((id) => known.has(id)).map((id) => `[${id}]`).join(''))
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+([.,;:!?])/g, '$1')
+    .trim();
+  const cited = [...new Set([...answer.matchAll(/\[(S\d{1,2})\]/g)].map((match) => match[1]))].map((id) => known.get(id)!);
+  return { answer, cited };
+}
+
+const publicSources = (sources: AssistantSource[]) => sources.map(({ id, kind, title, link }) => ({ id, kind, title, link }));
+
+/**
+ * Retrieval: the backend picks the sources for the question; the Worker (or the demonstration)
+ * answers from them. `failure` is set when Gemini failed and the demonstration stands in.
+ */
+async function retrieve(actor: PublicUser, question: string, chosen: AssistantProvider, reason: string | null, failure?: string): Promise<ReplyBody> {
+  const sources = await gatherSources(actor, question);
+  let output;
+  let mode = chosen.mode;
+  let notice = failure ? fallbackNotice(failure) : chosen.mode === 'demo' ? (reason ? fallbackNotice(reason) : DEMO_NOTICE) : null;
+  let demoReason: string | null = failure ?? (chosen.mode === 'demo' ? reason ?? 'not_configured' : null);
+  try {
+    const answer = chosen.answer?.bind(chosen);
+    if (!answer) throw new AssistantUnavailable('MODEL_UNAVAILABLE');
+    const input = { question, profile: actor.role, sources };
+    output = chosen.mode === 'ai' ? await withModelSlot(() => answer(input)) : await answer(input);
+  } catch (error) {
+    if (!(error instanceof AssistantUnavailable)) throw error;
+    console.error(`[assistant] ${chosen.name} unavailable (${error.reason}); answering in demonstration mode`);
+    output = await demoProvider.answer({ question, profile: actor.role, sources });
+    mode = 'demo';
+    notice = fallbackNotice(error.reason);
+    demoReason = error.reason;
+  }
+  const { answer, cited } = checkCitations(output.answer, sources);
+  const shown = cited.length ? cited : sources.filter((source) => output.citedSources.includes(source.id));
+  const answeredByModel = mode === 'ai' && chosen.name !== 'demo';
+  return {
+    answer,
+    mode,
+    provider: answeredByModel ? (chosen.name as 'gemini' | 'cloudflare') : null,
+    notice,
+    demoReason,
+    model: answeredByModel ? output.model : null,
+    usage: answeredByModel ? output.usage ?? null : null,
+    sources: publicSources(shown),
+    toolsUsed: [],
+  };
+}
+
+/** Conversation: the model answers, asking for the read-only tools when it needs data. */
+async function converse(actor: PublicUser, question: string, chosen: AssistantProvider, history: Turn[]): Promise<ReplyBody> {
+  const talk = chosen.converse?.bind(chosen);
+  if (!talk) throw new AssistantUnavailable('MODEL_UNAVAILABLE');
+  const collector = new SourceCollector();
+  const output = await withModelSlot(() => talk({
+    profile: actor.role,
+    history,
+    message: question,
+    tools: toolDeclarationsFor(actor),
+    runTool: (name, args) => runTool(actor, name, args, collector),
+  }));
+  const { answer, cited } = checkCitations(output.answer, collector.sources);
+  // Data looked up but not cited still came from the system: show it, so nothing looks invented.
+  const shown = cited.length ? cited : collector.sources.slice(0, 3);
+  return {
+    answer,
+    mode: 'ai',
+    provider: chosen.name === 'demo' ? null : chosen.name,
+    notice: null,
+    demoReason: null,
+    model: output.model,
+    usage: output.usage,
+    sources: publicSources(shown),
+    toolsUsed: [...collector.used].map(toolLabel).filter((label): label is string => Boolean(label)),
+  };
+}
+
+export async function ask(actor: PublicUser, question: string, conversationId?: string): Promise<AssistantReply> {
   const { provider: chosen, reason } = provider();
   const usesModel = chosen.mode === 'ai';
   if (usesModel) claimAiTurn(actor.id, question);
-
+  const conversation = openConversation(actor, conversationId);
   try {
-    const sources = await gatherSources(actor, question);
-    let output;
-    let mode = chosen.mode;
-    let notice = chosen.mode === 'demo' ? (reason ? fallbackNotice(reason) : DEMO_NOTICE) : null;
-    let demoReason: string | null = chosen.mode === 'demo' ? reason ?? 'not_configured' : null;
+    if (!chosen.converse) return { ...(await retrieve(actor, question, chosen, reason)), conversationId: conversation.id };
     try {
-      if (usesModel && running >= ASSISTANT_USE_LIMITS.maxConcurrent) throw new AssistantUnavailable('BUSY');
-      if (usesModel) running += 1;
-      try {
-        output = await chosen.answer({ question, profile: actor.role, sources });
-      } finally {
-        if (usesModel) running -= 1;
-      }
+      const reply = await converse(actor, question, chosen, conversation.turns);
+      remember(actor, conversation.id, question, reply.answer);
+      return { ...reply, conversationId: conversation.id };
     } catch (error) {
       if (!(error instanceof AssistantUnavailable)) throw error;
       console.error(`[assistant] ${chosen.name} unavailable (${error.reason}); answering in demonstration mode`);
-      output = await demoProvider.answer({ question, profile: actor.role, sources });
-      mode = 'demo';
-      notice = fallbackNotice(error.reason);
-      demoReason = error.reason;
+      return { ...(await retrieve(actor, question, demoProvider, null, error.reason)), conversationId: conversation.id };
     }
-
-    // Only sources this backend sent count; any other [S..] marker is removed from the text. Grouped
-    // markers ([S1, S9]) are split and checked one by one. The answer is plain text: tags are dropped.
-    const known = new Map(sources.map((source) => [source.id, source]));
-    const answer = output.answer
-      .replace(/<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/gi, '')
-      .replace(/\[(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\]/g, (_marker, list: string) =>
-        list.split(/\s*[,;]\s*/).filter((id) => known.has(id)).map((id) => `[${id}]`).join(''))
-      .replace(/[ \t]{2,}/g, ' ')
-      .replace(/[ \t]+([.,;:!?])/g, '$1')
-      .trim();
-    const cited = [...new Set([...answer.matchAll(/\[(S\d{1,2})\]/g)].map((match) => match[1]))];
-    const shown = (cited.length ? cited : output.citedSources.filter((id) => known.has(id))).map((id) => known.get(id)!);
-    const answeredByModel = mode === 'ai' && chosen.name !== 'demo';
-    return {
-      answer,
-      mode,
-      provider: answeredByModel ? (chosen.name as 'gemini' | 'cloudflare') : null,
-      notice,
-      demoReason,
-      model: answeredByModel ? output.model : null,
-      usage: answeredByModel ? output.usage ?? null : null,
-      sources: shown.map(({ id, kind, title, link }) => ({ id, kind, title, link })),
-    };
   } finally {
     if (usesModel) inFlight.delete(actor.id);
   }

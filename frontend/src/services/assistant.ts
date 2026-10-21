@@ -15,9 +15,13 @@ export type AssistantReply = {
   /** AI mode only: token counts reported by the model (used to estimate consumption). */
   usage: { inputTokens: number | null; outputTokens: number | null } | null
   sources: { id: string; kind: AssistantSourceKind; title: string; link: string | null }[]
+  /** What the assistant looked up in the system for this answer (empty for general advice). */
+  toolsUsed: string[]
+  /** Sent back with the next message so the assistant remembers the conversation. */
+  conversationId: string
 }
 
-/** The backend decides what this profile may see; the question only says what is relevant. */
-export function askAssistant(question: string, signal?: AbortSignal): Promise<{ reply: AssistantReply }> {
-  return apiRequest('/assistant/ask', { method: 'POST', body: { question }, signal })
+/** The backend decides what this profile may see and keeps the history; the client sends only the id. */
+export function askAssistant(question: string, conversationId?: string, signal?: AbortSignal): Promise<{ reply: AssistantReply }> {
+  return apiRequest('/assistant/ask', { method: 'POST', body: { question, ...(conversationId && { conversationId }) }, signal })
 }

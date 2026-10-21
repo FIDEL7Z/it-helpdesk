@@ -7,9 +7,9 @@ import type { UserRole } from '../services/auth'
 import { getErrorMessage } from '../utils/errors'
 
 const SUGGESTIONS: Record<UserRole, string[]> = {
-  solicitante: ['Meu teclado parou de funcionar, o que eu faço?', 'Como está o meu último pedido?', 'A internet está com problema?'],
-  ti: ['Quantos teclados temos disponíveis?', 'Quais chamados de teclado estão abertos?', 'Como orientar alguém com problema de acesso?'],
-  gestor: ['Qual o consumo de materiais por setor neste mês?', 'Como está a carga da equipe?', 'Como está a qualidade do atendimento neste mês?'],
+  solicitante: ['Oi! O que você consegue fazer?', 'Meu computador está lento', 'Qual o status do meu último chamado?'],
+  ti: ['Tem teclado no estoque?', 'Quais chamados estão sem responsável?', 'Como orientar alguém sem acesso ao e-mail?'],
+  gestor: ['Qual departamento consumiu mais periféricos?', 'Como está a carga da equipe?', 'Como está a qualidade do atendimento neste mês?'],
 }
 
 const KIND_LABELS: Record<AssistantReply['sources'][number]['kind'], string> = {
@@ -34,8 +34,9 @@ const TOO_MANY: Record<string, string> = {
 type Message = { id: number; role: 'person'; text: string } | { id: number; role: 'assistant'; reply: AssistantReply } | { id: number; role: 'error'; text: string }
 
 /**
- * Advisory chat available on every page. The conversation lives only in this page's memory: it is
- * not stored. The assistant never changes tickets or stock; it points to the page where to act.
+ * Assistant chat available on every page. The messages live only in this page's memory; the backend
+ * keeps a short history under the conversation id for follow-up questions (never in the database).
+ * The assistant only reads: it never changes tickets or stock and points to the page where to act.
  */
 export function AssistantPanel() {
   const { user } = useAuth()
@@ -43,6 +44,8 @@ export function AssistantPanel() {
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [busy, setBusy] = useState(false)
+  const [conversationId, setConversationId] = useState<string | undefined>()
+  const [slow, setSlow] = useState(false)
   const launcherRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLOListElement>(null)
@@ -73,6 +76,16 @@ export function AssistantPanel() {
     listRef.current?.lastElementChild?.scrollIntoView({ block: 'nearest' })
   }, [messages])
 
+  // The free AI tier can take a while under load: say so instead of leaving a silent spinner.
+  useEffect(() => {
+    if (!busy) return
+    const timer = setTimeout(() => setSlow(true), 8_000)
+    return () => {
+      clearTimeout(timer)
+      setSlow(false)
+    }
+  }, [busy])
+
   if (!user) return null
   const lastMode = [...messages].reverse().find((message): message is Extract<Message, { role: 'assistant' }> => message.role === 'assistant')?.reply.mode
 
@@ -83,12 +96,13 @@ export function AssistantPanel() {
 
   async function send(text: string) {
     const trimmed = text.trim()
-    if (trimmed.length < 3 || busy) return
+    if (!trimmed || busy) return
     setMessages((list) => [...list, { id: nextId.current++, role: 'person', text: trimmed }])
     setQuestion('')
     setBusy(true)
     try {
-      const { reply } = await askAssistant(trimmed)
+      const { reply } = await askAssistant(trimmed, conversationId)
+      setConversationId(reply.conversationId)
       setMessages((list) => [...list, { id: nextId.current++, role: 'assistant', reply }])
     } catch (error) {
       const text = error instanceof ApiError && error.status === 429
@@ -98,6 +112,13 @@ export function AssistantPanel() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function startOver() {
+    setMessages([])
+    setConversationId(undefined)
+    setQuestion('')
+    inputRef.current?.focus()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -136,16 +157,21 @@ export function AssistantPanel() {
               <h2 id={titleId} className="assistant-panel__title">Assistente</h2>
               <p className="assistant-panel__subtitle">
                 {lastMode === 'ai' ? <span className="badge badge--status-resolvido">IA</span> : lastMode === 'demo' ? <span className="badge badge--status-em_andamento">Modo demonstrativo</span> : null}
-                {' '}Responde com o que você já pode ver no sistema. Não altera chamados nem estoque.
+                {' '}Converse sobre problemas de TI e o uso do sistema. Só consulta: não altera chamados nem estoque.
               </p>
             </div>
-            <button type="button" className="button button--ghost button--small" onClick={close} aria-label="Fechar o assistente">Fechar</button>
+            <div className="assistant-panel__actions">
+              {messages.length > 0 && (
+                <button type="button" className="button button--ghost button--small" onClick={startOver} disabled={busy}>Nova conversa</button>
+              )}
+              <button type="button" className="button button--ghost button--small" onClick={close} aria-label="Fechar o assistente">Fechar</button>
+            </div>
           </header>
 
           <ol ref={listRef} className="assistant-panel__messages" aria-live="polite">
             {messages.length === 0 && (
               <li className="assistant-panel__empty">
-                <p>Experimente perguntar:</p>
+                <p>Pergunte o que quiser sobre TI, ou comece por aqui:</p>
                 <div className="assistant-panel__suggestions">
                   {SUGGESTIONS[user.role].map((text) => (
                     <button key={text} type="button" className="choice-pill assistant-panel__suggestion" disabled={busy} onClick={() => void send(text)}>{text}</button>
@@ -162,6 +188,9 @@ export function AssistantPanel() {
                     <p className={`assistant-message__origin assistant-message__origin--${message.reply.mode}`}>
                       {originLabel(message.reply)}
                     </p>
+                    {message.reply.toolsUsed.length > 0 && (
+                      <p className="assistant-message__tools">Consultou no sistema: {message.reply.toolsUsed.join(', ')}</p>
+                    )}
                     {message.reply.notice && <p className="assistant-message__notice">{message.reply.notice}</p>}
                     <p className="assistant-message__answer">{message.reply.answer}</p>
                     {message.reply.sources.length > 0 && (
@@ -179,7 +208,7 @@ export function AssistantPanel() {
                 )}
               </li>
             ))}
-            {busy && <li className="assistant-message assistant-message--assistant" role="status"><span className="spinner spinner--small" aria-hidden="true" /> Procurando...</li>}
+            {busy && <li className="assistant-message assistant-message--assistant" role="status"><span className="spinner spinner--small" aria-hidden="true" /> Pensando...{slow && ' A IA gratuita está com muita procura agora; a resposta pode levar até um minuto.'}</li>}
           </ol>
 
           <form className="assistant-panel__form" onSubmit={handleSubmit}>
@@ -189,14 +218,14 @@ export function AssistantPanel() {
               ref={inputRef}
               className="field__input assistant-panel__input"
               rows={2}
-              maxLength={500}
-              placeholder="Escreva sua pergunta"
+              maxLength={1000}
+              placeholder="Escreva sua mensagem"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               onKeyDown={handleKeyDown}
               disabled={busy}
             />
-            <button type="submit" className="button button--primary" disabled={busy || question.trim().length < 3}>Perguntar</button>
+            <button type="submit" className="button button--primary" disabled={busy || !question.trim()}>Enviar</button>
           </form>
         </section>
       )}

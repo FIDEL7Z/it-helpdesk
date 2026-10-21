@@ -2,7 +2,7 @@ import type { PipelineStage } from 'mongoose';
 import { AssetModel, ProductModel, StockMovementModel, type AssetStatus } from '../models/inventory.model';
 import { productViews } from './catalog.service';
 import { resolveOriginFilter, type DataOrigin } from './data-origin';
-import { periodRange, type ManagerFilters } from './manager.service';
+import { periodRange, type ExplicitRange, type ManagerFilters } from './manager.service';
 
 /**
  * Stock and equipment for management decisions: what to restock, which models break more,
@@ -26,6 +26,8 @@ export interface InventoryInsights {
     linkedToTickets: number;
     topProducts: { id: string; name: string; units: number }[];
     byDepartment: { id: string; name: string; units: number }[];
+    /** The most delivered products of each department (up to 3 each). */
+    departmentProducts: { departmentId: string; department: string; products: { name: string; units: number }[] }[];
     defectsByProduct: { id: string; name: string; units: number }[];
   };
 }
@@ -33,8 +35,8 @@ export interface InventoryInsights {
 const DELIVERIES = ['issue', 'asset_assign'];
 const DEFECTS = { $or: [{ type: 'return', condition: 'defective' }, { type: 'asset_defective' }] };
 
-export async function inventoryInsights(filters: { period: ManagerFilters['period']; dataOrigin?: DataOrigin }, now = new Date()): Promise<InventoryInsights> {
-  const range = periodRange(filters.period, now);
+export async function inventoryInsights(filters: { period: ManagerFilters['period']; dataOrigin?: DataOrigin }, now = new Date(), explicit?: ExplicitRange): Promise<InventoryInsights> {
+  const range = explicit ?? periodRange(filters.period, now);
   const origin = resolveOriginFilter(filters.dataOrigin ?? 'operational') ?? 'operational';
   // Legacy has no movements: every movement has a proven author.
   const base: Record<string, unknown> = { occurredAt: { $gte: range.start, $lt: range.end }, dataOrigin: origin === 'legacy' ? '__none__' : origin };
@@ -49,7 +51,7 @@ export async function inventoryInsights(filters: { period: ManagerFilters['perio
     { $match: { _id: { $ne: null } } }, { $sort: { units: -1, _id: 1 } }, { $limit: 8 },
   ];
 
-  const [products, assetRows, delivered, linked, top, departments, defects] = await Promise.all([
+  const [products, assetRows, delivered, linked, top, departments, defects, departmentProducts] = await Promise.all([
     ProductModel.find({ active: true }),
     AssetModel.aggregate<{ _id: AssetStatus; count: number }>([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
     StockMovementModel.aggregate<{ units: number }>([{ $match: { ...base, type: { $in: DELIVERIES } } }, ...notReversed, { $group: { _id: null, units: { $sum: '$quantity' } } }]),
@@ -57,9 +59,21 @@ export async function inventoryInsights(filters: { period: ManagerFilters['perio
     StockMovementModel.aggregate<{ _id: unknown; units: number }>(sumBy('$product', { type: { $in: DELIVERIES } })),
     StockMovementModel.aggregate<{ _id: unknown; name: string; units: number }>(sumBy('$location.departmentId', { type: { $in: DELIVERIES } })),
     StockMovementModel.aggregate<{ _id: unknown; units: number }>(sumBy('$product', DEFECTS)),
+    StockMovementModel.aggregate<{ _id: { department: unknown; product: unknown }; department: string; units: number }>([
+      { $match: { ...base, type: { $in: DELIVERIES }, 'location.departmentId': { $ne: null } } }, ...notReversed,
+      { $group: { _id: { department: '$location.departmentId', product: '$product' }, department: { $first: '$location.departmentName' }, units: { $sum: '$quantity' } } },
+      { $sort: { units: -1, '_id.product': 1 } },
+    ]),
   ]);
   const views = await productViews(products);
-  const names = new Map((await ProductModel.find({ _id: { $in: [...top, ...defects].map((row) => row._id) } }).select('name')).map((p) => [p.id, p.name]));
+  const names = new Map((await ProductModel.find({ _id: { $in: [...top, ...defects, ...departmentProducts.map((row) => ({ _id: row._id.product }))].map((row) => row._id) } }).select('name')).map((p) => [p.id, p.name]));
+  const perDepartment = new Map<string, InventoryInsights['period']['departmentProducts'][number]>();
+  for (const row of departmentProducts) {
+    const key = String(row._id.department);
+    const entry = perDepartment.get(key) ?? { departmentId: key, department: row.department, products: [] };
+    if (entry.products.length < 3) entry.products.push({ name: names.get(String(row._id.product)) ?? 'Produto removido', units: row.units });
+    perDepartment.set(key, entry);
+  }
   const named = (rows: { _id: unknown; units: number }[]) => rows.map((row) => ({ id: String(row._id), name: names.get(String(row._id)) ?? 'Produto removido', units: row.units }));
 
   return {
@@ -78,6 +92,7 @@ export async function inventoryInsights(filters: { period: ManagerFilters['perio
       linkedToTickets: linked,
       topProducts: named(top),
       byDepartment: departments.map((row) => ({ id: String(row._id), name: row.name, units: row.units })),
+      departmentProducts: [...perDepartment.values()],
       defectsByProduct: named(defects),
     },
   };

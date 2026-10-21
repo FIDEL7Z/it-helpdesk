@@ -63,9 +63,16 @@ type CycleKey = { ticket: Types.ObjectId; cycle: number };
 type EventFacets = { resolutions: Actor[]; participation: Actor[]; reopenings: Actor[]; trends: Count[]; conflicts: Count[]; uniqueTickets: Count[]; currentVerified: Count[]; resolvedCycles: { _id: CycleKey }[] };
 type Answer = { _id: CycleKey; confirmed: number; contested: number; rating: number | null };
 
-/** Current assignee measures load; historical actor measures actions, so they use separate scopes. */
-export async function getManagerDashboard(filters: ManagerFilters, now = new Date()) {
-  const range = periodRange(filters.period, now);
+/** An explicit [start, end) window, used instead of the period preset (e.g. last week for a comparison). */
+export type ExplicitRange = { start: Date; end: Date };
+
+/**
+ * Current assignee measures load; historical actor measures actions, so they use separate scopes.
+ * With an explicit range, the period measures (creations, resolutions, quality) use it; the current
+ * queue (backlog, loads, alerts) is always as of now.
+ */
+export async function getManagerDashboard(filters: ManagerFilters, now = new Date(), explicit?: ExplicitRange) {
+  const range = explicit ? { start: explicit.start, end: explicit.end, timezone: env.APP_TIMEZONE, bucket: 'day' as const } : periodRange(filters.period, now);
   const common: Record<string, unknown> = filters.dataOrigin === 'legacy'
     ? { $or: [{ dataOrigin: 'legacy' }, { dataOrigin: { $exists: false } }] } : { dataOrigin: filters.dataOrigin };
   for (const key of ['category', 'priority', 'status'] as const) if (filters[key]) common[key] = filters[key];

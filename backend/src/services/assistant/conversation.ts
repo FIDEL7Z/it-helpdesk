@@ -29,6 +29,7 @@ interface Conversation {
 }
 
 const conversations = new Map<string, Conversation>();
+let clock = () => Date.now();
 const keyOf = (actor: PublicUser, id: string) => `${actor.id}:${id}`;
 
 function sweep(now: number): void {
@@ -39,7 +40,7 @@ function sweep(now: number): void {
 
 /** The person's conversation with this id, or a new one (unknown, expired or someone else's id). */
 export function openConversation(actor: PublicUser, requestedId?: string): { id: string; turns: Turn[] } {
-  const now = Date.now();
+  const now = clock();
   sweep(now);
   const existing = requestedId ? conversations.get(keyOf(actor, requestedId)) : undefined;
   if (requestedId && existing && existing.role === actor.role) {
@@ -52,19 +53,23 @@ export function openConversation(actor: PublicUser, requestedId?: string): { id:
 /** Keeps a question and its answer; the oldest messages drop out first. */
 export function remember(actor: PublicUser, id: string, question: string, answer: string): void {
   const key = keyOf(actor, id);
-  const conversation = conversations.get(key) ?? { role: actor.role, turns: [], touchedAt: Date.now() };
+  const conversation = conversations.get(key) ?? { role: actor.role, turns: [], touchedAt: clock() };
   conversation.turns.push(
     { role: 'user', text: question.slice(0, CONVERSATION_LIMITS.maxTurnChars) },
     { role: 'model', text: answer.slice(0, CONVERSATION_LIMITS.maxTurnChars) },
   );
   conversation.turns = conversation.turns.slice(-CONVERSATION_LIMITS.maxTurns);
-  conversation.touchedAt = Date.now();
+  conversation.touchedAt = clock();
   conversations.delete(key);
   conversations.set(key, conversation);
   if (conversations.size > CONVERSATION_LIMITS.maxConversations) conversations.delete(conversations.keys().next().value!);
 }
 
-/** Tests: start from no conversations. */
+/** Tests: start from no conversations, and optionally move the clock. */
 export function forgetConversationsForTests(): void {
   conversations.clear();
+  clock = () => Date.now();
+}
+export function setConversationClockForTests(next: () => number): void {
+  clock = next;
 }

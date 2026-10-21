@@ -62,7 +62,7 @@ const toolResults = (params: GenerateContentParameters): Json[] => (params.conte
   .filter((part: Part) => part.functionResponse).map((part: Part) => part.functionResponse!.response as Json);
 /** Answers like a well-behaved model: cites every source the tools returned. */
 const citeResults = (params: GenerateContentParameters) => {
-  const ids = toolResults(params).flatMap((result) => (result.fontes ?? []).map((source: Json) => source.id));
+  const ids = toolResults(params).flatMap((result) => [...(result.fontes ?? []).map((source: Json) => source.id), ...(result.fonte ? [result.fonte] : [])]);
   return textReply(ids.length ? `Consultei o sistema: ${ids.map((id) => `[${id}]`).join('')}.` : 'Não encontrei nada no sistema sobre isso.');
 };
 
@@ -145,7 +145,8 @@ describe('conversation', () => {
     const config = gemini.calls[0].config!;
     assert.match(String(config.systemInstruction), /uma pessoa da empresa que pede suporte/);
     assert.equal(config.temperature, GEMINI_LIMITS.temperature);
-    assert.ok(config.maxOutputTokens! <= 2048);
+    assert.ok(config.maxOutputTokens! <= 4096);
+    assert.equal(config.thinkingConfig?.thinkingLevel, 'LOW');
     assert.ok(config.abortSignal);
     assert.doesNotMatch(JSON.stringify(config.tools), /googleSearch|codeExecution|urlContext/);
   });
@@ -194,8 +195,8 @@ describe('tools by profile', () => {
     await ask(carlos, 'Oi, tudo bem?');
     await ask(ana, 'Oi, tudo bem?');
     assert.deepEqual(gemini.declared(0), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos']);
-    assert.deepEqual(gemini.declared(1), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque']);
-    assert.deepEqual(gemini.declared(2), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque', 'consumo_por_departamento', 'indicadores_atendimento']);
+    assert.deepEqual(gemini.declared(1), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque', 'estoque_critico', 'categorias_recorrentes']);
+    assert.deepEqual(gemini.declared(2), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque', 'estoque_critico', 'categorias_recorrentes', 'produtividade_equipe', 'comparar_periodos', 'pontos_de_atencao', 'consumo_por_departamento']);
   });
 
   it('requester: "my last request" looks up only their own tickets and keeps the model turn with its signature', async () => {
@@ -224,16 +225,16 @@ describe('tools by profile', () => {
   });
 
   it('manager: consumption by department comes from the inventory indicators', async () => {
-    const gemini = new FakeGemini(usingTool('consumo_por_departamento', { periodo: 'mes' }));
+    const gemini = new FakeGemini(usingTool('consumo_por_departamento', { periodo: 'este_mes' }));
     use(gemini);
     const reply = (await ask(ana, 'Qual departamento consumiu mais periféricos?')).body.reply;
-    assert.match(JSON.stringify(gemini.results()), /Unidades entregues no período: 3\. Por departamento: Financeiro: 3/);
+    assert.match(JSON.stringify(gemini.results()), /"unidades_entregues":3,"por_departamento":\[\{"departamento":"Financeiro","unidades":3/);
     assert.deepEqual(reply.toolsUsed, ['Consumo por departamento']);
   });
 
   it('a requester cannot reach management, stock or someone else\'s ticket, even if the model asks', async () => {
     const forced: [string, Json][] = [
-      ['indicadores_atendimento', { periodo: 'mes' }],
+      ['produtividade_equipe', { periodo: 'ultimos_7_dias' }],
       ['consumo_por_departamento', {}],
       ['consultar_estoque', { termo: 'teclado' }],
       ['consultar_chamados', { quantidade: 5, userId: paulo.id }],
@@ -273,6 +274,11 @@ describe('tools by profile', () => {
     const reply = (await ask(maria, 'Como está meu pedido?')).body.reply;
     assert.equal(reply.answer, 'Seu pedido está aguardando [S1] neste mês; veja também o manual.');
     assert.deepEqual(reply.sources.map((source: Json) => source.id), ['S1']);
+
+    const markdown = new FakeGemini((_params, call) => (call === 1 ? callReply('consultar_chamados', { quantidade: 1 }) : textReply('## Resumo\n**Situação:** aguardando [S1].\n- __Próximo passo:__ aguardar a TI.')));
+    use(markdown);
+    const plain = (await ask(maria, 'E o resumo do meu pedido?')).body.reply;
+    assert.equal(plain.answer, 'Resumo\nSituação: aguardando [S1].\n- Próximo passo: aguardar a TI.');
   });
 
   it('stops after 3 tool rounds and answers as a labeled demonstration', async () => {
@@ -306,7 +312,7 @@ describe('failures fall back to an identified demonstration', () => {
       assert.deepEqual([reply.mode, reply.provider, reply.model, reply.demoReason], ['demo', null, null, reason]);
       assert.match(reply.notice, notice);
       assert.match(reply.notice, /sem IA/);
-      assert.equal(gemini.calls.length, 1, 'no retries');
+      assert.equal(gemini.calls.length, reason === 'MODEL_BUSY' ? 2 : 1, 'one retry only for an overload, none otherwise');
       assert.ok(!result.raw.includes(KEY));
     });
   }
@@ -317,6 +323,13 @@ describe('failures fall back to an identified demonstration', () => {
       const reply = (await ask(paulo, `Resposta estranha ${reason}?`)).body.reply;
       assert.deepEqual([reply.mode, reply.demoReason], ['demo', reason]);
     }
+  });
+
+  it('an answer cut by the size limit says so instead of ending mid-sentence', async () => {
+    use(new FakeGemini(() => ({ ...textReply('As resoluções aumentaram de 6 para 7, ou 16,'), candidates: [{ content: { role: 'model', parts: [{ text: 'As resoluções aumentaram de 6 para 7, ou 16,' }] }, finishReason: 'MAX_TOKENS' }] })));
+    const reply = (await ask(paulo, 'Resumo longo, por favor')).body.reply;
+    assert.equal(reply.mode, 'ai');
+    assert.match(reply.answer, /ou 16,…\n\n\(Resposta interrompida pelo limite de tamanho\./);
   });
 
   it('the demonstration answer to a greeting lists nothing', async () => {
@@ -347,20 +360,20 @@ describe('Gemini through the real SDK (fake fetch, no network)', () => {
     assert.equal(calls.length, 2);
     assert.match(calls[0].url, new RegExp(`/models/${MODEL}:generateContent`));
     assert.ok(calls.every((call) => !call.url.includes(KEY) && call.headers.get('x-goog-api-key') === KEY));
-    assert.deepEqual(calls[0].body.tools[0].functionDeclarations.map((d: Json) => d.name), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque']);
+    assert.deepEqual(calls[0].body.tools[0].functionDeclarations.map((d: Json) => d.name), ['buscar_artigos', 'consultar_chamados', 'detalhar_chamado', 'problemas_conhecidos', 'consultar_estoque', 'estoque_critico', 'categorias_recorrentes']);
     assert.doesNotMatch(JSON.stringify(calls[0].body.tools), /googleSearch|codeExecution/);
     const sent = calls[1].body.contents as Json[];
     assert.equal(sent.at(-2)!.parts[0].thoughtSignature, 'signature-consultar_estoque');
     assert.match(JSON.stringify(sent.at(-1)!.parts[0].functionResponse.response), /Disponíveis para entrega: 4/);
   });
 
-  it('does not retry a 429 or a 503 (each failed question costs one request at most)', async () => {
+  it('never retries a 429 and retries an overload (503) only once', async () => {
     for (const status of [429, 503]) {
       const { calls, fn } = fakeFetch([{ error: { code: status, message: 'busy', status: 'RESOURCE_EXHAUSTED' } }], status);
       setAssistantProviderForTests(geminiProvider({ apiKey: KEY, model: MODEL, fetch: fn }));
       const reply = (await ask(carlos, `Teclados disponíveis? (${status})`)).body.reply;
       assert.equal(reply.mode, 'demo');
-      assert.equal(calls.length, 1);
+      assert.equal(calls.length, status === 429 ? 1 : 2);
     }
   });
 });

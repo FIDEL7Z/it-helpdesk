@@ -8,8 +8,8 @@ import { getErrorMessage } from '../utils/errors'
 
 const SUGGESTIONS: Record<UserRole, string[]> = {
   solicitante: ['Oi! O que você consegue fazer?', 'Meu computador está lento', 'Qual o status do meu último chamado?'],
-  ti: ['Tem teclado no estoque?', 'Quais chamados estão sem responsável?', 'Como orientar alguém sem acesso ao e-mail?'],
-  gestor: ['Qual departamento consumiu mais periféricos?', 'Como está a carga da equipe?', 'Como está a qualidade do atendimento neste mês?'],
+  ti: ['Tem teclado no estoque?', 'O que está abaixo do estoque mínimo?', 'Quais assuntos mais se repetiram nesta semana?'],
+  gestor: ['Analise a produtividade da minha equipe, compare com a semana passada e diga o que merece atenção.', 'Quais departamentos consumiram mais equipamentos nesta semana?', 'Quem resolveu mais chamados e quem está com mais pendentes?'],
 }
 
 const KIND_LABELS: Record<AssistantReply['sources'][number]['kind'], string> = {

@@ -1,4 +1,4 @@
-import { ApiError, GoogleGenAI, type Content, type GenerateContentParameters, type GenerateContentResponse, type Part } from '@google/genai';
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel, type Content, type GenerateContentParameters, type GenerateContentResponse, type Part } from '@google/genai';
 import { AssistantUnavailable, type AssistantProvider, type ConverseInput, type ConverseOutput } from './providers';
 import { conversationRules } from './prompt';
 
@@ -20,12 +20,15 @@ export const GEMINI_LIMITS = Object.freeze({
    */
   timeoutMs: 50_000,
   totalMs: 100_000,
-  // Includes the model's thinking tokens (Flash thinks more by default); answers stay short.
-  maxOutputTokens: 2_048,
+  // Includes the model's thinking tokens; analyses of several tools need room for both.
+  maxOutputTokens: 4_096,
   /** Rounds in which the model may ask for tools before it must answer (so at most 4 model calls). */
   maxToolRounds: 3,
-  maxCallsPerRound: 3,
+  // A composite question (productivity + comparison + attention) asks for 3 analyses at once.
+  maxCallsPerRound: 4,
   maxAnswerChars: 4_000,
+  /** Wait before the single retry of an overloaded call (500, 502, 503, 504). */
+  overloadRetryDelayMs: 1_500,
   temperature: 0.3,
 });
 
@@ -82,25 +85,38 @@ export function geminiProvider({ apiKey, model, client, fetch }: GeminiOptions):
     let version: string | null = null;
 
     for (let round = 0; ; round += 1) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) throw new AssistantUnavailable('timeout');
+      if (deadline - Date.now() <= 0) throw new AssistantUnavailable('timeout');
+      const generate = () => gemini.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: conversationRules(profile),
+          temperature: GEMINI_LIMITS.temperature,
+          maxOutputTokens: GEMINI_LIMITS.maxOutputTokens,
+          ...(tools.length && { tools: [{ functionDeclarations: tools }] }),
+          // Gemini 3 models think at a medium level by default: low is faster and leaves room to answer.
+          ...(model.startsWith('gemini-3') && { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+          abortSignal: AbortSignal.timeout(Math.min(GEMINI_LIMITS.timeoutMs, Math.max(1, deadline - Date.now()))),
+        },
+      });
       let response: GenerateContentResponse;
       try {
-        response = await gemini.models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction: conversationRules(profile),
-            temperature: GEMINI_LIMITS.temperature,
-            maxOutputTokens: GEMINI_LIMITS.maxOutputTokens,
-            ...(tools.length && { tools: [{ functionDeclarations: tools }] }),
-            abortSignal: AbortSignal.timeout(Math.min(GEMINI_LIMITS.timeoutMs, remaining)),
-          },
-        });
+        response = await generate();
       } catch (error) {
         // The HTTP status only: never the message, which may echo request details.
         if (error instanceof ApiError) console.error(`[assistant] gemini answered HTTP ${error.status}`);
-        throw new AssistantUnavailable(classifyGeminiError(error));
+        // One more try only for a momentary overload (no answer was produced), if time allows.
+        // Quota and rate limits (429) are never retried, and the model is never switched.
+        if (classifyGeminiError(error) !== 'MODEL_BUSY' || deadline - Date.now() < GEMINI_LIMITS.overloadRetryDelayMs + 5_000) {
+          throw new AssistantUnavailable(classifyGeminiError(error));
+        }
+        await new Promise((resolve) => setTimeout(resolve, GEMINI_LIMITS.overloadRetryDelayMs));
+        try {
+          response = await generate();
+        } catch (retryError) {
+          if (retryError instanceof ApiError) console.error(`[assistant] gemini answered HTTP ${retryError.status} again`);
+          throw new AssistantUnavailable(classifyGeminiError(retryError));
+        }
       }
 
       const usage = response.usageMetadata;
@@ -130,8 +146,13 @@ export function geminiProvider({ apiKey, model, client, fetch }: GeminiOptions):
         continue;
       }
 
-      const answer = answerText(response);
-      if (!answer) throw new AssistantUnavailable('EMPTY_ANSWER');
+      const text = answerText(response);
+      if (!text) throw new AssistantUnavailable('EMPTY_ANSWER');
+      // Never let a cut answer pass for a complete one.
+      const cut = response.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS;
+      const answer = cut ? `${text}…
+
+(Resposta interrompida pelo limite de tamanho. Peça um resumo ou uma parte de cada vez.)` : text;
       return {
         answer: answer.slice(0, GEMINI_LIMITS.maxAnswerChars),
         model: version ?? model,

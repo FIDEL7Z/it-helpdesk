@@ -174,6 +174,10 @@ function checkCitations(text: string, sources: AssistantSource[]): { answer: str
   const known = new Map(sources.map((source) => [source.id, source]));
   const answer = text
     .replace(/<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/gi, '')
+    // The panel shows plain text: Markdown emphasis and headings would show as symbols.
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
     .replace(/\[(S\d{1,2}(?:\s*[,;]\s*S\d{1,2})*)\]/g, (_marker, list: string) =>
       list.split(/\s*[,;]\s*/).filter((id) => known.has(id)).map((id) => `[${id}]`).join(''))
     .replace(/[ \t]{2,}/g, ' ')

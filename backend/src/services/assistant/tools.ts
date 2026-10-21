@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import { can } from '../../auth/permissions';
 import { HttpError } from '../../errors/http-error';
-import type { TicketEventType, TicketStatus } from '../../models/ticket.model';
+import { TICKET_CATEGORIES, TICKET_PRIORITIES, type TicketEventType, type TicketStatus } from '../../models/ticket.model';
 import type { PublicUser } from '../../models/user.model';
 import { normalizeForSearch } from '../article.service';
-import type { ManagerFilters } from '../manager.service';
 import { getTicket, listTickets, type TicketSummaryView } from '../ticket.service';
+import { attentionPoints, comparePeriods, consumptionByDepartment, criticalStock, recurringCategories, teamProductivity } from './analytics';
+import { PERIOD_NAMES, PERIOD_SCHEMA, periodArgs, periodFrom, resolveNamedPeriod, type ResolvedPeriod } from './periods';
 import {
-  SOURCE_LIMITS, STATUS, SUBJECT, articles, clip, consumption, date, incidents, keywords, management,
-  seesManagerView, singular, stock, type AssistantSource, type Draft,
+  SOURCE_LIMITS, STATUS, SUBJECT, articles, clip, date, incidents, keywords,
+  seesManagerView, singular, stock, type AssistantSource, type Draft, type SourceKind,
 } from './sources';
 
 /*
@@ -16,6 +17,10 @@ import {
  * person's role allows; every call is checked again here (role, then strict arguments) and runs the
  * same services as the pages, with the person from the JWT. Arguments never carry identity: a
  * userId, role or department sent by the model is rejected. Nothing here changes data.
+ *
+ * Two kinds of result: records (articles, tickets, stock), returned as short numbered sources; and
+ * analyses (productivity, comparisons, attention points, consumption), returned as structured numbers
+ * computed by the backend (analytics.ts) under one numbered source the answer can cite.
  */
 
 export interface ToolDeclaration {
@@ -23,6 +28,13 @@ export interface ToolDeclaration {
   description: string;
   parametersJsonSchema: Record<string, unknown>;
 }
+
+/** A computed analysis: one citable source and the numbers behind it. */
+interface Analysis {
+  source: { kind: SourceKind; title: string; link: string };
+  data: Record<string, unknown>;
+}
+type ToolResult = Draft[] | Analysis | { error: string };
 
 interface AssistantTool<Args> {
   name: string;
@@ -32,10 +44,9 @@ interface AssistantTool<Args> {
   description(actor: PublicUser): string;
   parameters: Record<string, unknown>;
   args: z.ZodType<Args>;
-  run(actor: PublicUser, args: Args): Promise<Draft[]>;
+  run(actor: PublicUser, args: Args): Promise<ToolResult>;
 }
 
-const PERIODS = { hoje: 'today', semana: 'week', mes: 'month', ano: 'year' } as const satisfies Record<string, ManagerFilters['period']>;
 const SITUATIONS = { aguardando: 'aberto', em_atendimento: 'em_andamento', resolvido: 'resolvido' } as const satisfies Record<string, TicketStatus>;
 const EVENTS: Record<TicketEventType, string> = {
   created: 'aberto', updated: 'editado', status_changed: 'situação alterada', reopened: 'reaberto', assigned: 'responsável definido',
@@ -43,9 +54,8 @@ const EVENTS: Record<TicketEventType, string> = {
 };
 
 const term = z.string().trim().min(2).max(80);
-const periodArg = z.enum(['hoje', 'semana', 'mes', 'ano']).default('mes');
-const PERIOD_SCHEMA = { type: 'string', enum: Object.keys(PERIODS), description: 'Período: hoje, semana, mes (padrão) ou ano.' };
 const TERM_SCHEMA = (what: string) => ({ type: 'object', properties: { termo: { type: 'string', description: what } }, required: ['termo'] });
+const PERIOD_ONLY = { type: 'object', properties: PERIOD_SCHEMA };
 
 /** Words to search with: content words of the term, or the term itself in the singular. */
 const searchWords = (text: string) => {
@@ -70,6 +80,12 @@ function ticketDraft(ticket: TicketSummaryView, actor: PublicUser): Draft {
   return { kind: 'ticket', title: `${own ? 'Seu pedido' : 'Chamado'} #${ticketNumber(ticket.id)}: ${ticket.title}`, text: `${facts.join('. ')}.`, link: `/tickets/${ticket.id}` };
 }
 
+/** Runs an analysis for a period taken from the arguments (or the fallback name). */
+async function forPeriod(args: z.infer<z.ZodObject<typeof periodArgs>>, fallback: (typeof PERIOD_NAMES)[number], run: (period: ResolvedPeriod) => Promise<Analysis>): Promise<ToolResult> {
+  const period = periodFrom(args, fallback);
+  return 'error' in period ? period : run(period);
+}
+
 const tools = [
   {
     name: 'buscar_artigos',
@@ -86,21 +102,36 @@ const tools = [
     allowed: () => true,
     description: (actor) => requesterView(actor)
       ? 'Lista os pedidos de suporte da própria pessoa, do mais recente para o mais antigo, com situação, responsável e datas. Use para "meus pedidos", "meu último chamado" e afins.'
-      : 'Lista chamados que a pessoa pode ver na fila da equipe, do mais recente para o mais antigo, com situação, responsável e datas.',
+      : 'Lista chamados da fila que a pessoa pode ver, do mais recente para o mais antigo, com situação, responsável e datas. Filtra por situação, prioridade, assunto e responsável ("eu" ou "sem_responsavel").',
     parameters: {
       type: 'object',
       properties: {
         busca: { type: 'string', description: 'Palavra do título, opcional (ex.: "teclado").' },
         situacao: { type: 'string', enum: Object.keys(SITUATIONS), description: 'Filtra pela situação, opcional.' },
+        prioridade: { type: 'string', enum: [...TICKET_PRIORITIES], description: 'Filtra pela prioridade, opcional.' },
+        categoria: { type: 'string', enum: [...TICKET_CATEGORIES], description: 'Filtra pelo assunto, opcional.' },
+        responsavel: { type: 'string', enum: ['eu', 'sem_responsavel'], description: 'Equipe de TI: só os meus, ou só os sem responsável.' },
         quantidade: { type: 'integer', minimum: 1, maximum: 5, description: 'Quantos chamados, de 1 a 5 (padrão 3).' },
       },
     },
-    args: z.strictObject({ busca: term.optional(), situacao: z.enum(['aguardando', 'em_atendimento', 'resolvido']).optional(), quantidade: z.number().int().min(1).max(5).default(3) }),
-    run: async (actor, { busca, situacao, quantidade }) => {
-      const { tickets } = await listTickets({ page: 1, limit: quantidade, sort: 'newest', ...(busca && { search: busca }), ...(situacao && { status: SITUATIONS[situacao] }) }, actor);
+    args: z.strictObject({
+      busca: term.optional(),
+      situacao: z.enum(['aguardando', 'em_atendimento', 'resolvido']).optional(),
+      prioridade: z.enum(TICKET_PRIORITIES).optional(),
+      categoria: z.enum(TICKET_CATEGORIES).optional(),
+      responsavel: z.enum(['eu', 'sem_responsavel']).optional(),
+      quantidade: z.number().int().min(1).max(5).default(3),
+    }),
+    run: async (actor, { busca, situacao, prioridade, categoria, responsavel, quantidade }) => {
+      const { tickets } = await listTickets({
+        page: 1, limit: quantidade, sort: 'newest',
+        ...(busca && { search: busca }), ...(situacao && { status: SITUATIONS[situacao] }),
+        ...(prioridade && { priority: prioridade }), ...(categoria && { category: categoria }),
+        ...(responsavel && !requesterView(actor) && { assignee: responsavel === 'eu' ? 'me' : 'none' }),
+      }, actor);
       return tickets.map((ticket) => ticketDraft(ticket, actor));
     },
-  } satisfies AssistantTool<{ busca?: string; situacao?: keyof typeof SITUATIONS; quantidade: number }>,
+  } satisfies AssistantTool<{ busca?: string; situacao?: keyof typeof SITUATIONS; prioridade?: (typeof TICKET_PRIORITIES)[number]; categoria?: (typeof TICKET_CATEGORIES)[number]; responsavel?: 'eu' | 'sem_responsavel'; quantidade: number }>,
   {
     name: 'detalhar_chamado',
     label: 'Detalhe do chamado',
@@ -137,29 +168,84 @@ const tools = [
     name: 'consultar_estoque',
     label: 'Estoque',
     allowed: (actor) => can(actor.role, 'inventory:read'),
-    description: () => 'Consulta o saldo de materiais e equipamentos do estoque (disponíveis para entrega, reservados, com defeito, mínimo) ou a situação dos equipamentos com patrimônio.',
+    description: () => 'Consulta o saldo de um material ou equipamento do estoque (disponíveis para entrega, reservados, com defeito, mínimo) ou a situação dos equipamentos com patrimônio.',
     parameters: TERM_SCHEMA('Material ou equipamento, por exemplo "teclado" ou "notebook".'),
     args: z.strictObject({ termo: term }),
     run: (_actor, { termo }) => stock(searchWords(termo)),
   } satisfies AssistantTool<{ termo: string }>,
   {
+    name: 'estoque_critico',
+    label: 'Estoque crítico',
+    allowed: (actor) => can(actor.role, 'inventory:read'),
+    description: () => 'Lista os produtos que estão abaixo do estoque mínimo agora.',
+    parameters: { type: 'object', properties: {} },
+    args: z.strictObject({}),
+    run: async () => ({ source: { kind: 'stock', title: 'Estoque abaixo do mínimo', link: '/inventory' }, data: await criticalStock() }),
+  } satisfies AssistantTool<Record<string, never>>,
+  {
+    name: 'categorias_recorrentes',
+    label: 'Assuntos recorrentes',
+    allowed: (actor) => can(actor.role, 'tickets:view-all'),
+    description: () => 'Conta os chamados abertos no período por assunto (hardware, rede, acesso...), com quantos ainda estão pendentes, para achar problemas recorrentes.',
+    parameters: PERIOD_ONLY,
+    args: z.strictObject(periodArgs),
+    run: (actor, args) => forPeriod(args, 'ultimos_7_dias', async (period) => ({
+      source: { kind: 'metric', title: `Chamados por assunto (${period.label})`, link: '/tickets' },
+      data: await recurringCategories(actor, period),
+    })),
+  } satisfies AssistantTool<z.infer<z.ZodObject<typeof periodArgs>>>,
+  {
+    name: 'produtividade_equipe',
+    label: 'Produtividade da equipe',
+    allowed: seesManagerView,
+    description: () => 'Analisa o período: chamados abertos, resoluções comprovadas e reaberturas; por pessoa da equipe, as resoluções no período e a fila de agora (pendentes, em andamento, alta prioridade); equilíbrio de carga e qualidade (confirmações, contestações, notas).',
+    parameters: PERIOD_ONLY,
+    args: z.strictObject(periodArgs),
+    run: (_actor, args) => forPeriod(args, 'ultimos_7_dias', async (period) => ({
+      source: { kind: 'metric', title: `Produtividade da equipe (${period.label})`, link: '/manager' },
+      data: await teamProductivity(period),
+    })),
+  } satisfies AssistantTool<z.infer<z.ZodObject<typeof periodArgs>>>,
+  {
+    name: 'comparar_periodos',
+    label: 'Comparação de períodos',
+    allowed: seesManagerView,
+    description: () => 'Compara dois períodos (padrão: últimos 7 dias contra os 7 anteriores): chamados abertos, resoluções, reaberturas, resoluções por pessoa, chamados por assunto, confirmações, contestações e material entregue, com a diferença e o percentual já calculados.',
+    parameters: {
+      type: 'object',
+      properties: {
+        atual: { type: 'string', enum: [...PERIOD_NAMES], description: 'Período mais recente (padrão ultimos_7_dias).' },
+        anterior: { type: 'string', enum: [...PERIOD_NAMES], description: 'Período de comparação (padrão 7_dias_anteriores; use ontem para comparar com hoje).' },
+      },
+    },
+    args: z.strictObject({ atual: z.enum(PERIOD_NAMES).default('ultimos_7_dias'), anterior: z.enum(PERIOD_NAMES).default('7_dias_anteriores') }),
+    run: async (_actor, { atual, anterior }) => {
+      const current = resolveNamedPeriod(atual);
+      const previous = resolveNamedPeriod(anterior);
+      return { source: { kind: 'metric', title: `Comparação: ${current.label} x ${previous.label}`, link: '/manager' }, data: await comparePeriods(current, previous) };
+    },
+  } satisfies AssistantTool<{ atual: (typeof PERIOD_NAMES)[number]; anterior: (typeof PERIOD_NAMES)[number] }>,
+  {
+    name: 'pontos_de_atencao',
+    label: 'Pontos de atenção',
+    allowed: seesManagerView,
+    description: () => 'O que merece atenção da gestão agora: alta prioridade sem responsável, pendentes antigos ou sem movimentação, os mais antigos, pendências e aberturas por assunto, carga desigual, contestações e estoque abaixo do mínimo.',
+    parameters: { type: 'object', properties: {} },
+    args: z.strictObject({}),
+    run: async () => ({ source: { kind: 'metric', title: 'Pontos de atenção da operação', link: '/manager' }, data: await attentionPoints() }),
+  } satisfies AssistantTool<Record<string, never>>,
+  {
     name: 'consumo_por_departamento',
     label: 'Consumo por departamento',
     allowed: (actor) => can(actor.role, 'inventory:insights'),
-    description: () => 'Consumo de materiais entregues por departamento no período, os materiais mais entregues e o que está abaixo do estoque mínimo (dados operacionais).',
-    parameters: { type: 'object', properties: { periodo: PERIOD_SCHEMA } },
-    args: z.strictObject({ periodo: periodArg }),
-    run: (_actor, { periodo }) => consumption(PERIODS[periodo]),
-  } satisfies AssistantTool<{ periodo: keyof typeof PERIODS }>,
-  {
-    name: 'indicadores_atendimento',
-    label: 'Indicadores de atendimento',
-    allowed: seesManagerView,
-    description: () => 'Indicadores da gestão: chamados pendentes e sem responsável, carga e resoluções por pessoa da equipe e qualidade (confirmações, contestações, avaliações) no período.',
-    parameters: { type: 'object', properties: { periodo: PERIOD_SCHEMA } },
-    args: z.strictObject({ periodo: periodArg }),
-    run: (_actor, { periodo }) => management(PERIODS[periodo]),
-  } satisfies AssistantTool<{ periodo: keyof typeof PERIODS }>,
+    description: () => 'Material entregue no período por departamento, com os produtos de cada um, os mais entregues e o que está abaixo do estoque mínimo (dados operacionais).',
+    parameters: PERIOD_ONLY,
+    args: z.strictObject(periodArgs),
+    run: (_actor, args) => forPeriod(args, 'este_mes', async (period) => ({
+      source: { kind: 'metric', title: `Consumo por departamento (${period.label})`, link: '/manager' },
+      data: await consumptionByDepartment(period),
+    })),
+  } satisfies AssistantTool<z.infer<z.ZodObject<typeof periodArgs>>>,
 ] as const;
 
 type AnyTool = AssistantTool<any>;
@@ -190,9 +276,12 @@ export class SourceCollector {
   }
 }
 
+/** Largest analysis handed to the model; the analyses are bounded well below it. */
+const MAX_ANALYSIS_CHARS = 10_000;
+
 /**
  * Runs one tool call for the authenticated person. Returns what the model may read: numbered
- * sources, "nothing found", or an error it must explain. Never throws for a refused call.
+ * sources, an analysis, "nothing found", or an error it must explain. Never throws for a refused call.
  */
 export async function runTool(actor: PublicUser, name: string, rawArgs: unknown, collector: SourceCollector): Promise<Record<string, unknown>> {
   const tool = TOOLS.find((candidate) => candidate.name === name);
@@ -203,14 +292,21 @@ export async function runTool(actor: PublicUser, name: string, rawArgs: unknown,
   const parsed = tool.args.safeParse(rawArgs ?? {});
   if (!parsed.success) return { erro: 'Argumentos inválidos para esta consulta.' };
   collector.used.add(tool.name);
-  let drafts: Draft[];
+  let result: ToolResult;
   try {
-    drafts = await tool.run(actor, parsed.data);
+    result = await tool.run(actor, parsed.data);
   } catch {
     console.error(`[assistant] tool ${tool.name} failed`);
     return { erro: 'A consulta falhou. Diga que não foi possível consultar agora.' };
   }
-  const found = drafts.slice(0, 5).map((draft) => collector.add(draft)).filter((source): source is AssistantSource => source !== null);
+  if ('error' in result) return { erro: result.error };
+  if (!Array.isArray(result)) {
+    const json = JSON.stringify(result.data);
+    if (json.length > MAX_ANALYSIS_CHARS) return { erro: 'Resultado grande demais. Peça um período menor.' };
+    const source = collector.add({ ...result.source, text: result.source.title });
+    return { ...(source && { fonte: source.id }), titulo: result.source.title, dados: result.data };
+  }
+  const found = result.slice(0, 5).map((draft) => collector.add(draft)).filter((source): source is AssistantSource => source !== null);
   if (!found.length) return { resultado: 'Nenhum registro encontrado.' };
   return { fontes: found.map(({ id, kind, title, text }) => ({ id, tipo: kind, titulo: title, dados: text })) };
 }

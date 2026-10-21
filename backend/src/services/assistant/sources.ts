@@ -29,8 +29,8 @@ export interface AssistantSource {
 
 export const SOURCE_LIMITS = Object.freeze({ count: 8, titleChars: 120, textChars: 1_200, totalChars: 6_000 });
 
-const STATUS: Record<TicketStatus, string> = { aberto: 'aguardando atendimento', em_andamento: 'em atendimento', resolvido: 'resolvido' };
-const SUBJECT: Record<TicketCategory, string> = {
+export const STATUS: Record<TicketStatus, string> = { aberto: 'aguardando atendimento', em_andamento: 'em atendimento', resolvido: 'resolvido' };
+export const SUBJECT: Record<TicketCategory, string> = {
   hardware: 'Computador ou equipamento', software: 'Programas e aplicativos', rede: 'Internet e conexão', acesso: 'Contas e permissões', outros: 'Outro problema',
 };
 const STOP = new Set([
@@ -62,23 +62,24 @@ const STOCK_WORDS = /estoque|saldo|disponiv|teclad|mouse|monitor|notebook|headse
 const CONSUMPTION_WORDS = /consumo|consumid|setor|departament|entreg|repor|reposic|minimo|defeit/;
 const MANAGEMENT_WORDS = /equipe|analista|carga|qualidade|avaliac|confirm|contest|indicador|backlog|pendent|metric|resolvid|resoluc|desempenho|produtiv|fila/;
 const TICKET_WORDS = /chamado|pedido|status|andamento|aberto|resolvid|meu|minha/;
+const INCIDENT_WORDS = /incidente|problema conhecido|fora do ar|instabil|todo mundo|geral/;
 const HOW_TO_REQUEST = /solicit|\babrir\b|\babro\b|\bpedir\b|\bpeco\b|suporte|registr|novo (pedido|chamado)/;
 
-function period(normalized: string): ManagerFilters['period'] {
+export function period(normalized: string): ManagerFilters['period'] {
   if (/\bhoje\b/.test(normalized)) return 'today';
   if (/semana/.test(normalized)) return 'week';
   if (/\bano\b|anual/.test(normalized)) return 'year';
   return 'month';
 }
-const PERIOD_LABEL: Record<ManagerFilters['period'], string> = { today: 'hoje', week: 'nesta semana', month: 'neste mês', year: 'neste ano' };
+export const PERIOD_LABEL: Record<ManagerFilters['period'], string> = { today: 'hoje', week: 'nesta semana', month: 'neste mês', year: 'neste ano' };
 
-const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
-const date = (value: Date | null | undefined) => (value ? new Date(value).toLocaleDateString('pt-BR') : 'sem data');
+export const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+export const date = (value: Date | null | undefined) => (value ? new Date(value).toLocaleDateString('pt-BR') : 'sem data');
 
-type Draft = Omit<AssistantSource, 'id'>;
+export type Draft = Omit<AssistantSource, 'id'>;
 
 /** How to open a request, in the words of the screens the person sees (NewTicketPage, TicketsPage). */
-function guide(actor: PublicUser): Draft {
+export function guide(actor: PublicUser): Draft {
   if (!can(actor.role, 'tickets:view-all')) {
     return {
       kind: 'guide',
@@ -95,7 +96,7 @@ function guide(actor: PublicUser): Draft {
   };
 }
 
-async function articles(actor: PublicUser, words: string[]): Promise<Draft[]> {
+export async function articles(actor: PublicUser, words: string[]): Promise<Draft[]> {
   const hits = new Map<string, { score: number; title: string }>();
   for (const word of words) {
     const { articles: found } = await searchPublished({ q: word, page: 1, limit: 3 });
@@ -115,7 +116,7 @@ async function articles(actor: PublicUser, words: string[]): Promise<Draft[]> {
   return drafts;
 }
 
-async function incidents(actor: PublicUser, words: string[]): Promise<Draft[]> {
+export async function incidents(actor: PublicUser, words: string[]): Promise<Draft[]> {
   const active = await listActive(actor);
   const scored = active.map((incident) => {
     const haystack = normalizeForSearch(`${incident.title} ${incident.publicMessage}`);
@@ -129,10 +130,12 @@ async function incidents(actor: PublicUser, words: string[]): Promise<Draft[]> {
   }));
 }
 
-async function tickets(actor: PublicUser, words: string[], asked: boolean): Promise<Draft[]> {
+export async function tickets(actor: PublicUser, words: string[], asked: boolean): Promise<Draft[]> {
+  // Nothing to look for and no question about tickets (a greeting, general advice): no tickets.
+  if (!words.length && !asked) return [];
   // Same scope as the ticket list: a requester sees only their own tickets.
   const own = !can(actor.role, 'tickets:view-all');
-  const searches = words.length ? words.slice(0, 3) : [undefined];
+  const searches = words.length ? words : [undefined];
   const seen = new Map<string, Draft>();
   for (const search of searches) {
     const { tickets: found } = await listTickets({ page: 1, limit: 3, ...(search && { search }) }, actor);
@@ -157,7 +160,7 @@ async function tickets(actor: PublicUser, words: string[], asked: boolean): Prom
   return [...seen.values()].slice(0, 3);
 }
 
-async function stock(words: string[]): Promise<Draft[]> {
+export async function stock(words: string[]): Promise<Draft[]> {
   const seen = new Map<string, Draft>();
   for (const word of words) {
     const { products } = await listProducts({ q: word, status: 'active', page: 1, limit: 3 });
@@ -172,8 +175,7 @@ async function stock(words: string[]): Promise<Draft[]> {
   return [...seen.values()].slice(0, 3);
 }
 
-async function consumption(normalized: string): Promise<Draft[]> {
-  const chosen = period(normalized);
+export async function consumption(chosen: ManagerFilters['period']): Promise<Draft[]> {
   const insights = await inventoryInsights({ period: chosen, dataOrigin: 'operational' });
   const list = (rows: { name: string; units: number }[]) => rows.length ? rows.map((row) => `${row.name}: ${row.units}`).join('; ') : 'nenhum registro';
   return [
@@ -182,8 +184,7 @@ async function consumption(normalized: string): Promise<Draft[]> {
   ];
 }
 
-async function management(normalized: string): Promise<Draft[]> {
-  const chosen = period(normalized);
+export async function management(chosen: ManagerFilters['period']): Promise<Draft[]> {
   const dashboard = await getManagerDashboard({ period: chosen, dataOrigin: 'operational' });
   const team = dashboard.team.slice(0, 6).map((member) => `${member.name}: ${member.pending} pendentes (${member.highPriority} de alta), ${member.resolutions} resoluções no período`).join('; ');
   const quality = dashboard.quality;
@@ -196,20 +197,21 @@ async function management(normalized: string): Promise<Draft[]> {
 }
 
 /** The /dashboard/manager route is gestor-only (requireRole); the assistant follows the same rule. */
-const seesManagerView = (actor: PublicUser) => actor.role === 'gestor';
+export const seesManagerView = (actor: PublicUser) => actor.role === 'gestor';
 
 export async function gatherSources(actor: PublicUser, question: string): Promise<AssistantSource[]> {
   const normalized = normalizeForSearch(question);
   const words = keywords(question);
   const drafts: Draft[] = [];
 
-  if (seesManagerView(actor) && mentions(normalized, MANAGEMENT_WORDS)) drafts.push(...await management(normalized));
-  if (can(actor.role, 'inventory:insights') && mentions(normalized, CONSUMPTION_WORDS)) drafts.push(...await consumption(normalized));
+  if (seesManagerView(actor) && mentions(normalized, MANAGEMENT_WORDS)) drafts.push(...await management(period(normalized)));
+  if (can(actor.role, 'inventory:insights') && mentions(normalized, CONSUMPTION_WORDS)) drafts.push(...await consumption(period(normalized)));
   if (can(actor.role, 'inventory:read') && mentions(normalized, STOCK_WORDS)) drafts.push(...await stock(words));
-  if (can(actor.role, 'incidents:follow')) drafts.push(...await incidents(actor, words));
+  if (can(actor.role, 'incidents:follow') && (words.length || mentions(normalized, INCIDENT_WORDS))) drafts.push(...await incidents(actor, words));
   if (mentions(normalized, HOW_TO_REQUEST)) drafts.push(guide(actor));
   if (can(actor.role, 'kb:read')) drafts.push(...await articles(actor, words));
-  drafts.push(...await tickets(actor, words, mentions(normalized, TICKET_WORDS)));
+  // The latest tickets only when the question is about tickets and nothing more relevant was found.
+  drafts.push(...await tickets(actor, words, mentions(normalized, TICKET_WORDS) && drafts.length === 0));
 
   // Fit the answer service limits: at most 8 sources, short texts, 6,000 characters in total.
   const sources: AssistantSource[] = [];

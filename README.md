@@ -130,17 +130,28 @@ O e-mail sai sempre do endereço `GMAIL_USER`, com o nome dado em `EMAIL_FROM`. 
 
 ## Assistente
 
-O botão **Assistente**, no canto inferior direito de todas as páginas, abre um chat consultivo. Ele responde com o que a pessoa já pode ver no sistema e cita as fontes, com links para as páginas que as mostram.
+O botão **Assistente**, no canto inferior direito de todas as páginas, abre um chat. Com o Gemini (`AI_PROVIDER=gemini`), é um assistente conversacional: responde saudações e dúvidas gerais de TI diretamente, entende perguntas de acompanhamento ("e se continuar travando?") e, quando precisa de dados deste Helpdesk, decide sozinho consultar ferramentas **somente de leitura** que o backend libera para o perfil. As respostas com dados do sistema citam as fontes, com links para as páginas que as mostram, e dizem o que foi consultado ("Consultou no sistema: Chamados").
 
-| Perfil | O que o assistente pode usar |
-|---|---|
-| Solicitante | Artigos publicados, problemas conhecidos e os próprios pedidos |
-| TI | Os mesmos, os chamados da equipe e o saldo do estoque |
-| Gestor | Tudo acima, mais consumo de materiais por setor, situação dos chamados, equipe e qualidade |
+| Ferramenta | O que consulta | Solicitante | TI | Gestor |
+|---|---|---|---|---|
+| `buscar_artigos` | Artigos publicados da Central de ajuda | ✓ | ✓ | ✓ |
+| `consultar_chamados` | Os próprios pedidos (solicitante) ou a fila que a pessoa vê, com situação e responsável | ✓ | ✓ | ✓ |
+| `detalhar_chamado` | Situação, descrição e últimos passos de um chamado que a pessoa pode ver | ✓ | ✓ | ✓ |
+| `problemas_conhecidos` | Incidentes publicados pela TI | ✓ | ✓ | ✓ |
+| `consultar_estoque` | Saldo de materiais e situação do patrimônio | | ✓ | ✓ |
+| `estoque_critico` | Produtos abaixo do estoque mínimo | | ✓ | ✓ |
+| `categorias_recorrentes` | Chamados abertos no período por assunto, e quantos seguem pendentes | | ✓ | ✓ |
+| `produtividade_equipe` | Resoluções por pessoa no período, fila de agora, carga e qualidade | | | ✓ |
+| `comparar_periodos` | Dois períodos lado a lado, com diferença e percentual já calculados | | | ✓ |
+| `pontos_de_atencao` | Alta prioridade sem responsável, pendentes antigos ou parados, assuntos recorrentes, estoque crítico | | | ✓ |
+| `consumo_por_departamento` | Material entregue por departamento e produto no período | | | ✓ |
 
-- **Quem decide é o backend.** Ele confere o JWT e as permissões e lê os dados pelos mesmos serviços das páginas. A pergunta só escolhe o que é relevante entre o que já é permitido; pedir no chat não libera nada.
-- **A IA não acessa o banco.** O modelo recebe apenas a pergunta e até 8 trechos curtos já autorizados. Citações de fontes que não foram enviadas são descartadas, inclusive dentro de colchetes agrupados como `[S1, S9]`.
-- **É só consultivo.** O assistente não altera chamados nem estoque; ele aponta a página onde a ação é feita. A conversa não é guardada.
+- **Quem decide é o backend.** O modelo só recebe as declarações das ferramentas que o perfil pode usar. Cada chamada é conferida de novo (perfil e argumentos, com validação estrita) e roda os mesmos serviços das páginas, com a pessoa do JWT; argumentos como `userId`, perfil ou departamento são recusados. São no máximo 3 rodadas de consulta por pergunta.
+- **A IA não acessa o banco.** Ela recebe apenas o resultado das ferramentas, tratado como dado e nunca como instrução. Citações de fontes que não vieram das ferramentas são descartadas, inclusive dentro de colchetes agrupados como `[S1, S9]`.
+- **Memória curta.** O histórico da conversa (até 6 perguntas e respostas, por 30 minutos sem uso) fica na memória do backend, ligado à pessoa; o navegador manda só o id da conversa, então ninguém injeta mensagens falsas nem lê a conversa de outra conta. **Nova conversa** recomeça. Nada disso vai para o banco.
+- **É só consultivo.** O assistente não abre, altera, resolve nem exclui chamados e não movimenta estoque; ele explica onde fazer cada ação.
+
+Com o Cloudflare e no modo demonstrativo, o funcionamento é o anterior: o backend escolhe até 8 fontes pelas palavras da pergunta e o provedor responde com base nelas.
 
 ### Quem responde
 
@@ -148,14 +159,14 @@ O provedor é escolhido só no backend, por `AI_PROVIDER` em `backend/.env`; o n
 
 | `AI_PROVIDER` | Quem responde | Precisa de |
 |---|---|---|
-| `demo` (padrão) | Modo demonstrativo, sem IA: lista as informações encontradas para o perfil | Nada |
-| `gemini` | Google Gemini API, chamada diretamente pelo backend | Uma chave própria do Google AI Studio (`GEMINI_API_KEY`) |
+| `demo` (padrão) | Modo demonstrativo, sem IA: lista as informações encontradas para o perfil, sem conversar | Nada |
+| `gemini` | Assistente conversacional com o Google Gemini API, chamado diretamente pelo backend, com as ferramentas de leitura | Uma chave própria do Google AI Studio (`GEMINI_API_KEY`) |
 | `cloudflare` | O Worker do Cloudflare Workers AI em `ai-worker/` | Endereço e chave temporária do dono (`AI_WORKER_URL`, `AI_WORKER_KEY`) |
 
 Sem `AI_PROVIDER`, instalações antigas continuam iguais: usa o Cloudflare se `AI_WORKER_*` estiver preenchido; senão, o modo demonstrativo. Uma configuração incompleta ou inválida nunca impede o backend de subir: o assistente responde em modo demonstrativo e avisa que a IA escolhida não está configurada.
 
 Cada resposta mostra a origem logo abaixo do texto:
-- **"Resposta da IA · Gemini · gemini-3.5-flash-lite"** (ou "Cloudflare Workers AI" e o modelo dele);
+- **"Resposta da IA · Gemini · gemini-3.6-flash"** (ou "Cloudflare Workers AI" e o modelo dele);
 - **"Modo demonstrativo · sem IA"**, quando nenhuma IA está configurada;
 - **"Modo demonstrativo · IA indisponível"**, quando a IA configurada não respondeu. O aviso diz o motivo: desligada, cota diária gratuita esgotada, chave inválida ou vencida, muitas perguntas no minuto ou ao mesmo tempo, ou indisponível. O resto do Helpdesk segue normal.
 
@@ -179,8 +190,8 @@ Uma resposta demonstrativa nunca aparece como se fosse da IA.
    GEMINI_MODEL=
    ```
 
-   `GEMINI_MODEL` vazio usa `gemini-3.5-flash-lite`.
-3. Salve o arquivo. Com `npm run dev`, o backend reinicia sozinho quando o `.env` muda, e o terminal mostra `[assistant] provider: gemini (gemini-3.5-flash-lite)` (nunca a chave).
+   `GEMINI_MODEL` vazio usa `gemini-3.6-flash`.
+3. Salve o arquivo. Com `npm run dev`, o backend reinicia sozinho quando o `.env` muda, e o terminal mostra `[assistant] provider: gemini (gemini-3.6-flash)` (nunca a chave).
 
 **Se o navegador continuar em "Modo demonstrativo":** veja a linha `[assistant]` no terminal do backend.
 - `provider: demo (AI_PROVIDER is not set: a GEMINI_API_KEY alone does not turn Gemini on...)`: falta `AI_PROVIDER=gemini`. A chave sozinha não liga a IA, de propósito.
@@ -196,18 +207,19 @@ O banco de desenvolvimento pode ter contas e chamados reais, e no nível gratuit
 npm run dev:ai-sandbox
 ```
 
-O sandbox recria o banco separado `it-helpdesk-ai-sandbox` só com dados fictícios e sobe o backend nele, na mesma porta, com `AI_PROVIDER=gemini` (a chave vem do `backend/.env`). O frontend (`npm run dev`) não muda. Entre com as contas fictícias do sandbox, que o terminal lista: `bia@sandbox.local` (solicitante), `caio@sandbox.local` (TI) e `lara@sandbox.local` (gestor), todas com a senha `Sandbox@2026`. Elas são diferentes das contas de demonstração dos seeds, porque os chamados destas contam como dados de demonstração, e o assistente lê os dados operacionais. Para voltar ao banco normal, pare o sandbox e rode `npm run dev`. `AI_PROVIDER=demo npm run dev:ai-sandbox` mostra o mesmo sandbox sem IA.
+O sandbox recria o banco separado `it-helpdesk-ai-sandbox` só com dados fictícios e sobe o backend nele, na mesma porta, com `AI_PROVIDER=gemini` (a chave vem do `backend/.env`). O frontend (`npm run dev`) não muda. Entre com as contas fictícias do sandbox, que o terminal lista: `bia@sandbox.local`, `davi@sandbox.local` e `eva@sandbox.local` (solicitantes), `caio@sandbox.local` e `rita@sandbox.local` (TI) e `lara@sandbox.local` (gestor), todas com a senha `Sandbox@2026`. Elas são diferentes das contas de demonstração dos seeds, porque os chamados destas contam como dados de demonstração, e o assistente lê os dados operacionais. Para voltar ao banco normal, pare o sandbox e rode `npm run dev`. `AI_PROVIDER=demo npm run dev:ai-sandbox` mostra o mesmo sandbox sem IA.
 
-**Modelo:** `gemini-3.5-flash-lite`. É estável, tem camada gratuita, não tem data de desligamento (consulta de 20/10/2026) e é o indicado pelo Google para respostas rápidas e de alto volume; usa raciocínio mínimo por padrão. Configuração:
-- temperatura 0,2;
-- até 1.024 tokens de saída, contando o raciocínio;
-- 20 segundos de limite por chamada;
-- resposta em JSON (`answer`, `citedSources`), validada de novo no backend;
-- nenhuma ferramenta: sem busca do Google, execução de código ou chamada de funções.
+**Modelo:** `gemini-3.6-flash`. É estável, tem camada gratuita e chamada de funções (consulta de 20/10/2026). Foi escolhido pela latência medida com o plano gratuito sob carga: cerca de 2 s por resposta, contra 20 a 40 s do `gemini-3.5-flash-lite`, que continua disponível em `GEMINI_MODEL`. (O `gemini-2.5-flash-lite` não está mais disponível para chaves novas.) Configuração:
+- temperatura 0,3;
+- raciocínio em nível baixo nos modelos Gemini 3 e até 4.096 tokens de saída por chamada; se a resposta for cortada pelo limite, ela diz isso;
+- até 4 chamadas ao modelo por pergunta (3 rodadas de ferramentas e a resposta);
+- 50 segundos por chamada e 100 segundos por pergunta, porque o plano gratuito sob carga já levou de 20 a 40 s por chamada; o painel avisa quando a espera passa de 8 segundos;
+- só as ferramentas de leitura do perfil: sem busca do Google, execução de código ou outras funções;
+- uma única nova tentativa, depois de 1,5 s, só quando o Google responde sobrecarga (500, 502, 503, 504); limites e cota (429) nunca são repetidos, e o modelo nunca é trocado sozinho.
 
-**Cotas.** O Google não publica números fixos para a camada gratuita: os limites são por projeto e aparecem no AI Studio (Rate limits e Usage). A cota diária zera à meia-noite do horário do Pacífico. Quando ela acaba, a resposta vira demonstração com o aviso de cota. Sem faturamento ativo, não há cobrança. Confirmado neste projeto em 20/10/2026: o modelo está na camada gratuita da tabela de preços e as chamadas reais funcionaram no Free tier. Os números de limite do projeto não são expostos pela API e ficam no AI Studio.
+**Cotas.** O Google não publica números fixos para a camada gratuita: os limites são por projeto e aparecem no AI Studio (Rate limits e Usage). A cota diária zera à meia-noite do horário do Pacífico. Quando ela acaba, a resposta vira demonstração com o aviso de cota. Sem faturamento ativo, não há cobrança. Confirmado neste projeto em 20/10/2026, pela resposta 429 do próprio Google: **20 requisições por dia, por modelo**, no `gemini-3.6-flash` (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). Cada pergunta usa de 1 a 4 requisições, então cabem de 6 a 10 perguntas por dia; outro modelo (`GEMINI_MODEL`) tem a sua própria cota.
 
-**Privacidade no Free.** Na camada gratuita, o Google pode usar perguntas e respostas para melhorar os seus produtos, e revisores humanos podem lê-las (termos da Gemini API, "Unpaid Services"). O que sai do backend é a pergunta e até 8 trechos já autorizados: títulos e situação de chamados, nome do responsável, saldo de estoque e indicadores. Nunca saem e-mails, senhas, tokens nem a descrição dos chamados. Mesmo assim:
+**Privacidade no Free.** Na camada gratuita, o Google pode usar perguntas e respostas para melhorar os seus produtos, e revisores humanos podem lê-las (termos da Gemini API, "Unpaid Services"). O que sai do backend é a conversa da sessão (perguntas e respostas recentes) e o resultado das ferramentas consultadas: títulos, situação e responsável de chamados, a descrição e os últimos passos de um chamado detalhado, saldo de estoque e indicadores. Nunca saem e-mails, senhas nem tokens. Mesmo assim:
 - use **só dados fictícios**, como os dos seeds de demonstração;
 - dados reais da empresa exigiriam o nível pago (em que os dados não são usados para melhorar produtos) e uma decisão explícita de privacidade.
 
@@ -219,9 +231,37 @@ O sandbox recria o banco separado `it-helpdesk-ai-sandbox` só com dados fictíc
 
 Também confere a chave inválida e o modelo inexistente, que o Google recusa sem gastar cota. Para cada resposta, mostra origem, latência, tokens e fontes. Os testes automatizados (`npm test`) usam o Gemini simulado e não gastam cota.
 
-**Medição real (20/10/2026, Free tier, dados fictícios):** 8 respostas, mediana de 1,4 s (de 1,1 a 3,5 s), cerca de 510 tokens por resposta (460 de entrada e 55 de saída).
+**Medição real da conversa (20/10/2026, Free tier, sandbox fictício, no navegador):**
+- **Comportamento:** o Gemini respondeu a saudação sem consultar nada; deu o passo a passo para o computador lento; entendeu "E se continuar travando?"; consultou a ferramenta de chamados para "Qual o status do meu último chamado?", citando a fonte ("resolvido por Caio Mendes, aguardando a sua confirmação"); e disse ao solicitante que o perfil dele não tem acesso a indicadores nem a consumo.
+- **Latência:** o plano gratuito estava sob carga. O `gemini-3.5-flash-lite` levou de 26 a 56 s por resposta e falhou uma vez (HTTP 504). O `gemini-3.6-flash` respondeu em cerca de 2 s numa medição, mas também devolveu 503 em outras. Nas falhas, o painel mostrou "Modo demonstrativo · IA indisponível" com o motivo. Mais cedo no mesmo dia, sem carga, cada resposta levava de 1 a 3 s.
+- **Consumo:** com ferramentas, cada pergunta usa de 1 a 4 chamadas ao modelo, e cada chamada reenvia a conversa. O backend soma os tokens de todas as chamadas em `usage`.
+- **Análises (mesmo dia, `gemini-3.6-flash`):** a pergunta composta do gestor consultou produtividade, comparação e pontos de atenção numa só rodada e respondeu em 5,9 s com os números certos (7 resoluções contra 6, +16,7%; Caio 5, Rita 2; 1 chamado de alta prioridade sem responsável; 2 produtos abaixo do mínimo), separando pontos de atenção e sugestões. O solicitante recebeu orientação em 2,4 s e o andamento do chamado, com fonte, em 5,4 s. Depois de cerca de 20 requisições no dia, o Google respondeu 429 (cota diária), e o painel mostrou o aviso de cota.
 
 **Revogar a chave:** em AI Studio → API keys, exclua a chave (ou no Google Cloud Console → APIs e serviços → Credenciais). **Voltar ao modo demonstrativo:** `AI_PROVIDER=demo` (ou apague a linha) e salve o `.env`.
+
+### Análises para a gestão
+
+O gestor pode fazer perguntas livres, como "Analise a produtividade da minha equipe, compare com a semana passada e diga o que merece atenção". O Gemini escolhe as análises necessárias (às vezes várias de uma vez), o backend calcula os números e o Gemini explica o resultado: resposta direta, comparações, pontos de atenção (fatos) e sugestões, com o período e as fontes.
+
+- **Os cálculos são do backend** (`services/assistant/analytics.ts`), feitos com os mesmos serviços da visão gerencial (`getManagerDashboard`, `inventoryInsights`) e só com dados operacionais. Diferenças e percentuais já chegam prontos ao modelo; sem base de comparação (zero no período anterior), o percentual vem vazio e a resposta diz isso.
+- **Períodos** são resolvidos no fuso da aplicação (`APP_TIMEZONE`), com início e fim explícitos e datas no texto: hoje, ontem, últimos 7 dias ("esta semana"), os 7 dias anteriores ("semana passada"), este mês, mês passado, este ano, ou duas datas (até 366 dias). O modelo só escolhe um nome ou duas datas; filtros livres, operadores e consultas do banco são recusados.
+- **Leitura honesta:** a quantidade de chamados não é tratada como medida completa do trabalho de ninguém, e variações são apresentadas como o que mudou, não por que mudou.
+- **Para a TI:** estoque abaixo do mínimo e assuntos recorrentes da fila, além da consulta de chamados por situação, prioridade, assunto e responsável ("os meus", "sem responsável").
+
+### Roteiro para a gravação
+
+Com o sandbox no ar (`npm run dev:ai-sandbox` em `backend/` e `npm run dev` em `frontend/`), entre em http://localhost:5173. Os dados fictícios são sempre os mesmos, contados a partir do dia de hoje:
+- **Equipe:** Caio Mendes e Rita Alves (TI).
+- **Resoluções:** 7 nos últimos 7 dias (Caio 5, Rita 2) e 6 nos 7 anteriores (Caio 3, Rita 3).
+- **Fila:** 6 pendentes, 3 sem responsável, 1 de alta prioridade, 1 parado há 6 dias.
+- **Consumo:** 11 unidades nesta semana contra 7 na anterior; Financeiro lidera.
+- **Estoque:** 2 produtos abaixo do mínimo.
+
+1. `bia@sandbox.local`: "Meu computador está travando muito, o que eu faço?" e depois "Qual o andamento do meu chamado do teclado?".
+2. `caio@sandbox.local`: "Tem teclado no estoque?".
+3. `lara@sandbox.local`: "Analise a produtividade da minha equipe, compare com a semana passada e diga o que merece atenção." e depois "Quais departamentos consumiram mais equipamentos nesta semana?".
+
+Senha de todas: `Sandbox@2026`. O roteiro usa cerca de 10 das 20 requisições diárias gratuitas do modelo; ensaie com `AI_PROVIDER=demo npm run dev:ai-sandbox`, que não gasta cota.
 
 ### Cloudflare Workers AI
 
@@ -247,7 +287,7 @@ Como o serviço é publicado e protegido: [ai-worker/README.md](ai-worker/README
 
 Não é preciso chave para rodar o projeto: com `AI_PROVIDER=demo` (o padrão do `.env.example`), o assistente funciona nos três perfis, com as mesmas permissões e fontes, e cada resposta aparece como "Modo demonstrativo · sem IA". Para ver a IA real, a forma mais simples é criar a sua própria chave gratuita do Gemini (passos acima). Nenhuma chave do desenvolvedor está no repositório.
 
-Perguntas de exemplo: "Meu teclado parou de funcionar. Como solicito ajuda?" (solicitante), "Temos teclados disponíveis no estoque?" (TI) e "Quais departamentos consumiram mais periféricos neste mês?" (gestor).
+Para conversar com o Gemini: "Olá", "Meu computador está lento" e depois "E se continuar travando?", "Qual o status do meu último chamado?" (solicitante), "Tem teclado no estoque?" (TI) e "Qual departamento consumiu mais periféricos?" (gestor).
 
 ## Os três perfis
 
@@ -339,7 +379,7 @@ Para ver os dados de exemplo, mude **`DEMO_MODE=true`** em `backend/.env` e **`V
 | `MAILPIT_URL` | Opcional; padrão `http://127.0.0.1:8025`; API do Mailpit |
 | `RESEND_API_KEY` | Obrigatória só com `EMAIL_PROVIDER=resend` e e-mail ligado; nunca versionar |
 | `AI_PROVIDER` | Quem responde no [assistente](#assistente): `demo` (padrão, sem IA), `gemini` ou `cloudflare`. Configuração incompleta ou inválida cai no modo demonstrativo, com aviso, sem impedir o backend de subir |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Com `AI_PROVIDER=gemini`: a sua chave do Google AI Studio (só o backend lê) e o modelo (vazio usa `gemini-3.5-flash-lite`) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Com `AI_PROVIDER=gemini`: a sua chave do Google AI Studio (só o backend lê) e o modelo (vazio usa `gemini-3.6-flash`) |
 | `AI_WORKER_URL` / `AI_WORKER_KEY` | Com `AI_PROVIDER=cloudflare`: endereço do Worker e a chave temporária recebida do dono |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Obrigatórias só com `EMAIL_PROVIDER=gmail` e e-mail ligado; conta Gmail remetente e sua senha de app; nunca versionar |
 | `EMAIL_RECIPIENT_ALLOWLIST` | Opcional; fora de produção, o Resend e o Gmail só enviam para estes endereços ou `@domínios`, separados por vírgula |

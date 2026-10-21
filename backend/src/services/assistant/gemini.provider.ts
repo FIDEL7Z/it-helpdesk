@@ -1,45 +1,41 @@
-import { ApiError, GoogleGenAI, type GenerateContentParameters, type GenerateContentResponse } from '@google/genai';
-import { z } from 'zod';
-import { AssistantUnavailable, type AssistantProvider } from './providers';
-import { systemRules, userPrompt } from './prompt';
-import { SOURCE_LIMITS } from './sources';
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel, type Content, type GenerateContentParameters, type GenerateContentResponse, type Part } from '@google/genai';
+import { AssistantUnavailable, type AssistantProvider, type ConverseInput, type ConverseOutput } from './providers';
+import { conversationRules } from './prompt';
 
 /*
- * Google Gemini API, called directly by the backend. The model receives only the question and the
- * sources this backend already authorized; it has no tools (no search, no code execution, no
- * function calling) and no way to reach the database. The key stays in the backend environment:
- * it is never logged, never returned and never sent to the browser.
+ * Google Gemini API, called directly by the backend, as a conversational assistant. The model talks
+ * freely and, when it needs data from this Helpdesk, asks for one of the read-only tools the backend
+ * declared for this person's role; the backend checks and runs it (tools.ts) and hands back only the
+ * result. No other tool is enabled: no Google Search, no code execution. The key stays in the
+ * backend environment: it is never logged, never returned and never sent to the browser.
  */
 
-export const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+// Stable, free tier and function calling. Under load on 2026-10-20 it answered in about 2 s while
+// gemini-3.5-flash-lite took 20 to 40 s; GEMINI_MODEL can still pick the Flash-Lite.
+export const GEMINI_DEFAULT_MODEL = 'gemini-3.6-flash';
 export const GEMINI_LIMITS = Object.freeze({
-  timeoutMs: 20_000,
-  // Includes the model's thinking tokens; answers are short (a few paragraphs at most).
-  maxOutputTokens: 1_024,
-  // Question (500) + fenced sources (6,000 + titles and markers): anything larger is a bug upstream.
-  maxPromptChars: 8_000,
+  /**
+   * Each model call; the whole question (tool rounds included) has totalMs. The free tier answers in
+   * 1 to 3 s when idle but took 20 to 40 s per call under load (measured on 2026-10-20).
+   */
+  timeoutMs: 50_000,
+  totalMs: 100_000,
+  // Includes the model's thinking tokens; analyses of several tools need room for both.
+  maxOutputTokens: 4_096,
+  /** Rounds in which the model may ask for tools before it must answer (so at most 4 model calls). */
+  maxToolRounds: 3,
+  // A composite question (productivity + comparison + attention) asks for 3 analyses at once.
+  maxCallsPerRound: 4,
   maxAnswerChars: 4_000,
+  /** Wait before the single retry of an overloaded call (500, 502, 503, 504). */
+  overloadRetryDelayMs: 1_500,
+  temperature: 0.3,
 });
 
 /** Only the call this provider uses, so tests can pass a fake client and spend no quota. */
 export interface GeminiClient {
   models: { generateContent(params: GenerateContentParameters): Promise<GenerateContentResponse> };
 }
-
-const ANSWER_SCHEMA = {
-  type: 'object',
-  properties: {
-    answer: { type: 'string', description: 'Resposta em português do Brasil, com os marcadores [S1], [S2]... das fontes usadas.' },
-    citedSources: { type: 'array', items: { type: 'string' }, description: 'Identificadores das fontes citadas, por exemplo ["S1"].' },
-  },
-  required: ['answer', 'citedSources'],
-} as const;
-
-// The structured output is validated again here: a schema hint is not a guarantee.
-const answerShape = z.object({
-  answer: z.string().trim().min(1).max(GEMINI_LIMITS.maxAnswerChars),
-  citedSources: z.array(z.string().regex(/^S\d{1,2}$/)).max(SOURCE_LIMITS.count),
-});
 
 /** Maps Gemini failures to the reasons the assistant already explains; provider text is never echoed. */
 export function classifyGeminiError(error: unknown): string {
@@ -48,11 +44,18 @@ export function classifyGeminiError(error: unknown): string {
     if (error.status === 429) return /per ?day|PerDay|daily/i.test(text) ? 'QUOTA_EXCEEDED' : 'RATE_LIMITED';
     if (error.status === 401 || error.status === 403 || /API[_ ]KEY[_ ]INVALID|API key not valid|API key expired/i.test(text)) return 'UNAUTHORIZED';
     if (error.status === 404) return 'MODEL_UNAVAILABLE';
-    if (error.status === 503) return 'MODEL_BUSY';
+    // Overloaded or timed out on Google's side (the free tier under load answers 500, 503 or 504).
+    if ([500, 502, 503, 504].includes(error.status)) return 'MODEL_BUSY';
     return 'MODEL_UNAVAILABLE';
   }
   if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) return 'timeout';
   return 'network';
+}
+
+/** The answer text, without the model's thoughts. */
+function answerText(response: GenerateContentResponse): string {
+  const parts: Part[] = response.candidates?.[0]?.content?.parts ?? [];
+  return parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('').trim();
 }
 
 interface GeminiOptions {
@@ -69,49 +72,94 @@ export function geminiProvider({ apiKey, model, client, fetch }: GeminiOptions):
     apiKey,
     httpOptions: { timeout: GEMINI_LIMITS.timeoutMs, retryOptions: { attempts: 1 }, ...(fetch && { fetch }) },
   });
-  return {
-    mode: 'ai',
-    name: 'gemini',
-    async answer({ question, profile, sources }) {
-      const prompt = userPrompt(question, sources);
-      if (prompt.length > GEMINI_LIMITS.maxPromptChars) throw new AssistantUnavailable('TOO_LARGE');
 
+  async function converse({ profile, history, message, tools, runTool }: ConverseInput): Promise<ConverseOutput> {
+    const contents: Content[] = [
+      ...history.map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
+      { role: 'user', parts: [{ text: message }] },
+    ];
+    const deadline = Date.now() + GEMINI_LIMITS.totalMs;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let reported = false;
+    let version: string | null = null;
+
+    for (let round = 0; ; round += 1) {
+      if (deadline - Date.now() <= 0) throw new AssistantUnavailable('timeout');
+      const generate = () => gemini.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: conversationRules(profile),
+          temperature: GEMINI_LIMITS.temperature,
+          maxOutputTokens: GEMINI_LIMITS.maxOutputTokens,
+          ...(tools.length && { tools: [{ functionDeclarations: tools }] }),
+          // Gemini 3 models think at a medium level by default: low is faster and leaves room to answer.
+          ...(model.startsWith('gemini-3') && { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+          abortSignal: AbortSignal.timeout(Math.min(GEMINI_LIMITS.timeoutMs, Math.max(1, deadline - Date.now()))),
+        },
+      });
       let response: GenerateContentResponse;
       try {
-        response = await gemini.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: {
-            systemInstruction: systemRules(profile),
-            temperature: 0.2,
-            maxOutputTokens: GEMINI_LIMITS.maxOutputTokens,
-            responseMimeType: 'application/json',
-            responseJsonSchema: ANSWER_SCHEMA,
-            abortSignal: AbortSignal.timeout(GEMINI_LIMITS.timeoutMs),
-          },
-        });
+        response = await generate();
       } catch (error) {
-        throw new AssistantUnavailable(classifyGeminiError(error));
-      }
-
-      if (response.promptFeedback?.blockReason) throw new AssistantUnavailable('BLOCKED');
-      let parsed: z.infer<typeof answerShape>;
-      try {
-        const text = response.text;
-        if (!text?.trim()) throw new AssistantUnavailable('EMPTY_ANSWER');
-        parsed = answerShape.parse(JSON.parse(text));
-      } catch (error) {
-        throw error instanceof AssistantUnavailable ? error : new AssistantUnavailable('MALFORMED_RESPONSE');
+        // The HTTP status only: never the message, which may echo request details.
+        if (error instanceof ApiError) console.error(`[assistant] gemini answered HTTP ${error.status}`);
+        // One more try only for a momentary overload (no answer was produced), if time allows.
+        // Quota and rate limits (429) are never retried, and the model is never switched.
+        if (classifyGeminiError(error) !== 'MODEL_BUSY' || deadline - Date.now() < GEMINI_LIMITS.overloadRetryDelayMs + 5_000) {
+          throw new AssistantUnavailable(classifyGeminiError(error));
+        }
+        await new Promise((resolve) => setTimeout(resolve, GEMINI_LIMITS.overloadRetryDelayMs));
+        try {
+          response = await generate();
+        } catch (retryError) {
+          if (retryError instanceof ApiError) console.error(`[assistant] gemini answered HTTP ${retryError.status} again`);
+          throw new AssistantUnavailable(classifyGeminiError(retryError));
+        }
       }
 
       const usage = response.usageMetadata;
-      const output = usage ? (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) : null;
+      if (usage) {
+        reported = true;
+        inputTokens += usage.promptTokenCount ?? 0;
+        outputTokens += (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0);
+      }
+      version = response.modelVersion ?? version;
+      if (response.promptFeedback?.blockReason) throw new AssistantUnavailable('BLOCKED');
+
+      const calls = response.functionCalls ?? [];
+      if (calls.length) {
+        if (round >= GEMINI_LIMITS.maxToolRounds) throw new AssistantUnavailable('TOOL_LIMIT');
+        const content = response.candidates?.[0]?.content;
+        if (!content) throw new AssistantUnavailable('MALFORMED_RESPONSE');
+        // The model's turn goes back as it came: Gemini needs its thought signatures with the calls.
+        contents.push(content);
+        const results: Part[] = [];
+        for (const [index, call] of calls.entries()) {
+          const response = index < GEMINI_LIMITS.maxCallsPerRound
+            ? await runTool(call.name ?? '', call.args ?? {})
+            : { erro: 'Limite de consultas por pergunta atingido.' };
+          results.push({ functionResponse: { ...(call.id && { id: call.id }), name: call.name, response } });
+        }
+        contents.push({ role: 'user', parts: results });
+        continue;
+      }
+
+      const text = answerText(response);
+      if (!text) throw new AssistantUnavailable('EMPTY_ANSWER');
+      // Never let a cut answer pass for a complete one.
+      const cut = response.candidates?.[0]?.finishReason === FinishReason.MAX_TOKENS;
+      const answer = cut ? `${text}…
+
+(Resposta interrompida pelo limite de tamanho. Peça um resumo ou uma parte de cada vez.)` : text;
       return {
-        answer: parsed.answer,
-        citedSources: parsed.citedSources,
-        model: response.modelVersion ?? model,
-        usage: usage ? { inputTokens: usage.promptTokenCount ?? null, outputTokens: output } : null,
+        answer: answer.slice(0, GEMINI_LIMITS.maxAnswerChars),
+        model: version ?? model,
+        usage: reported ? { inputTokens, outputTokens } : null,
       };
-    },
-  };
+    }
+  }
+
+  return { mode: 'ai', name: 'gemini', converse };
 }

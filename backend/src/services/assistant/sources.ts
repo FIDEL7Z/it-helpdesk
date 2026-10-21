@@ -135,7 +135,7 @@ export async function tickets(actor: PublicUser, words: string[], asked: boolean
   if (!words.length && !asked) return [];
   // Same scope as the ticket list: a requester sees only their own tickets.
   const own = !can(actor.role, 'tickets:view-all');
-  const searches = words.length ? words.slice(0, 3) : [undefined];
+  const searches = words.length ? words : [undefined];
   const seen = new Map<string, Draft>();
   for (const search of searches) {
     const { tickets: found } = await listTickets({ page: 1, limit: 3, ...(search && { search }) }, actor);
@@ -210,7 +210,8 @@ export async function gatherSources(actor: PublicUser, question: string): Promis
   if (can(actor.role, 'incidents:follow') && (words.length || mentions(normalized, INCIDENT_WORDS))) drafts.push(...await incidents(actor, words));
   if (mentions(normalized, HOW_TO_REQUEST)) drafts.push(guide(actor));
   if (can(actor.role, 'kb:read')) drafts.push(...await articles(actor, words));
-  drafts.push(...await tickets(actor, words, mentions(normalized, TICKET_WORDS)));
+  // The latest tickets only when the question is about tickets and nothing more relevant was found.
+  drafts.push(...await tickets(actor, words, mentions(normalized, TICKET_WORDS) && drafts.length === 0));
 
   // Fit the answer service limits: at most 8 sources, short texts, 6,000 characters in total.
   const sources: AssistantSource[] = [];

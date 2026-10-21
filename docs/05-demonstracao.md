@@ -160,17 +160,17 @@ No banco local avaliado, os cinco IDs são `6ac9715c1a2d1fec7dee10c3`, `6ac97180
 
 No E2E, o painel abre com o foco na pergunta, responde em modo demonstrativo com links internos e a etiqueta "Modo demonstrativo · sem IA", devolve o foco depois da resposta e fecha com Esc. O Worker tem testes próprios (`ai-worker`, `npm test`): chaves recusadas antes da inferência, configuração publicada desligada, erros de cota e de plano pago, fontes cercadas e tokens.
 
-`assistant-gemini.test.ts`, com o Gemini **simulado** (cliente falso ou o SDK real com `fetch` falso; nenhuma cota gasta):
-- os três perfis com as perguntas de teclado, estoque e consumo por setor, e os números das fontes iguais aos da API;
-- solicitante sem dados da gestão, sem estoque e sem pedido de outra pessoa;
-- citações inexistentes e agrupadas (`[S1, S9]`) conferidas uma a uma; HTML removido da resposta;
-- instrução escondida em artigo e em chamado fica dentro do bloco de dados;
-- sem ferramentas, temperatura baixa, saída limitada e em JSON; a chave só no cabeçalho, nunca na URL nem na resposta;
-- chave ausente, chave inválida, cota diária, limite por minuto, modelo inexistente ou sobrecarregado, timeout, rede, resposta malformada, vazia ou bloqueada: sempre demonstração com aviso próprio e uma única chamada (sem novas tentativas);
-- escolha e troca de provedor só pelo ambiente; uma pergunta por vez, sem repetir em 30 s, até 3 chamadas simultâneas;
+`assistant-conversation.test.ts`, com o Gemini **simulado** (cliente roteirizado ou o SDK real com `fetch` falso; nenhuma cota gasta):
+- saudação respondida direto, sem consultas nem fontes; perguntas de acompanhamento recebem o histórico, só da mesma pessoa; histórico limitado e sem as respostas que falharam;
+- ferramentas declaradas por perfil; "meu último chamado" consulta só os pedidos da pessoa e devolve ao modelo a chamada com a assinatura dele; estoque e consumo com os números da API;
+- o solicitante não alcança indicadores, consumo, estoque nem o chamado de outra pessoa, mesmo que o modelo peça ou que a pessoa diga ser da gestão; argumentos com `userId` são recusados;
+- instruções escondidas em artigo e chamado ficam nos dados, nunca nas regras; citações inexistentes e agrupadas (`[S1, S9]`) conferidas uma a uma; HTML removido;
+- no máximo 3 rodadas de ferramentas; chave inválida, cota diária, limite por minuto, modelo inexistente, sobrecarregado ou lento, timeout, rede, resposta vazia ou bloqueada: sempre demonstração com aviso próprio e uma única chamada;
+- a demonstração de uma saudação não lista chamados;
+- escolha e troca de provedor só pelo ambiente; uma pergunta por vez, sem repetir em 30 s, até 3 perguntas com o modelo ao mesmo tempo;
 - nenhum arquivo do frontend menciona a chave.
 
-Com chamadas **reais** (fora do `npm test`): `npm run assistant:check`, num banco temporário com dados fictícios. Resultado de 20/10/2026 no Free tier: 8 de 8 respostas do Gemini e todas as verificações aprovadas |
+Com chamadas **reais** (fora do `npm test`): `npm run assistant:check`, num banco temporário com dados fictícios, e a conversa no navegador com `npm run dev:ai-sandbox`. Em 20/10/2026, no Free tier, o Gemini conversou e usou as ferramentas como esperado (saudação, acompanhamento, último chamado com fonte, acesso negado às métricas); sob carga do Google, parte das respostas caiu no modo demonstrativo identificado (veja a medição no [README](../README.md#gemini-google-ai-studio)) |
 | Notificações por e-mail | `notifications.test.ts`, com provedores simulados (nada sai da máquina):
 - registro, início, resolução e reabertura pela equipe entram na fila; atribuição, edição e as respostas do próprio solicitante, não;
 - entrega ligada ao pedido avisa o dono uma vez, e o destinatário nunca vem da requisição;
